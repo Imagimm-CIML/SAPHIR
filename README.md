@@ -27,8 +27,14 @@ Zip file containing the ROIs of the image defined with ImageJ.
 Use the first item of the menu "Choose your image" and click on the "Browse" button. Select the image you want to analyse in your documents. 
 
 #### Second step : select ROIs to remove
-Under the browse box, you can plot variables of the results or the intensity file and select ROIs with extreme values to remove them from the datas to analyse. 
-Select the points on the plot and click on the "Remove" button. The ROIs corresponding to these points will be removed from the intensity and result files and from the Roi set. 
+Under the browse box, you can plot variables of the results or the intensity file and select ROIs with extreme values to remove them from the datas to analyse. For choosing the variables to plot, use the select widget : 
+* if you select ONE variable, an histogram of this variable will be plotted with a bin width of 10. 
+* if you select TWO variables, a scatter plot will be displayed with the first selected variable in X and the second in Y. 
+
+Make a selection on the plot and click on the "Remove" button. 
+* for the histogram, the ROIs having the values selected for the plotted variable will be selected 
+* for the scatterplot, the ROIs corresponding to the points will be selected
+The selection will be removed from the intensity and result files and from the Roi set. 
 
 #### Third step : plot datas
 Use the second item of the menu : "Plot to Image". <br>
