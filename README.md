@@ -9,13 +9,13 @@ The image file to analyse must be in TIFF format. It can be up to 4 dimensions w
 #### DataFiles & ROIs
 The other necessary files are : intensity.txt and RoiSet.zip. These files must be in a repository in the same location as the image, this repository must be named "'filename of the image.tif'_out". 
 
-##### File intensity.txt 
+##### - File intensity.txt 
 File containing for each ROI its ID, its intensity on each channel of the image and values for other variables like area, roundness... 
 The columns must be separated with a tab, decimals with a ".". 
 The table must have column headers with unique column names. 
 
-#### File RoiSet.zip
-Zip file containing the ROIs of the image defined with ImageJ.
+##### - File RoiSet.zip
+Zip file containing the ROIs of the image defined with ImageJ. If the image has more than 1 slice, the ROIs of each slice must be named with the Z coordinate in their name. 
 
 ### Using the application 
 #### First step : upload the image you want to analyse 
