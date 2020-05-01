@@ -44,8 +44,13 @@ Selections on the plot :
 * Points of the plot can be selected (by clicking or brushing) and datas of the ROIs selected are printed in a table below. 
 * These datas can be downloaded in a csv file with the button "Download selected ROIs subtable". 
 
+Image : 
 The image is displayed on the left, channel and slice to display can be modified with the sliders. 
-ROIs selected on the plot are displayed on the image and the color of the mask can be modified. 
+ROIs selected on the plot are displayed on the image and the color of the mask correspond to cell type. 
+
+Cropped ROIs : 
+The ROIs selected on the plot can be displayed with the button "". Each time a new selection is made, you need to reload the viewer with the "" button. 
+The ROIs are displayed in the viewer in order of ROIs IDs. 
 
 ##### Part 2 : Image to plot 
 Use the third item of the menu : "Image to plot". <br> 
