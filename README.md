@@ -31,7 +31,8 @@ Make a selection on the plot and click on the "Remove" button.
 * for the scatterplot, the ROIs corresponding to the points will be selected
 The selection will be removed from the intensity and result files and from the Roi set. 
 
-#### Third step : plot datas
+#### Third step 
+##### Part 1 : Plot to Image
 Use the second item of the menu : "Plot to Image". <br>
 Zones of the plot : 
 * A plot representing for ROIs their intensities on different channels is displayed. The variables plotted in X and Y can be modified. 
@@ -43,6 +44,11 @@ Selections on the plot :
 * Points of the plot can be selected (by clicking or brushing) and datas of the ROIs selected are printed in a table below. 
 * These datas can be downloaded in a csv file with the button "Download selected ROIs subtable". 
 
-#### Fourth step : image datas
 The image is displayed on the left, channel and slice to display can be modified with the sliders. 
 ROIs selected on the plot are displayed on the image and the color of the mask can be modified. 
+
+##### Part 2 : Image to plot 
+Use the third item of the menu : "Image to plot". <br> 
+The image is displayed on the left with the ROIs you retained. You can choose channel and slice to display with sliders and the color with which the ROIs are displayed. <br> 
+
+You can select ROIs on the image (one click or selection) and check the datas on the ROIs selected. These datas can be plotted with the plot on the left. 
