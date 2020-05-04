@@ -12,10 +12,14 @@ The other necessary files are : intensity.txt and RoiSet.zip. These files must b
 ##### - File intensity.txt 
 File containing for each ROI its ID, its intensity on each channel of the image and values for other variables like area, roundness... 
 The columns must be separated with a tab, decimals with a ".". 
-The table must have column headers with unique column names. 
+The table must have column headers with unique column names. Columns names are requisites : 
+- the column containing the IDs must be named "ID"
+- the column containing the areas must be names "Cell area"
+- the columns containing the cell type must be named "Cell type"
+- if there is a 4th dimension with depth, the file must contain a column "Slice" which contain for each ROI the Slice in which it is. 
 
 ##### - File RoiSet.zip
-Zip file containing the ROIs of the image defined with ImageJ. If the image has more than 1 slice, the ROIs of each slice must be named with the Z coordinate in their name. 
+Zip file containing the ROIs of the image defined with ImageJ. 
 
 ### Using the application 
 #### First step : upload the image you want to analyse 
@@ -49,7 +53,7 @@ The image is displayed on the left, channel and slice to display can be modified
 ROIs selected on the plot are displayed on the image and the color of the mask correspond to cell type. 
 
 Cropped ROIs : 
-The ROIs selected on the plot can be displayed with the button "". Each time a new selection is made, you need to reload the viewer with the "" button. 
+The ROIs selected on the plot can be displayed with the button "Load ROIs". Each time a new selection is made, you need to reload the viewer with the "Load ROIs" button. 
 The ROIs are displayed in the viewer in order of ROIs IDs. 
 
 ##### Part 2 : Image to plot 
