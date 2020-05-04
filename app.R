@@ -1,6 +1,6 @@
 ## AVEC MENU CHOIX & CR0P & REMOVE
 # Installation of the necessary packages
-pkg <- c("shiny", "shinyFiles", "ggplot2", "stringr", "shinydashboard", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager")
+pkg <- c("shiny", "shinyFiles", "ggplot2", "stringr", "shinydashboard", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) {
   install.packages(new.pkg)
@@ -11,7 +11,7 @@ if (!"EBImage" %in% installed.packages()) {
   }
   BiocManager::install("EBImage")
 }
-
+library(shinyjs)
 library(shiny)
 library(shinyFiles)
 library(ggplot2)
@@ -21,6 +21,7 @@ library(shinycssloaders)
 library(ijtiff)
 library(RImageJROI)
 library(plotly)
+library(V8)
 # User interface 
 ui <- dashboardPage(
   ## Title of the page
@@ -38,40 +39,37 @@ ui <- dashboardPage(
   dashboardBody(
     ## Hide disabled elements
     tags$head(tags$style(HTML("input[type='search']:disabled {visibility:hidden}"))),
+    shinyjs::useShinyjs(),
+    shinyjs::extendShinyjs(text = "shinyjs.refresh = function() { location.reload(); }"),
     # FIRST ITEM : Choose image to analyse & select values to remove
     tabItems(
       tabItem(tabName= "image",
               # Image browser 
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
-                     title = "Select the image to analyse", 
+                     title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
-                     tags$br(),
                      shinyFilesButton("imgFile", "Choose Image", "Search", icon = icon("file-import"), multiple=FALSE),
                      verbatimTextOutput("imgPath"),
-                )
+                     tags$hr(),
+                     helpText("Select the file containing the datas to analyse. (Format .txt)"),
+                     radioButtons("sep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
+                     radioButtons("dec", label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
+                     checkboxInput("header", label = "Header", value = TRUE),
+                     shinyFilesButton("dataFile", "Choose Data file", "Search", icon = icon("file-import"), multiple=FALSE),
+                     verbatimTextOutput("dataPath"),
+                     tags$hr(),
+                     helpText("Select the zip file containing your ROIs."),
+                     shinyFilesButton("zipFile", "Choose ROIs .zip file", "Search", icon = icon("file-import"), multiple=FALSE),
+                     verbatimTextOutput("zipPath")
+                ),
               ),
-              fluidRow(
-                box(width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                    title = "Select data file",
-                    helpText("Select the file containing the datas to analyse. (Format .txt)"),
-                    tags$br(),
-                    shinyFilesButton("dataFile", "Choose Data file", "Search", icon = icon("file-import"), multiple=FALSE),
-                    verbatimTextOutput("dataPath"),
-                )
-              ),
-              fluidRow(
-                box(width=12, solidHeader = TRUE, status = "primary",collapsible = TRUE,
-                    title = "Select ROIs .zip file",
-                    helpText("Select the zip file containing your ROIs."),
-                    tags$br(),
-                    shinyFilesButton("zipFile", "Choose ROIs .zip file", "Search", icon = icon("file-import"), multiple=FALSE),
-                    verbatimTextOutput("zipPath")
-                )
-              ),
+              actionButton("refresh", "Reset"),
+              tags$br(),
+              tags$br(),
               # Selection of cell to remove  
               fluidRow(
-                box (width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,collapsed=TRUE,
+                box (width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,
                      title = "Select ROIs to use",
                      helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
                      uiOutput("variablesHisto"),
@@ -107,29 +105,29 @@ ui <- dashboardPage(
                 ),
                 # Second box : Image displayer
                 column (width=6,
-                        box( width=NULL, 
-                             title = "Image display", solidHeader= TRUE, status = "primary",
-                             helpText("Select channel and frame to display."),
-                             uiOutput("channel1"),
-                             uiOutput("frame1"),
-                             helpText("Select the color of the ROIs on the image."),
-                             tags$hr(),
-                             withSpinner(
-                               plotOutput("img_rois1")
-                             ),
-                             actionButton("go", "Load displayers"),
-                        ),
-                        tabBox (width=NULL, selected="ROIs",
-                                tabPanel("ROIs",
-                                         EBImage::displayOutput("list")
-                                ),
-                                tabPanel("Image", 
-                                         EBImage::displayOutput("zoomImg")
-                                )
-                                
-                        )
+                  box( width=NULL, 
+                       title = "Image display", solidHeader= TRUE, status = "primary",
+                       helpText("Select channel and frame to display."),
+                       uiOutput("channel1"),
+                       uiOutput("frame1"),
+                       helpText("Select the color of the ROIs on the image."),
+                       tags$hr(),
+                       withSpinner(
+                         plotOutput("img_rois1")
+                       ),
+                       actionButton("go", "Load displayers"),
+                  ),
+                  tabBox (width=NULL, selected="ROIs",
+                          tabPanel("ROIs",
+                                   EBImage::displayOutput("list")
+                                   ),
+                          tabPanel("Image", 
+                                   EBImage::displayOutput("zoomImg")
+                                   )
+                      
+                  )
                 )
-              )
+            )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -183,6 +181,10 @@ server <- function(input, output) {
     roots = roots
   )
   
+  observeEvent(input$refresh, {
+    shinyjs::js$refresh()
+  })
+  
   # Global reactive variable 
   global <- reactiveValues(imgPath = "", dataPath = "", data = NULL, img=NULL, zipPath="", zip=NULL, IDs="", colors=NULL, imgPNG=NULL)
   
@@ -197,10 +199,12 @@ server <- function(input, output) {
   
   observeEvent(eventExpr= input$dataFile, handlerExpr = {
     if (!"files" %in% names(input$dataFile)) return() 
+    separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
+    decimal <- switch (input$dec, "Point"=".", "Comma"=",")
     # Path to data
     global$dataPath <- parseFilePaths(roots, input$dataFile)[[4]]
     # Datas
-    global$data <- read.table(global$dataPath,header=TRUE, sep="\t")
+    global$data <- read.table(global$dataPath,header=input$header, sep=separator, dec=decimal)
   }, label = "files")
   
   observeEvent(eventExpr= input$zipFile, handlerExpr = {
