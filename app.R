@@ -43,7 +43,7 @@ ui <- dashboardPage(
       tabItem(tabName= "image",
               # Image browser 
               fluidRow(
-                box (width = 12, solidHeader=TRUE, status = "primary", 
+                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the image to analyse", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      tags$br(),
@@ -52,7 +52,7 @@ ui <- dashboardPage(
                 )
               ),
               fluidRow(
-                box(width = 12, solidHeader=TRUE, status="primary",
+                box(width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,
                     title = "Select data file",
                     helpText("Select the file containing the datas to analyse. (Format .txt)"),
                     tags$br(),
@@ -61,7 +61,7 @@ ui <- dashboardPage(
                 )
               ),
               fluidRow(
-                box(width=12, solidHeader = TRUE, status = "primary",
+                box(width=12, solidHeader = TRUE, status = "primary",collapsible = TRUE,
                     title = "Select ROIs .zip file",
                     helpText("Select the zip file containing your ROIs."),
                     tags$br(),
@@ -71,7 +71,7 @@ ui <- dashboardPage(
               ),
               # Selection of cell to remove  
               fluidRow(
-                box (width = 12, solidHeader=TRUE, status="primary",
+                box (width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,collapsed=TRUE,
                      title = "Select ROIs to use",
                      helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
                      uiOutput("variablesHisto"),
@@ -106,7 +106,8 @@ ui <- dashboardPage(
                      tableOutput("rois_plot_table1")
                 ),
                 # Second box : Image displayer
-                box( width = 6, 
+                column (width=6,
+                box( width=NULL, 
                      title = "Image display", solidHeader= TRUE, status = "primary",
                      helpText("Select channel and frame to display."),
                      uiOutput("channel1"),
@@ -116,10 +117,14 @@ ui <- dashboardPage(
                      withSpinner(
                        plotOutput("img_rois1")
                      ),
-                     actionButton("go", "Load ROIs"),
-                     EBImage::displayOutput("list")
+                ),
+                box (width=NULL,
+                    title = "ROIs display", solidHeader=TRUE, status="primary",
+                    actionButton("go", "Load ROIs"),
+                    EBImage::displayOutput("list")
                 )
-              )
+                )
+            )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
