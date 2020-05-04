@@ -67,7 +67,7 @@ ui <- dashboardPage(
                     tags$br(),
                     shinyFilesButton("zipFile", "Choose ROIs .zip file", "Search", icon = icon("file-import"), multiple=FALSE),
                     verbatimTextOutput("zipPath")
-                  )
+                )
               ),
               # Selection of cell to remove  
               fluidRow(
@@ -107,24 +107,29 @@ ui <- dashboardPage(
                 ),
                 # Second box : Image displayer
                 column (width=6,
-                box( width=NULL, 
-                     title = "Image display", solidHeader= TRUE, status = "primary",
-                     helpText("Select channel and frame to display."),
-                     uiOutput("channel1"),
-                     uiOutput("frame1"),
-                     helpText("Select the color of the ROIs on the image."),
-                     tags$hr(),
-                     withSpinner(
-                       plotOutput("img_rois1")
-                     ),
-                ),
-                box (width=NULL,
-                    title = "ROIs display", solidHeader=TRUE, status="primary",
-                    actionButton("go", "Load ROIs"),
-                    EBImage::displayOutput("list")
+                        box( width=NULL, 
+                             title = "Image display", solidHeader= TRUE, status = "primary",
+                             helpText("Select channel and frame to display."),
+                             uiOutput("channel1"),
+                             uiOutput("frame1"),
+                             helpText("Select the color of the ROIs on the image."),
+                             tags$hr(),
+                             withSpinner(
+                               plotOutput("img_rois1")
+                             ),
+                             actionButton("go", "Load displayers"),
+                        ),
+                        tabBox (width=NULL, selected="ROIs",
+                                tabPanel("ROIs",
+                                         EBImage::displayOutput("list")
+                                ),
+                                tabPanel("Image", 
+                                         EBImage::displayOutput("zoomImg")
+                                )
+                                
+                        )
                 )
-                )
-            )
+              )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -569,6 +574,10 @@ server <- function(input, output) {
     }
   })
   
+  output$zoomImg <- EBImage::renderDisplay({
+    req(input$go)
+    EBImage::display(global$imgPNG)
+  })
   
   ## MENU IMAGE TO PLOT
   # Path to image 
