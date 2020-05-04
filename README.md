@@ -22,6 +22,8 @@ The table must have column headers with unique column names. Columns names are r
 Zip file containing the ROIs of the image defined with ImageJ. 
 
 ### Using the application 
+To launch the app, you have to open the app.R file in RStudio and click on the "Run app" button on the right top corner. 
+
 #### First step : upload the image you want to analyse 
 Use the first item of the menu "Choose your image" and click on the "Browse" button. Select the image you want to analyse in your documents. 
 
