@@ -8,7 +8,8 @@ The image file to analyse must be in TIFF format. It can be up to 4 dimensions w
 
 #### Data File 
 File containing for each ROI its ID, its intensity on each channel of the image and values for other variables like area, roundness... 
-The columns must be separated with a tab, decimals with a ".". 
+You can choose the separator and the type of decimals in your file with the radioButtons. 
+If the first line of the file represent the names of the columns, check the "Header" button. 
 The table must have column headers with unique column names. Columns names are requisites : 
 - the column containing the IDs must be named "ID"
 - the column containing the areas must be names "Cell area"
