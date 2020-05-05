@@ -484,7 +484,7 @@ server <- function(input, output) {
     }
   })
   # Image PNG
-  observeEvent(eventExpr=input$go, 
+  observeEvent(eventExpr= {rois_plot1()},
                handlerExpr= {
                  out <- tempfile(fileext='.png')
                  png(out, width=dim(global$img)[1], height=dim(global$img)[2])
@@ -526,7 +526,7 @@ server <- function(input, output) {
                })
   # CROP ROIS
   output$list <- EBImage::renderDisplay({
-    req(input$go)
+    req(length(rois_plot1()) != 0)
     if (dim(global$img)[4]==1) {
       d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
       dim <- 2*d+1
@@ -550,8 +550,8 @@ server <- function(input, output) {
         if (xmax > dim(global$imgPNG)[1]) { 
           xmax <- dim(global$imgPNG)[1]
           xmin <- dim(global$imgPNG)[1] - dim +1}
-        cross <- imgPNG
-        cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="black", fill=FALSE, z=1)
+        cross <- global$imgPNG
+        cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
         prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
       }
       nbCell <- nrow(rois_plot_table1())
@@ -583,8 +583,8 @@ server <- function(input, output) {
               xmax <- dim(global$imgPNG)[1]
               xmin <- dim(global$imgPNG)[1] - dim +1
             }
-            cross <- imgPNG
-            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="black", fill=FALSE, z=1)
+            cross <- global$imgPNG
+            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
             prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
           }
         }
@@ -595,7 +595,7 @@ server <- function(input, output) {
   })
   
   output$zoomImg <- EBImage::renderDisplay({
-    req(input$go)
+    req(length(rois_plot1()) != 0)
     EBImage::display(global$imgPNG)
   })
   
