@@ -49,19 +49,16 @@ ui <- dashboardPage(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
-                     shinyFilesButton("imgFile", "Choose Image", "Search", icon = icon("file-import"), multiple=FALSE),
-                     verbatimTextOutput("imgPath"),
+                     fileInput("imgFile", "Choose Image", multiple=FALSE),
                      tags$hr(),
                      helpText("Select the file containing the datas to analyse. (Format .txt)"),
                      radioButtons("sep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
                      radioButtons("dec", label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
                      checkboxInput("header", label = "Header", value = TRUE),
-                     shinyFilesButton("dataFile", "Choose Data file", "Search", icon = icon("file-import"), multiple=FALSE),
-                     verbatimTextOutput("dataPath"),
+                     fileInput("dataFile", "Choose Data file", multiple=FALSE),
                      tags$hr(),
                      helpText("Select the zip file containing your ROIs."),
-                     shinyFilesButton("zipFile", "Choose ROIs .zip file", "Search", icon = icon("file-import"), multiple=FALSE),
-                     verbatimTextOutput("zipPath")
+                     fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
                 ),
               ),
               actionButton("refresh", "Reset"),
@@ -178,19 +175,20 @@ server <- function(input, output) {
   
   ### MENU IMAGE 
   # File chooser
-  if (.Platform$OS.type == "windows") { roots <- c('home'='C:')}
+  if (.Platform$OS.type == "windows") { roots <- c('home'='~/')}
   else if (.Platform$OS.type == "unix") { roots <- c('home'='~')}
-  shinyFileChoose(
-    input,
-    'imgFile',
-    roots = roots
-  )
+   
+  #shinyFileChoose(
+    #input,
+    #'imgFile',
+    #roots = roots
+  #)
   
-  shinyFileChoose(
-    input,
-    'dataFile',
-    roots = roots
-  )
+  #shinyFileChoose(
+    #input,
+    #'dataFile',
+    #roots = roots
+  #)
   
   shinyFileChoose(
     input,
@@ -203,48 +201,27 @@ server <- function(input, output) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(imgPath = "", dataPath = "", data = NULL, img=NULL, zipPath="", zip=NULL, IDs="", colors=NULL, imgPNG=NULL)
+  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs="", colors=NULL, imgPNG=NULL)
   
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
-    if (!"files" %in% names(input$imgFile)) return() 
-    # Path to image
-    global$imgPath <- parseFilePaths(roots, input$imgFile)[[4]]
     # Image
-    global$img <- read_tif(global$imgPath)
+    global$img <- read_tif(input$imgFile$datapath)
   }, label = "files")
   
   observeEvent(eventExpr= input$dataFile, handlerExpr = {
-    if (!"files" %in% names(input$dataFile)) return() 
+    #if (!"files" %in% names(input$dataFile)) return() 
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
     decimal <- switch (input$dec, "Point"=".", "Comma"=",")
-    # Path to data
-    global$dataPath <- parseFilePaths(roots, input$dataFile)[[4]]
     # Datas
-    global$data <- read.table(global$dataPath,header=input$header, sep=separator, dec=decimal)
+    global$data <- read.table(input$dataFile$datapath,header=input$header, sep=separator, dec=decimal)
   }, label = "files")
   
   observeEvent(eventExpr= input$zipFile, handlerExpr = {
-    if (!"files" %in% names(input$zipFile)) return() 
-    # Path to image
-    global$zipPath <- parseFilePaths(roots, input$zipFile)[[4]]
-    # ROIzip file
-    global$zip <- read.ijzip(global$zipPath)
+    #ROIzip file
+    global$zip <- read.ijzip(input$zipFile$datapath)
   }, label = "files")
-  
-  # Output of the image path
-  output$imgPath <- renderText({
-    global$imgPath
-  })
-  
-  output$dataPath <- renderText ({
-    global$dataPath
-  })
-  
-  output$zipPath <- renderText ({
-    global$zipPath
-  })
-  
+
   # Output of the variable(s) to plot for selection  
   output$variablesHisto <- renderUI({
     selectizeInput(inputId = "variablesHisto",
@@ -721,7 +698,7 @@ server <- function(input, output) {
   
   
 }
-options(shiny.maxRequestSize = 30 * 1024 ^ 2)
+options(shiny.maxRequestSize = 1000 * 1024 ^ 2)
 shinyApp(ui=ui, server=server)
 
 
