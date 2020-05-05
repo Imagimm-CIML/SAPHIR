@@ -1,6 +1,6 @@
 ## AVEC MENU CHOIX & CR0P & REMOVE
 # Installation of the necessary packages
-pkg <- c("shiny", "shinyFiles", "ggplot2", "stringr", "shinydashboard", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs")
+pkg <- c("shiny", "shinyFiles", "ggplot2", "stringr", "shinydashboard", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) {
   install.packages(new.pkg)
@@ -70,7 +70,7 @@ ui <- dashboardPage(
               # Selection of cell to remove  
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                     title = "Select ROIs to use",
+                     title = "Filtering ROIs",
                      helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
                      uiOutput("variablesHisto"),
                      helpText("Select the ROIs (click or brush) and remove values selected by clicking on the remove button."),
@@ -83,25 +83,40 @@ ui <- dashboardPage(
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
               fluidRow(
+              column( width =6,
                 # First box : Plot & Datas
-                box( width = 6,
-                     title = "Plot", solidHeader = TRUE, status = "primary",
+                box( width = NULL,
+                     title = "Plot parameters", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                      helpText("Select the columns to use for the scatter plot."),
                      uiOutput("colsX1"),
                      uiOutput("colsY1"),
                      helpText("Select the position of the cursors on the scatter plot. "),
                      sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
-                     sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150), 
-                     downloadLink("downloadData", "Download Groups subtables"),
-                     tags$br(),
-                     tags$br(),
-                     verbatimTextOutput("groups"),
+                     sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150)
+                ),
+                box (width = NULL, 
+                     title = "Plot", solidHeader = TRUE, status = "primary",
                      helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                      withSpinner(
                        plotlyOutput("plot_rois1")),
-                     verbatimTextOutput("rois_plot1"),
-                     downloadLink("downloadSubdata", "Download selected ROIs subtable"),
-                     tableOutput("rois_plot_table1")
+                ),
+                tabBox (width=NULL, selected="Subgroups",
+                        tabPanel("Subgroups",
+                                 downloadLink("downloadData", "Download Groups subtables"),
+                                 tags$br(),
+                                 downloadLink("downloadSummaryData", "Download summary of groups subtables"),
+                                 tags$br(),
+                                 tags$br(),
+                                 verbatimTextOutput("groups"),
+                                 verbatimTextOutput("summary")
+                        ),
+                        tabPanel("Selected", 
+                                 verbatimTextOutput("rois_plot1"),
+                                 downloadLink("downloadSubdata", "Download selected ROIs subtable"),
+                                 tableOutput("rois_plot_table1")
+                        )
+                        
+                )
                 ),
                 # Second box : Image displayer
                 column (width=6,
@@ -112,6 +127,7 @@ ui <- dashboardPage(
                        uiOutput("frame1"),
                        helpText("Select the color of the ROIs on the image."),
                        tags$hr(),
+                       helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in GREEN,", tags$br(), "- Upper left group in DARK BLUE,", tags$br(), "- Upper right group in TURQUOISE."),
                        withSpinner(
                          plotOutput("img_rois1")
                        ),
@@ -126,8 +142,8 @@ ui <- dashboardPage(
                                    )
                       
                   )
-                )
             )
+          )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -156,6 +172,7 @@ ui <- dashboardPage(
     ) 
   )
 )
+
 
 server <- function(input, output) {
   
@@ -240,7 +257,7 @@ server <- function(input, output) {
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectVar <- renderPlotly({
     if (length(input$variablesHisto)==1) {
-      v <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=10)
+      v <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram()
       ggplotly(v, source="v")
     }
     else if (length(input$variablesHisto)==2) {
@@ -370,6 +387,23 @@ server <- function(input, output) {
     }, contentType = "application/zip"
   )
   
+  output$downloadSummaryData <- downloadHandler (
+    filename = function() {
+      paste("groupSummaryDatas.zip")
+    },
+    content = function(file) {
+      tmpdir <- tempdir()
+      setwd(tempdir())
+      fls <- c("ULGroup_summary.csv", "URGroup_summary.csv", "DLGroup_summary.csv", "DRGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="ULgroup"],]), "ULGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="URgroup"],]), "URGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DLgroup"],]), "DLGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DRgroup"],]), "DRGroup_summary.csv")
+      zip::zipr(zipfile = file,fls)
+      if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
+    }, contentType = "application/zip")
+  
+  
   # Text output to see number of cells in each group 
   output$groups <- renderText ({
     groups <- c()
@@ -378,6 +412,13 @@ server <- function(input, output) {
       groups <- c(nCell, groups)
     }
     paste("Number of ROIs in ", groups, "\n")
+  })
+  
+  output$summary <- renderPrint ({
+    for (i in unique(global$colors$color)) {
+      print(i)
+      print(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],]))
+    }
   })
   
   # Scatter plot
@@ -446,6 +487,8 @@ server <- function(input, output) {
       if (i==input$channel1) {
         c <- i
       }
+    }
+    for (i in c(1:dim(global$img)[4])) {
       if (i==input$frame1) {
         f <- i
       }
@@ -453,9 +496,9 @@ server <- function(input, output) {
     display(global$img[,,c,f], method="raster")
     col=2
     if (dim(global$img)[4]==1) {
-      for (j in unique(global$data$Cell.type)) {
+      for (j in sort(unique(global$colors$color))) {
         for (i in rois_plot1()) {
-          if (global$data$Cell.type[global$data$ID==i]==j) {
+          if (global$colors$color[global$data$ID==i]==j) {
             plot(global$zip[[i]], col=col, add=TRUE)
           }
         }
@@ -463,9 +506,9 @@ server <- function(input, output) {
       }
     }
     else if (dim(global$img)[4] > 1) {
-      for (j in unique(global$data$Cell.type)) {
+      for (j in sort(unique(global$colors$color))) {
         for (i in rois_plot1()) {
-          if ((global$data$Cell.type[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
+          if ((global$colors$color[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
             plot(global$zip[[i]], col=col, add=TRUE)
           }
         }
@@ -473,7 +516,7 @@ server <- function(input, output) {
       }
     }
   })
-  
+  # Image PNG
   observeEvent(eventExpr=input$go, 
                handlerExpr= {
                  out <- tempfile(fileext='.png')
@@ -482,6 +525,8 @@ server <- function(input, output) {
                    if (i==input$channel1) {
                      c <- i
                    }
+                 }
+                 for (i in c(1:dim(global$img)[4])) {
                    if (i==input$frame1) {
                      f <- i
                    }
@@ -489,9 +534,9 @@ server <- function(input, output) {
                  display(global$img[,,c,f], method="raster")
                  col=2
                  if (dim(global$img)[4]==1) {
-                   for (j in unique(global$data$Cell.type)) {
+                   for (j in sort(unique(global$colors$color))) {
                      for (i in rois_plot1()) {
-                       if (global$data$Cell.type[global$data$ID==i]==j) {
+                       if (global$colors$color[global$data$ID==i]==j) {
                          plot(global$zip[[i]], col=col, add=TRUE)
                        }
                      }
@@ -499,9 +544,9 @@ server <- function(input, output) {
                    }
                  }
                  else if (dim(global$img)[4] > 1) {
-                   for (j in unique(global$data$Cell.type)) {
+                   for (j in sort(unique(global$colors$color))) {
                      for (i in rois_plot1()) {
-                       if ((global$data$Cell.type[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
+                       if ((global$colors$color[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
                          plot(global$zip[[i]], col=col, add=TRUE)
                        }
                      }
@@ -512,7 +557,7 @@ server <- function(input, output) {
                  out <- normalizePath(out, "/")
                  global$imgPNG <- EBImage::readImage(out)
                })
-  
+  # CROP ROIS
   output$list <- EBImage::renderDisplay({
     req(input$go)
     if (dim(global$img)[4]==1) {
