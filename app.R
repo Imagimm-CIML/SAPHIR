@@ -110,6 +110,8 @@ ui <- dashboardPage(
                         tabPanel("Selected", 
                                  verbatimTextOutput("rois_plot1"),
                                  downloadLink("downloadSubdata", "Download selected ROIs subtable"),
+                                 tags$br(),
+                                 downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
                                  tableOutput("rois_plot_table1")
                         )
                         
@@ -174,28 +176,6 @@ ui <- dashboardPage(
 server <- function(input, output) {
   
   ### MENU IMAGE 
-  # File chooser
-  if (.Platform$OS.type == "windows") { roots <- c('home'='~/')}
-  else if (.Platform$OS.type == "unix") { roots <- c('home'='~')}
-   
-  #shinyFileChoose(
-    #input,
-    #'imgFile',
-    #roots = roots
-  #)
-  
-  #shinyFileChoose(
-    #input,
-    #'dataFile',
-    #roots = roots
-  #)
-  
-  shinyFileChoose(
-    input,
-    'zipFile',
-    roots = roots
-  )
-  
   observeEvent(input$refresh, {
     shinyjs::js$refresh()
   })
@@ -445,6 +425,16 @@ server <- function(input, output) {
     }
   )
   
+  #Button to download summary on selected cells in a csv file
+  output$downloadSummarySubdata <- downloadHandler(
+    filename = function() {
+      paste("data-summary", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(summary(rois_plot_table1()), file)
+    }
+  )
+  
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
     req(input$imgFile)
@@ -538,7 +528,7 @@ server <- function(input, output) {
   output$list <- EBImage::renderDisplay({
     req(input$go)
     if (dim(global$img)[4]==1) {
-      d <- round(max(global$data$Cell.area))
+      d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
       dim <- 2*d+1
       prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
       for (i in rois_plot1()) {
@@ -560,13 +550,15 @@ server <- function(input, output) {
         if (xmax > dim(global$imgPNG)[1]) { 
           xmax <- dim(global$imgPNG)[1]
           xmin <- dim(global$imgPNG)[1] - dim +1}
-        prem <- EBImage::combine(prem, global$imgPNG[xmin:xmax,ymin:ymax,])
+        cross <- imgPNG
+        cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="black", fill=FALSE, z=1)
+        prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
       }
       nbCell <- nrow(rois_plot_table1())
       EBImage::display(prem[,,,2:(nbCell+1)])
     }
     else if (dim(global$img)[4]>1) {
-      d <- round(max(global$data$Cell.area))+10
+      d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
       dim <- 2*d+1
       prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
       if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
@@ -591,7 +583,9 @@ server <- function(input, output) {
               xmax <- dim(global$imgPNG)[1]
               xmin <- dim(global$imgPNG)[1] - dim +1
             }
-            prem <- EBImage::combine(prem, global$imgPNG[xmin:xmax,ymin:ymax,])
+            cross <- imgPNG
+            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="black", fill=FALSE, z=1)
+            prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
           }
         }
         nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)
