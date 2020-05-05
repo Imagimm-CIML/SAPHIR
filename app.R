@@ -484,7 +484,9 @@ server <- function(input, output) {
     }
   })
   # Image PNG
-  observeEvent(eventExpr= {rois_plot1()},
+  observeEvent(eventExpr= {rois_plot1()
+    input$channel1
+    input$frame1 },
                handlerExpr= {
                  out <- tempfile(fileext='.png')
                  png(out, width=dim(global$img)[1], height=dim(global$img)[2])
@@ -525,79 +527,90 @@ server <- function(input, output) {
                  global$imgPNG <- EBImage::readImage(out)
                })
   # CROP ROIS
-  output$list <- EBImage::renderDisplay({
-    req(length(rois_plot1()) != 0)
-    if (dim(global$img)[4]==1) {
-      d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
-      dim <- 2*d+1
-      prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-      for (i in rois_plot1()) {
-        xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-        ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-        xmin = xcenter-d
-        xmax= xcenter+d
-        ymin = ycenter-d
-        ymax = ycenter+d
-        if (xmin < 0) { 
-          xmin <- 0
-          xmax <- dim}
-        if (ymin < 0) { 
-          ymin <- 0
-          ymax <- dim}
-        if (ymax > dim(global$imgPNG)[2]) { 
-          ymin <- dim(global$imgPNG)[2] - dim +1
-          ymax <- dim(global$imgPNG)[2]}
-        if (xmax > dim(global$imgPNG)[1]) { 
-          xmax <- dim(global$imgPNG)[1]
-          xmin <- dim(global$imgPNG)[1] - dim +1}
-        cross <- global$imgPNG
-        cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-        prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
-      }
-      nbCell <- nrow(rois_plot_table1())
-      EBImage::display(prem[,,,2:(nbCell+1)])
-    }
-    else if (dim(global$img)[4]>1) {
-      d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
-      dim <- 2*d+1
-      prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-      if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
-        for (i in rois_plot1()) {
-          if (global$data$Slice[global$data$ID==i]==input$frame1) {
-            xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-            ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-            xmin = xcenter-d
-            xmax= xcenter+d
-            ymin = ycenter-d
-            ymax = ycenter+d
-            if (xmin < 0) { 
-              xmin <- 0
-              xmax <- dim}
-            if (ymin < 0) { 
-              ymin <- 0
-              ymax <- dim}
-            if (ymax > dim(global$imgPNG)[2]) { 
-              ymin <- dim(global$imgPNG)[2] - dim +1
-              ymax <- dim(global$imgPNG)[2]}
-            if (xmax > dim(global$imgPNG)[1]) { 
-              xmax <- dim(global$imgPNG)[1]
-              xmin <- dim(global$imgPNG)[1] - dim +1
+  observeEvent(eventExpr= {rois_plot1()
+    input$channel1
+    input$frame1 },
+    handlerExpr= {
+        output$list <- EBImage::renderDisplay({
+          req(length(rois_plot1()) != 0)
+          if (dim(global$img)[4]==1) {
+            d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
+            dim <- 2*d+1
+            prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+            for (i in rois_plot1()) {
+              xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+              ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+              xmin = xcenter-d
+              xmax= xcenter+d
+              ymin = ycenter-d
+              ymax = ycenter+d
+              if (xmin < 0) { 
+                xmin <- 0
+                xmax <- dim}
+              if (ymin < 0) { 
+                ymin <- 0
+                ymax <- dim}
+              if (ymax > dim(global$imgPNG)[2]) { 
+                ymin <- dim(global$imgPNG)[2] - dim +1
+                ymax <- dim(global$imgPNG)[2]}
+              if (xmax > dim(global$imgPNG)[1]) { 
+                xmax <- dim(global$imgPNG)[1]
+                xmin <- dim(global$imgPNG)[1] - dim +1}
+              cross <- global$imgPNG
+              cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+              prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
             }
-            cross <- global$imgPNG
-            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-            prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+            nbCell <- nrow(rois_plot_table1())
+            EBImage::display(prem[,,,2:(nbCell+1)])
           }
-        }
-        nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)
-        EBImage::display(prem[,,,2:(nbCell+1)])
-      }
-    }
+          else if (dim(global$img)[4]>1) {
+            d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
+            dim <- 2*d+1
+            prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+            if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
+              for (i in rois_plot1()) {
+                if (global$data$Slice[global$data$ID==i]==input$frame1) {
+                  xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+                  ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+                  xmin = xcenter-d
+                  xmax= xcenter+d
+                  ymin = ycenter-d
+                  ymax = ycenter+d
+                  if (xmin < 0) { 
+                    xmin <- 0
+                    xmax <- dim}
+                  if (ymin < 0) { 
+                    ymin <- 0
+                    ymax <- dim}
+                  if (ymax > dim(global$imgPNG)[2]) { 
+                    ymin <- dim(global$imgPNG)[2] - dim +1
+                    ymax <- dim(global$imgPNG)[2]}
+                  if (xmax > dim(global$imgPNG)[1]) { 
+                    xmax <- dim(global$imgPNG)[1]
+                    xmin <- dim(global$imgPNG)[1] - dim +1
+                  }
+                  cross <- global$imgPNG
+                  cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+                  prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+                }
+              }
+              nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)
+              EBImage::display(prem[,,,2:(nbCell+1)])
+            }
+          }
+        })
   })
   
-  output$zoomImg <- EBImage::renderDisplay({
-    req(length(rois_plot1()) != 0)
-    EBImage::display(global$imgPNG)
-  })
+  
+  observeEvent(eventExpr= {rois_plot1()
+    input$channel1
+    input$frame1 },
+    handlerExpr= {
+        output$zoomImg <- EBImage::renderDisplay({
+          req(length(rois_plot1()) != 0)
+          EBImage::display(global$imgPNG)
+        })
+    })
   
   ## MENU IMAGE TO PLOT
   # Path to image 
