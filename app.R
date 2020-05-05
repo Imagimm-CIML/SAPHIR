@@ -352,13 +352,13 @@ server <- function(input, output) {
         # Add columns "color" with position of the group the cell belong to
         for (i in c(1:nrow(global$data))) {
           if ((global$data[colsX1()][i,] < input$x_limit1) & (global$data[colsY1()][i,] < input$y_limit1)){
-            global$colors$color[i] <- "DLgroup"
+            global$colors$color[i] <- "LLgroup"
           }
           else if ((global$data[colsX1()][i,] > input$x_limit1) & (global$data[colsY1()][i,] > input$y_limit1)){
             global$colors$color[i] <- "URgroup"
           }
           else if ((global$data[colsX1()][i,] < input$x_limit1) & (global$data[colsY1()][i,] > input$y_limit1)) {
-            global$colors$color[i] <- "DRgroup"
+            global$colors$color[i] <- "LRgroup"
           }
           else {
             global$colors$color[i] <- "ULgroup"
@@ -377,11 +377,11 @@ server <- function(input, output) {
     content = function(file){
       tmpdir <- tempdir()
       setwd(tempdir())
-      fls <- c("ULGroup.csv", "URGroup.csv", "DLGroup.csv", "DRGroup.csv")
+      fls <- c("ULGroup.csv", "URGroup.csv", "LLGroup.csv", "LRGroup.csv")
       write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="ULgroup"],], "ULGroup.csv")
       write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="URgroup"],], "URGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DLgroup"],], "DLGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DRgroup"],], "DRGroup.csv")
+      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LLgroup"],], "LLGroup.csv")
+      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LRgroup"],], "LRGroup.csv")
       zip::zipr(zipfile = file,fls)
       if (file.exists (paste0 (file," .zip "))) {file.rename (paste0 (file," .zip "), file)}
     }, contentType = "application/zip"
@@ -394,11 +394,11 @@ server <- function(input, output) {
     content = function(file) {
       tmpdir <- tempdir()
       setwd(tempdir())
-      fls <- c("ULGroup_summary.csv", "URGroup_summary.csv", "DLGroup_summary.csv", "DRGroup_summary.csv")
+      fls <- c("ULGroup_summary.csv", "URGroup_summary.csv", "LLGroup_summary.csv", "LRGroup_summary.csv")
       write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="ULgroup"],]), "ULGroup_summary.csv")
       write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="URgroup"],]), "URGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DLgroup"],]), "DLGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="DRgroup"],]), "DRGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LLgroup"],]), "LLGroup_summary.csv")
+      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LRgroup"],]), "LRGroup_summary.csv")
       zip::zipr(zipfile = file,fls)
       if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
     }, contentType = "application/zip")
