@@ -124,16 +124,15 @@ ui <- dashboardPage(
                        helpText("Select channel and frame to display."),
                        uiOutput("channel1"),
                        uiOutput("frame1"),
-                       helpText("Select the color of the ROIs on the image."),
                        tags$hr(),
                        helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in GREEN,", tags$br(), "- Upper left group in DARK BLUE,", tags$br(), "- Upper right group in TURQUOISE."),
                        withSpinner(
                          plotOutput("img_rois1")
-                       ),
-                       actionButton("go", "Load displayers"),
+                       )
                   ),
                   tabBox (width=NULL, selected="ROIs",
                           tabPanel("ROIs",
+                                   uiOutput("size"),
                                    EBImage::displayOutput("list")
                                    ),
                           tabPanel("Image", 
@@ -527,6 +526,12 @@ server <- function(input, output) {
                  global$imgPNG <- EBImage::readImage(out)
                })
   # CROP ROIS
+  output$size <- renderUI ({
+    val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
+    max <- min(dim(global$img)[1], dim(global$img)[2])
+    sliderInput("size", label = "Size of the image", min = 0, max = max, value = val)
+  })
+  
   observeEvent(eventExpr= {rois_plot1()
     input$channel1
     input$frame1 },
@@ -534,7 +539,7 @@ server <- function(input, output) {
         output$list <- EBImage::renderDisplay({
           req(length(rois_plot1()) != 0)
           if (dim(global$img)[4]==1) {
-            d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
+            d <- (input$size-1)/2
             dim <- 2*d+1
             prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
             for (i in rois_plot1()) {
@@ -564,7 +569,7 @@ server <- function(input, output) {
             EBImage::display(prem[,,,2:(nbCell+1)])
           }
           else if (dim(global$img)[4]>1) {
-            d <- 2*round(sqrt(max(data$Cell.area)/pi))+10
+            d <- (input$size-1)/2
             dim <- 2*d+1
             prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
             if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
