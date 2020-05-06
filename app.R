@@ -94,6 +94,7 @@ ui <- dashboardPage(
                 box (width = NULL, 
                      title = "Plot", solidHeader = TRUE, status = "primary",
                      helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
+                     checkboxInput("selectAll", "Select all", value=FALSE),
                      withSpinner(
                        plotlyOutput("plot_rois1")),
                 ),
@@ -387,12 +388,18 @@ server <- function(input, output) {
   
   # Reactive variable : points selected on the plot 
   rois_plot1 <- reactive({
+  if (input$selectAll == FALSE) {
     if (!is.null(event_data("plotly_selected", source="p"))) {
       event_data("plotly_selected", source="p")$customdata
     }
     else if (!is.null(event_data("plotly_click", source="p"))) {
       event_data("plotly_click", source="p")$customdata
     }
+  }
+  else if (input$selectAll == TRUE) {
+    rois_plot1 <- global$data$ID
+  }
+    
   })
   
   # Reactive variable : infos on points selected on the plot 
