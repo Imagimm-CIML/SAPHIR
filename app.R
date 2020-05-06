@@ -126,7 +126,7 @@ ui <- dashboardPage(
                        uiOutput("channel1"),
                        uiOutput("frame1"),
                        tags$hr(),
-                       helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in GREEN,", tags$br(), "- Upper left group in DARK BLUE,", tags$br(), "- Upper right group in TURQUOISE."),
+                       helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in DARK BLUE,", tags$br(), "- Upper left group in GREEN,", tags$br(), "- Upper right group in PINK."),
                        withSpinner(
                          plotOutput("img_rois1")
                        )
@@ -363,6 +363,7 @@ server <- function(input, output) {
   
   # Text output to see number of cells in each group 
   output$groups <- renderText ({
+    req(input$dataFile)
     groups <- c()
     for (i in unique(global$colors$color)) {
       nCell <- str_c(i, length(global$colors$ID[global$colors$color==i]), sep=" : ")
@@ -372,6 +373,7 @@ server <- function(input, output) {
   })
   
   output$summary <- renderPrint ({
+    req(input$dataFile)
     for (i in unique(global$colors$color)) {
       print(i)
       print(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],]))
@@ -380,7 +382,7 @@ server <- function(input, output) {
   
   # Scatter plot
   output$plot_rois1 <- renderPlotly({
-    req(input$imgFile)
+    req(input$dataFile)
     p <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
       labs(x=colsX1(), y=colsY1())
     ggplotly(p, source="p")
@@ -404,20 +406,20 @@ server <- function(input, output) {
   
   # Reactive variable : infos on points selected on the plot 
   rois_plot_table1 <- reactive ({
-    req(input$imgFile)
+    req(input$dataFile)
     global$data[global$data$ID %in% rois_plot1(),]
   })
   
   # RenderText : number of selected cells 
   output$rois_plot1 <- renderText({
-    req(input$imgFile)
+    req(input$dataFile)
     nbCell <- nrow(rois_plot_table1())
     paste("You selected", nbCell, "cells")
   })
   
   # Table containing infos on selected cells 
   output$rois_plot_table1 <- renderTable({
-    req(input$imgFile)
+    req(input$dataFile)
     rois_plot_table1()
   })
   
@@ -467,25 +469,20 @@ server <- function(input, output) {
       }
     }
     display(global$img[,,c,f], method="raster")
-    col=2
     if (dim(global$img)[4]==1) {
-      for (j in sort(unique(global$colors$color))) {
-        for (i in rois_plot1()) {
-          if (global$colors$color[global$data$ID==i]==j) {
-            plot(global$zip[[i]], col=col, add=TRUE)
-          }
-        }
-        col = col+1
+      for (i in rois_plot1()) {
+        col <- global$colors$color[global$data$ID==i]
+        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+        plot(global$zip[[i]], col=col, add=TRUE)
       }
     }
     else if (dim(global$img)[4] > 1) {
-      for (j in sort(unique(global$colors$color))) {
-        for (i in rois_plot1()) {
-          if ((global$colors$color[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
-            plot(global$zip[[i]], col=col, add=TRUE)
-          }
+      for (i in rois_plot1()) {
+        col <- global$colors$color[global$data$ID==i]
+        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+        if (global$data$Slice[global$data$ID==i]==f) {
+          plot(global$zip[[i]], col=col, add=TRUE)
         }
-        col = col+1
       }
     }
   })
@@ -507,25 +504,20 @@ server <- function(input, output) {
                    }
                  }
                  display(global$img[,,c,f], method="raster")
-                 col=2
                  if (dim(global$img)[4]==1) {
-                   for (j in sort(unique(global$colors$color))) {
-                     for (i in rois_plot1()) {
-                       if (global$colors$color[global$data$ID==i]==j) {
-                         plot(global$zip[[i]], col=col, add=TRUE)
-                       }
-                     }
-                     col = col+1
+                   for (i in rois_plot1()) {
+                     col <- global$colors$color[global$data$ID==i]
+                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                     plot(global$zip[[i]], col=col, add=TRUE)
                    }
                  }
                  else if (dim(global$img)[4] > 1) {
-                   for (j in sort(unique(global$colors$color))) {
-                     for (i in rois_plot1()) {
-                       if ((global$colors$color[global$data$ID==i]==j) & (global$data$Slice[global$data$ID==i]==f)) {
-                         plot(global$zip[[i]], col=col, add=TRUE)
-                       }
+                   for (i in rois_plot1()) {
+                     col <- global$colors$color[global$data$ID==i]
+                     col <- switch (col, "LLGroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                     if (global$data$Slice[global$data$ID==i]==f) {
+                       plot(global$zip[[i]], col=col, add=TRUE)
                      }
-                     col = col+1
                    }
                  }
                  dev.off()
