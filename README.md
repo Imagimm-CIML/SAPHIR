@@ -43,21 +43,25 @@ The selection will be removed from the intensity and result files and from the R
 Use the second item of the menu : "Plot to Image". <br>
 Zones of the plot : 
 * A plot representing for ROIs their intensities on different channels is displayed. The variables plotted in X and Y can be modified. 
-* The plot can be cut in 4 zones : Up Left (UL), Up Right (UR), Down Left (LL) and Down Right (DR) depending on movable horizontal and a vertical lines. At the beginning, all the points have the same color. The colors of the points in each zone can be modified with the button "Reload colors".
-* The datas (result file) of the ROIs of each zone can be downloaded in a zip file containing 4 csv files, one for each zone, with the button "Download Groups subtable". 
-
+* The plot can be cut in 4 zones : Upper Left (UL), Upper Right (UR), Lower Left (LL) and Lower Right (DR) depending on movable horizontal and a vertical lines. You can modify the repartition by moving the sliders. 
+* To check the datas (summary) of the subgroups, select the "Subgroup" tabs in the lower box. A summary of the subgroups is printed. 
+* The datas (result file) of the ROIs of each zone can be downloaded in a zip file containing 4 csv files, one for each zone, with the button "Download Groups subtable". You can also download the summary of each subgroup. 
 
 Selections on the plot :
 * Points of the plot can be selected (by clicking or brushing) and datas of the ROIs selected are printed in a table below. 
-* These datas can be downloaded in a csv file with the button "Download selected ROIs subtable". 
+* You can check the datas with the "Selected" tabs of the lower box. 
+* These datas can be downloaded in a csv file with the button "Download selected ROIs subtable". You can also download the summary of your selection. 
 
 Image : <br>
 The image is displayed on the left, channel and slice to display can be modified with the sliders. 
-ROIs selected on the plot are displayed on the image and the color of the mask correspond to cell type. 
+ROIs selected on the plot are displayed on the image and the color of the mask correspond to the subgroups of the plot. 
 
 Cropped ROIs : <br>
-The ROIs selected on the plot can be displayed with the button "Load ROIs". Each time a new selection is made, you need to reload the viewer with the "Load ROIs" button. 
+The ROIs selected on the plot can be displayed in the right lower box in the tab "ROIs". You can modify the size of the crop with a slider. 
 The ROIs are displayed in the viewer in order of ROIs IDs. 
+
+Zoomed Image : <br>
+In the lower left box, tab "Image" you can see the image in a viewer so you can zoom on the image. 
 
 ##### Part 2 : Image to plot 
 Use the third item of the menu : "Image to plot". <br> 
