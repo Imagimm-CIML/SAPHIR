@@ -22,8 +22,11 @@ Zip file containing the ROIs of the image defined with ImageJ.
 ### Using the application 
 To launch the app, you have to open the app.R file in RStudio and click on the "Run app" button on the right top corner. 
 
-#### First step : upload the image you want to analyse 
-Use the first item of the menu "Choose your image" and click on the "Browse" button. Select the image you want to analyse in your documents. 
+#### First step : upload the files you want to analyse 
+Use the first item of the menu "Choose your image". 
+First, click on the top "Browse" button. Select the image you want to analyse. After, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
+Then, upload your zip file containing the ROIs of your image. 
+
 
 #### Second step : select ROIs to remove
 Under the browse box, you can plot variables of the results or the intensity file and select ROIs with extreme values to remove them from the datas to analyse. For choosing the variables to plot, use the select widget : 
