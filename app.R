@@ -51,6 +51,7 @@ ui <- dashboardPage(
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
+                     actionButton("default", "Use default image"),
                      tags$hr(),
                      helpText("Select the file containing the datas to analyse. (Format .txt)"),
                      radioButtons("sep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
@@ -81,64 +82,64 @@ ui <- dashboardPage(
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
               fluidRow(
-              column( width =6,
-                # First box : Plot & Datas
-                box( width = NULL,
-                     title = "Plot parameters", solidHeader = TRUE, status = "primary", collapsible = TRUE,
-                     helpText("Select the columns to use for the scatter plot."),
-                     uiOutput("colsX1"),
-                     uiOutput("colsY1"),
-                     helpText("Select the position of the cursors on the scatter plot. "),
-                     sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
-                     sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150)
-                ),
-                box (width = NULL, 
-                     title = "Plot", solidHeader = TRUE, status = "primary",
-                     helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                     checkboxInput("selectAll", "Select all", value=FALSE),
-                     withSpinner(
-                       plotlyOutput("plot_rois1")),
-                ),
-                tabBox (width=NULL, selected="Subgroups",
-                        tabPanel("Subgroups",
-                                 downloadLink("downloadData", "Download Groups subtables"),
-                                 tags$br(),
-                                 downloadLink("downloadSummaryData", "Download summary of groups subtables"),
-                                 tags$br(),
-                                 tags$br(),
-                                 verbatimTextOutput("groups"),
-                                 verbatimTextOutput("summary")
+                column( width =6,
+                        # First box : Plot & Datas
+                        box( width = NULL,
+                             title = "Plot parameters", solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                             helpText("Select the columns to use for the scatter plot."),
+                             uiOutput("colsX1"),
+                             uiOutput("colsY1"),
+                             helpText("Select the position of the cursors on the scatter plot. "),
+                             sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
+                             sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150)
                         ),
-                        tabPanel("Selected", 
-                                 verbatimTextOutput("rois_plot1"),
-                                 downloadLink("downloadSubdata", "Download selected ROIs subtable"),
-                                 tags$br(),
-                                 downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
-                                 tableOutput("rois_plot_table1")
+                        box (width = NULL, 
+                             title = "Plot", solidHeader = TRUE, status = "primary",
+                             helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
+                             checkboxInput("selectAll", "Select all", value=FALSE),
+                             withSpinner(
+                               plotlyOutput("plot_rois1")),
+                        ),
+                        tabBox (width=NULL, selected="Subgroups",
+                                tabPanel("Subgroups",
+                                         downloadLink("downloadData", "Download Groups subtables"),
+                                         tags$br(),
+                                         downloadLink("downloadSummaryData", "Download summary of groups subtables"),
+                                         tags$br(),
+                                         tags$br(),
+                                         verbatimTextOutput("groups"),
+                                         verbatimTextOutput("summary")
+                                ),
+                                tabPanel("Selected", 
+                                         verbatimTextOutput("rois_plot1"),
+                                         downloadLink("downloadSubdata", "Download selected ROIs subtable"),
+                                         tags$br(),
+                                         downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
+                                         tableOutput("rois_plot_table1")
+                                )
+                                
                         )
-                        
-                )
                 ),
                 # Second box : Image displayer
                 column (width=6,
-                  box( width=NULL, 
-                       title = "Image display", solidHeader= TRUE, status = "primary",
-                       helpText("Select channel and frame to display."),
-                       uiOutput("channel1"),
-                       uiOutput("frame1"),
-                       tags$hr(),
-                       helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in DARK BLUE,", tags$br(), "- Upper left group in GREEN,", tags$br(), "- Upper right group in PINK."),
-                       withSpinner(
-                         EBImage::displayOutput("zoomImg")
-                       )
-                  ),
-                  box (width=NULL, selected="ROIs", solidHeader = TRUE, status="primary",
-                        title = "ROIs",
-                        uiOutput("size"),
-                        EBImage::displayOutput("list")
-                  )
-            )
-          )
+                        box( width=NULL, 
+                             title = "Image display", solidHeader= TRUE, status = "primary",
+                             helpText("Select channel and frame to display."),
+                             uiOutput("channel1"),
+                             uiOutput("frame1"),
+                             tags$hr(),
+                             helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in DARK BLUE,", tags$br(), "- Upper left group in GREEN,", tags$br(), "- Upper right group in PINK."),
+                             withSpinner(
+                               EBImage::displayOutput("zoomImg")
+                             )
+                        ),
+                        box (width=NULL, selected="ROIs", solidHeader = TRUE, status="primary",
+                             title = "ROIs",
+                             uiOutput("size"),
+                             EBImage::displayOutput("list")
+                        )
+                )
+              )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -185,6 +186,11 @@ server <- function(input, output) {
     global$img <- read_tif(input$imgFile$datapath)
   }, label = "files")
   
+  observeEvent(eventExpr = input$default,
+               handlerExpr = {
+                 global$img <- read_tif("www/image.tif")
+               })
+  
   observeEvent(eventExpr= input$dataFile, handlerExpr = {
     #if (!"files" %in% names(input$dataFile)) return() 
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
@@ -197,7 +203,7 @@ server <- function(input, output) {
     #ROIzip file
     global$zip <- read.ijzip(input$zipFile$datapath)
   }, label = "files")
-
+  
   # Output of the variable(s) to plot for selection  
   output$variablesHisto <- renderUI({
     selectizeInput(inputId = "variablesHisto",
@@ -386,17 +392,17 @@ server <- function(input, output) {
   
   # Reactive variable : points selected on the plot 
   rois_plot1 <- reactive({
-  if (input$selectAll == FALSE) {
-    if (!is.null(event_data("plotly_selected", source="p"))) {
-      event_data("plotly_selected", source="p")$customdata
+    if (input$selectAll == FALSE) {
+      if (!is.null(event_data("plotly_selected", source="p"))) {
+        event_data("plotly_selected", source="p")$customdata
+      }
+      else if (!is.null(event_data("plotly_click", source="p"))) {
+        event_data("plotly_click", source="p")$customdata
+      }
     }
-    else if (!is.null(event_data("plotly_click", source="p"))) {
-      event_data("plotly_click", source="p")$customdata
+    else if (input$selectAll == TRUE) {
+      rois_plot1 <- global$data$ID
     }
-  }
-  else if (input$selectAll == TRUE) {
-    rois_plot1 <- global$data$ID
-  }
     
   })
   
@@ -441,13 +447,13 @@ server <- function(input, output) {
   
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     sliderInput("channel1", label="Channel to display", min=1, max=dim(global$img)[3], value=1, step=1)
   })
   
   # UI to choose slice to display
   output$frame1 <- renderUI ({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     sliderInput("frame1", label = "Slice to display", min = 1, max = dim(global$img)[4], value = 1, step=1)
   })
   
@@ -457,40 +463,40 @@ server <- function(input, output) {
     rois_plot1()
     input$channel1
     input$frame1 },
-               handlerExpr= {
-                 out <- tempfile(fileext='.png')
-                 png(out, width=dim(global$img)[1], height=dim(global$img)[2])
-                 for (i in c(1:dim(global$img)[3])) {
-                   if (i==input$channel1) {
-                     c <- i
-                   }
-                 }
-                 for (i in c(1:dim(global$img)[4])) {
-                   if (i==input$frame1) {
-                     f <- i
-                   }
-                 }
-                 display(global$img[,,c,f], method="raster")
-                 if (dim(global$img)[4]==1) {
-                   for (i in rois_plot1()) {
-                     col <- global$colors$color[global$data$ID==i]
-                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                     plot(global$zip[[i]], col=col, add=TRUE)
-                   }
-                 }
-                 else if (dim(global$img)[4] > 1) {
-                   for (i in rois_plot1()) {
-                     col <- global$colors$color[global$data$ID==i]
-                     col <- switch (col, "LLGroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                     if (global$data$Slice[global$data$ID==i]==f) {
-                       plot(global$zip[[i]], col=col, add=TRUE)
-                     }
-                   }
-                 }
-                 dev.off()
-                 out <- normalizePath(out, "/")
-                 global$imgPNG <- EBImage::readImage(out)
-               })
+    handlerExpr= {
+      out <- tempfile(fileext='.png')
+      png(out, width=dim(global$img)[1], height=dim(global$img)[2])
+      for (i in c(1:dim(global$img)[3])) {
+        if (i==input$channel1) {
+          c <- i
+        }
+      }
+      for (i in c(1:dim(global$img)[4])) {
+        if (i==input$frame1) {
+          f <- i
+        }
+      }
+      display(global$img[,,c,f], method="raster")
+      if (dim(global$img)[4]==1) {
+        for (i in rois_plot1()) {
+          col <- global$colors$color[global$data$ID==i]
+          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+          plot(global$zip[[i]], col=col, add=TRUE)
+        }
+      }
+      else if (dim(global$img)[4] > 1) {
+        for (i in rois_plot1()) {
+          col <- global$colors$color[global$data$ID==i]
+          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+          if (global$data$Slice[global$data$ID==i]==f) {
+            plot(global$zip[[i]], col=col, add=TRUE)
+          }
+        }
+      }
+      dev.off()
+      out <- normalizePath(out, "/")
+      global$imgPNG <- EBImage::readImage(out)
+    })
   # CROP ROIS
   output$size <- renderUI ({
     val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
@@ -502,110 +508,111 @@ server <- function(input, output) {
     input$channel1
     input$frame1 },
     handlerExpr= {
-        output$list <- EBImage::renderDisplay({
-          req(length(rois_plot1()) != 0)
-          if (dim(global$img)[4]==1) {
-            d <- (input$size-1)/2
-            dim <- 2*d+1
-            prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+      output$list <- EBImage::renderDisplay({
+        req(length(rois_plot1()) != 0)
+        if (dim(global$img)[4]==1) {
+          d <- (input$size-1)/2
+          dim <- 2*d+1
+          prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+          for (i in rois_plot1()) {
+            xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+            ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+            xmin = xcenter-d
+            xmax= xcenter+d
+            ymin = ycenter-d
+            ymax = ycenter+d
+            if (xmin < 0) { 
+              xmin <- 0
+              xmax <- dim}
+            if (ymin < 0) { 
+              ymin <- 0
+              ymax <- dim}
+            if (ymax > dim(global$imgPNG)[2]) { 
+              ymin <- dim(global$imgPNG)[2] - dim +1
+              ymax <- dim(global$imgPNG)[2]}
+            if (xmax > dim(global$imgPNG)[1]) { 
+              xmax <- dim(global$imgPNG)[1]
+              xmin <- dim(global$imgPNG)[1] - dim +1}
+            cross <- global$imgPNG
+            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+            prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+          }
+          nbCell <- nrow(rois_plot_table1())
+          EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
+        }
+        else if (dim(global$img)[4]>1) {
+          d <- (input$size-1)/2
+          dim <- 2*d+1
+          prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+          if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
             for (i in rois_plot1()) {
-              xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-              ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-              xmin = xcenter-d
-              xmax= xcenter+d
-              ymin = ycenter-d
-              ymax = ycenter+d
-              if (xmin < 0) { 
-                xmin <- 0
-                xmax <- dim}
-              if (ymin < 0) { 
-                ymin <- 0
-                ymax <- dim}
-              if (ymax > dim(global$imgPNG)[2]) { 
-                ymin <- dim(global$imgPNG)[2] - dim +1
-                ymax <- dim(global$imgPNG)[2]}
-              if (xmax > dim(global$imgPNG)[1]) { 
-                xmax <- dim(global$imgPNG)[1]
-                xmin <- dim(global$imgPNG)[1] - dim +1}
-              cross <- global$imgPNG
-              cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-              prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+              if (global$data$Slice[global$data$ID==i]==input$frame1) {
+                xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+                ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+                xmin = xcenter-d
+                xmax= xcenter+d
+                ymin = ycenter-d
+                ymax = ycenter+d
+                if (xmin < 0) { 
+                  xmin <- 0
+                  xmax <- dim}
+                if (ymin < 0) { 
+                  ymin <- 0
+                  ymax <- dim}
+                if (ymax > dim(global$imgPNG)[2]) { 
+                  ymin <- dim(global$imgPNG)[2] - dim +1
+                  ymax <- dim(global$imgPNG)[2]}
+                if (xmax > dim(global$imgPNG)[1]) { 
+                  xmax <- dim(global$imgPNG)[1]
+                  xmin <- dim(global$imgPNG)[1] - dim +1
+                }
+                cross <- global$imgPNG
+                cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+                prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+              }
             }
-            nbCell <- nrow(rois_plot_table1())
+            nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)
             EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
           }
-          else if (dim(global$img)[4]>1) {
-            d <- (input$size-1)/2
-            dim <- 2*d+1
-            prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-            if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
-              for (i in rois_plot1()) {
-                if (global$data$Slice[global$data$ID==i]==input$frame1) {
-                  xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-                  ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-                  xmin = xcenter-d
-                  xmax= xcenter+d
-                  ymin = ycenter-d
-                  ymax = ycenter+d
-                  if (xmin < 0) { 
-                    xmin <- 0
-                    xmax <- dim}
-                  if (ymin < 0) { 
-                    ymin <- 0
-                    ymax <- dim}
-                  if (ymax > dim(global$imgPNG)[2]) { 
-                    ymin <- dim(global$imgPNG)[2] - dim +1
-                    ymax <- dim(global$imgPNG)[2]}
-                  if (xmax > dim(global$imgPNG)[1]) { 
-                    xmax <- dim(global$imgPNG)[1]
-                    xmin <- dim(global$imgPNG)[1] - dim +1
-                  }
-                  cross <- global$imgPNG
-                  cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-                  prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
-                }
-              }
-              nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)
-              EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
-            }
-          }
-        })
-  })
+        }
+      })
+    })
   
   
   observeEvent(eventExpr= {
+    input$imgFile
     rois_plot1()
     input$channel1
     input$frame1 },
     handlerExpr= {
-        output$zoomImg <- EBImage::renderDisplay({
-          req(length(rois_plot1()) != 0)
-          EBImage::display(global$imgPNG, method = 'browser')
-        })
+      output$zoomImg <- EBImage::renderDisplay({
+        req(length(rois_plot1()) != 0)
+        EBImage::display(global$imgPNG, method = 'browser')
+      })
     })
   
   ## MENU IMAGE TO PLOT
   # UI to choose channel to display on the image
   output$channel2 <- renderUI({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     sliderInput("channel2", label="Channel to display", min=1, max=dim(global$img)[3], value=1, step=1)
   })
   
   # UI to choose slice to display
   output$frame2 <- renderUI ({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     sliderInput("frame2", label = "Slice to display", min = 1, max = dim(global$img)[4], value = 1, step=1)
   })
   
   # UI to choose color of the ROIs 
   output$color2 <- renderUI ({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     radioButtons("color2", label = "Color of the ROIs", choices=c("red", "blue", "green" ,"yellow", "white"), selected="red", inline=TRUE)
   })
   
   # Plot with the image and all ROIs 
   output$img_rois2 <- renderPlot({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     for (i in c(1:dim(global$img)[3])) {
       if (i==input$channel2) {
         c <- i
@@ -621,7 +628,7 @@ server <- function(input, output) {
   
   # Infos on ROIs selected on the image 
   output$rois_img2 <- renderPrint({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     list <- c()
     if ((input$select2 == "Click") & (is.null(input$img_click)==FALSE)){
       for (i in c(1:length(global$zip))) {
@@ -649,7 +656,7 @@ server <- function(input, output) {
   
   # Plot corresponding to ROIs selected
   output$plot_rois2 <- renderPlotly({
-    req(input$imgFile)
+    req(is.null(global$img)==FALSE)
     p <- ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2, color="`Cell.type`")) + labs(x=input$colsX2, y=input$colsY2, color="Cell type") + xlim(0,255) +ylim(0,255)
     ggplotly(p)
   })
