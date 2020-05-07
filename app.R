@@ -486,6 +486,8 @@ server <- function(input, output) {
   # Image plot 
   output$imgPlot <- renderPlot ({
     req(!is.null(global$img))
+    req(!is.null(global$data))
+    req(!is.null(global$zip))
     for (i in c(1:dim(global$img)[3])) {
       if (i==input$channel1) {
         c <- i
@@ -517,7 +519,7 @@ server <- function(input, output) {
     input$frame1 },
     handlerExpr= {
       out <- tempfile(fileext='.png')
-      png(out, width=dim(global$img)[1], height=dim(global$img)[2])
+      png(out, height=dim(global$img)[1], width=dim(global$img)[2])
       for (i in c(1:dim(global$img)[3])) {
         if (i==input$channel1) {
           c <- i
@@ -660,6 +662,8 @@ server <- function(input, output) {
   # Plot with the image and all ROIs 
   output$img_rois2 <- renderPlot({
     req(!is.null(global$img))
+    req(!is.null(global$data))
+    req(!is.null(global$zip))
     for (i in c(1:dim(global$img)[3])) {
       if (i==input$channel2) {
         c <- i
@@ -684,6 +688,8 @@ server <- function(input, output) {
   # Infos on ROIs selected on the image 
   output$rois_img2 <- renderPrint({
     req(!is.null(global$img))
+    req(!is.null(global$data))
+    req(!is.null(global$zip))
     list <- c()
     if ((input$select2 == "Click") & (is.null(input$img_click)==FALSE)){
       for (i in global$data$ID) {
@@ -712,6 +718,8 @@ server <- function(input, output) {
   # Plot corresponding to ROIs selected
   output$plot_rois2 <- renderPlotly({
     req(!is.null(global$img))
+    req(!is.null(global$data))
+    req(!is.null(global$zip))
     p <- ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2, color="`Cell.type`")) + labs(x=input$colsX2, y=input$colsY2, color="Cell type") + xlim(0,255) +ylim(0,255)
     ggplotly(p)
   })
