@@ -180,22 +180,25 @@ server <- function(input, output) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs="", colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1)
+  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs="", colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1)
   
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
       if ((count_frames(input$imgFile$datapath))[1]==1) {
         global$img <- read_tif(input$imgFile$datapath)
+        global$nChan <- dim(global$img)[3]
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) {
         global$img <- read_tif(input$imgFile$datapath, frames=1)
         global$nFrame <- count_frames(input$imgFile$datapath)[1]
+        global$nChan <- dim(global$img)[3]
       }
     }
     else {
       if ((count_frames(input$imgFile$datapath)[1]==attr(count_frames(input$imgFile$datapath), "n_dirs"))) {
         global$img <- read_tif(input$imgFile$datapath)
+        global$nChan <- dim(global$img)[3]
       }
       else {
         output$error <- renderText ({
@@ -204,6 +207,7 @@ server <- function(input, output) {
       }
     }
   }, label = "files")
+  
   
   observeEvent(eventExpr= input$dataFile, handlerExpr = {
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
@@ -288,6 +292,7 @@ server <- function(input, output) {
                    label = "Column for X coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
+                   selected = names(global$data)[2],
                    options = list(maxItems = 1))
   })
   output$colsY1 <- renderUI({
@@ -296,6 +301,7 @@ server <- function(input, output) {
                    label = "Column for Y coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
+                   selected = names(global$data)[3],
                    options = list(maxItems = 1))
   })
   
@@ -464,7 +470,7 @@ server <- function(input, output) {
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
     req(is.null(global$img)==FALSE)
-    sliderInput("channel1", label="Channel to display", min=1, max=dim(global$img)[3], value=1, step=1)
+    sliderInput("channel1", label="Channel to display", min=1, max= global$nChan, value=global$imgChan, step=1)
   })
   
   # UI to choose slice to display
@@ -479,6 +485,7 @@ server <- function(input, output) {
                  if (global$nFrame > 1) {
                    global$imgFrame <- input$frame1
                    global$img <- read_tif(input$imgFile$datapath, frames=input$frame1)
+                   global$imgChan <- input$channel1
                  }
                })
   
