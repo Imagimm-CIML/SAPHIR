@@ -478,7 +478,7 @@ server <- function(input, output) {
                handlerExpr={
                  if (global$nFrame > 1) {
                    global$imgFrame <- input$frame1
-                   global$img <- read_tif(input$imgFile$datapath, frames=global$imgFrame)
+                   global$img <- read_tif(input$imgFile$datapath, frames=input$frame1)
                  }
                })
   
