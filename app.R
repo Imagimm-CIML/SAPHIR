@@ -236,7 +236,7 @@ server <- function(input, output) {
   output$selectVar <- renderPlotly({
     req(!is.null(global$data))
     if (length(input$variablesHisto)==1) {
-      v <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram()
+      v <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
       ggplotly(v, source="v")
     }
     else if (length(input$variablesHisto)==2) {
@@ -250,14 +250,15 @@ server <- function(input, output) {
     req(!is.null(global$data))
     # If histogram : select ROIs having values selected
     if (length(input$variablesHisto)==1) {
+      d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
       if (!is.null(event_data("plotly_selected", source="v"))) {
-        min <- min(event_data("plotly_selected", source="v")$x)-5
-        max <- max(event_data("plotly_selected", source="v")$x)+5
+        min <- round(min(event_data("plotly_selected", source="v")$x)-d/2)
+        max <- round(max(event_data("plotly_selected", source="v")$x)+d/2)
         global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
       }
       else if (!is.null(event_data("plotly_click", source="v"))) {
-        min <- (event_data("plotly_click", source="v")$x)-5
-        max <- (event_data("plotly_click", source="v")$x)+5
+        min <- (event_data("plotly_click", source="v")$x)-d/2
+        max <- (event_data("plotly_click", source="v")$x)+d/2
         global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
       }
     }
