@@ -94,7 +94,7 @@ ui <- dashboardPage(
                         box (width = NULL, 
                              title = "Plot", solidHeader = TRUE, status = "primary",
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                             checkboxInput("selectAll", "Select all", value=FALSE),
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all", "Select none"), selected="Free selection"),
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                         ),
@@ -409,13 +409,13 @@ server <- function(input, output) {
   output$plot_rois1 <- renderPlotly({
     req(!is.null(global$data))
     p <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-      labs(x=colsX1(), y=colsY1())
+      labs(x=colsX1(), y=colsY1(), color= "Color")
     ggplotly(p, source="p")
   })
   
   # Reactive variable : points selected on the plot 
   rois_plot1 <- reactive({
-    if (input$selectAll == FALSE) {
+    if (input$selectionType == "Free selection") {
       if (!is.null(event_data("plotly_selected", source="p"))) {
         event_data("plotly_selected", source="p")$customdata
       }
@@ -423,10 +423,12 @@ server <- function(input, output) {
         event_data("plotly_click", source="p")$customdata
       }
     }
-    else if (input$selectAll == TRUE) {
+    else if (input$selectionType == "Select all") {
       rois_plot1 <- global$data$ID
     }
-    
+    else {
+      rois_plot1 <- c()
+    }
   })
   
   # Reactive variable : infos on points selected on the plot 
@@ -490,17 +492,15 @@ server <- function(input, output) {
                  }
                })
   
+  observeEvent(eventExpr=input$channel1,
+               handlerExpr={global$imgChan = input$channel1})
+  
   # Image plot 
   output$imgPlot <- renderPlot ({
     req(!is.null(global$img))
     req(!is.null(global$data))
     req(!is.null(global$zip))
-    for (i in c(1:dim(global$img)[3])) {
-      if (i==input$channel1) {
-        c <- i
-      }
-    }
-    display(global$img[,,c,1], method="raster")
+    display(global$img[,,global$imgChan,1], method="raster")
     if (global$nFrame==1) {
       for (i in rois_plot1()) {
         col <- global$colors$color[global$data$ID==i]
@@ -527,12 +527,7 @@ server <- function(input, output) {
     handlerExpr= {
       out <- tempfile(fileext='.png')
       png(out, height=dim(global$img)[1], width=dim(global$img)[2])
-      for (i in c(1:dim(global$img)[3])) {
-        if (i==input$channel1) {
-          c <- i
-        }
-      }
-      display(global$img[,,c,1], method="raster")
+      display(global$img[,,global$imgChan,1], method="raster")
       if (global$nFrame==1) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$data$ID==i]

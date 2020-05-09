@@ -5,6 +5,6 @@ account: elodiegrn
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2270925
-bundleId: 3124096
+bundleId: 3124267
 url: https://elodiegrn.shinyapps.io/imageexplorer/
-when: 1589025775.35142
+when: 1589031495.70353
