@@ -492,6 +492,16 @@ server <- function(input, output) {
                  }
                })
   
+  observeEvent(eventExpr=rois_plot1(),
+               handlerExpr={
+                 if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
+                   newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
+                   global$imgFrame <- newFrame
+                   global$img <- read_tif(input$imgFile$datapath, frames=newFrame)
+                   global$imgChan <- input$channel1
+                 }
+               })
+  
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
