@@ -147,24 +147,23 @@ ui <- dashboardPage(
       tabItem(tabName = "imageToPlot",
               fluidRow(
                 # First box : image displayer
-                box( width = 6,
+                box( width = 7,
                      title = "Image display", solidHeader = TRUE, status = "primary",
                      helpText("Select channel and frame to display."),
                      uiOutput("channel2"),
                      uiOutput("frame2"),
                      helpText("Select the color of the ROIs."),
                      uiOutput("color2"),
-                     radioButtons("select2", label="Type of selection on the image", choices = c("Click", "Brush"), selected="Click", inline=TRUE),
                      helpText("Click or select cells on the image and see their correspondance in the plot. "),
-                     withSpinner(plotOutput("img_rois2", brush="img_brush", click="img_click")),
+                     withSpinner(plotlyOutput("img_rois2")),
                      verbatimTextOutput("rois_img2")
                 ),
                 # Second box : corresponding plot 
-                box( width = 6, title = "Plot", solidHeader=TRUE, status="primary",
+                box( width = 5, title = "Plot", solidHeader=TRUE, status="primary",
                      helpText("Select the columns to use on the scatter plot."),
                      uiOutput("colsX2"),
                      uiOutput("colsY2"),
-                     plotlyOutput("plot_rois2"))
+                     plotOutput("plot_rois2"))
               )
       )
     ) 
@@ -180,23 +179,26 @@ server <- function(input, output) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs="", colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1)
+  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
   
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
       if ((count_frames(input$imgFile$datapath))[1]==1) {
         global$img <- read_tif(input$imgFile$datapath)
+        global$img2 <- read_tif(input$imgFile$datapath)
         global$nChan <- dim(global$img)[3]
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) {
         global$img <- read_tif(input$imgFile$datapath, frames=1)
+        global$img2 <- read_tif(input$imgFile$datapath, frames=1)
         global$nFrame <- count_frames(input$imgFile$datapath)[1]
         global$nChan <- dim(global$img)[3]
       }
     }
     else {
       if ((count_frames(input$imgFile$datapath)[1]==attr(count_frames(input$imgFile$datapath), "n_dirs"))) {
+        global$img2 <- read_tif(input$imgFile$datapath)
         global$img <- read_tif(input$imgFile$datapath)
         global$nChan <- dim(global$img)[3]
       }
@@ -283,7 +285,10 @@ server <- function(input, output) {
   observeEvent(eventExpr = input$remove,
                handlerExpr = {
                  global$data <- global$data[!(global$data$ID %in% rois_toRemove()$ID),]
-               })
+                 if (!is.null(global$colors)) {
+                   global$colors <- global$colors[!(global$colors$ID %in% rois_toRemove()$ID),]
+                 }
+               }, ignoreNULL=FALSE)
   
   # MENU PLOT TO IMAGE 
   # UI for choosing variables to display 
@@ -293,7 +298,7 @@ server <- function(input, output) {
                    label = "Column for X coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
-                   selected = names(global$data)[2],
+                   selected = names(global$data)[3],
                    options = list(maxItems = 1))
   })
   output$colsY1 <- renderUI({
@@ -302,7 +307,7 @@ server <- function(input, output) {
                    label = "Column for Y coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
-                   selected = names(global$data)[3],
+                   selected = names(global$data)[2],
                    options = list(maxItems = 1))
   })
   
@@ -321,6 +326,7 @@ server <- function(input, output) {
       input$colsY1
       input$x_limit1
       input$y_limit1
+      input$remove
     },
     handlerExpr = { 
       if (!is.null(global$data)) {
@@ -340,14 +346,14 @@ server <- function(input, output) {
             global$colors$color[i] <- "URgroup"
           }
           else if ((global$data[colsX1()][i,] < input$x_limit1) & (global$data[colsY1()][i,] > input$y_limit1)) {
-            global$colors$color[i] <- "LRgroup"
+            global$colors$color[i] <- "ULgroup"
           }
           else {
-            global$colors$color[i] <- "ULgroup"
+            global$colors$color[i] <- "LRgroup"
           }
         }
       }
-    }
+    }, ignoreNULL=FALSE
   )
   
   # Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
@@ -406,12 +412,17 @@ server <- function(input, output) {
   })
   
   # Scatter plot
-  output$plot_rois1 <- renderPlotly({
-    req(!is.null(global$data))
-    p <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-      labs(x=colsX1(), y=colsY1(), color= "Color")
-    ggplotly(p, source="p")
-  })
+  observeEvent(eventExpr=input$remove,
+               handlerExpr= {
+                  output$plot_rois1 <- renderPlotly({
+                    req(!is.null(global$data))
+                    req(!is.null(global$colors))
+                    p <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
+                      labs(x=colsX1(), y=colsY1(), color= "Color") + xlim(0,255) +ylim(0,255) 
+                    ggplotly(p, source="p")
+                  })
+               }, ignoreNULL=FALSE)
+
   
   # Reactive variable : points selected on the plot 
   rois_plot1 <- reactive({
@@ -492,7 +503,9 @@ server <- function(input, output) {
                  }
                })
   
-  observeEvent(eventExpr=rois_plot1(),
+  observeEvent(eventExpr= {
+                rois_plot1()
+                input$remove},
                handlerExpr={
                  if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
                    newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
@@ -506,34 +519,42 @@ server <- function(input, output) {
                handlerExpr={global$imgChan = input$channel1})
   
   # Image plot 
-  output$imgPlot <- renderPlot ({
-    req(!is.null(global$img))
-    req(!is.null(global$data))
-    req(!is.null(global$zip))
-    display(global$img[,,global$imgChan,1], method="raster")
-    if (global$nFrame==1) {
-      for (i in rois_plot1()) {
-        col <- global$colors$color[global$data$ID==i]
-        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-        plot(global$zip[[i]], col=col, add=TRUE)
-      }
-    }
-    else if (global$nFrame > 1) {
-      for (i in rois_plot1()) {
-        col <- global$colors$color[global$data$ID==i]
-        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-        if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-          plot(global$zip[[i]], col=col, add=TRUE)
-        }
-      }
-    }
-  })
+  observeEvent(eventExpr= {
+              input$remove
+              input$dataFile 
+              }, 
+               handlerExpr={
+                 output$imgPlot <- renderPlot ({
+                 req(!is.null(global$img))
+                 req(!is.null(global$data))
+                 req(!is.null(global$zip))
+                 display(global$img[,,global$imgChan,1], method="raster")
+                 if (global$nFrame==1) {
+                   for (i in rois_plot1()) {
+                     col <- global$colors$color[global$data$ID==i]
+                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                     plot(global$zip[[i]], col=col, add=TRUE)
+                   }
+                 }
+                 else if (global$nFrame > 1) {
+                   for (i in rois_plot1()) {
+                     col <- global$colors$color[global$data$ID==i]
+                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                     if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+                       plot(global$zip[[i]], col=col, add=TRUE)
+                     }
+                   }
+                 }
+               })})
+  
+  
   
   # Image PNG
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
-    input$frame1 },
+    input$frame1
+    input$remove},
     handlerExpr= {
       out <- tempfile(fileext='.png')
       png(out, height=dim(global$img)[1], width=dim(global$img)[2])
@@ -568,7 +589,8 @@ server <- function(input, output) {
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
-    input$frame1 },
+    input$frame1 
+    input$remove},
     handlerExpr= {
       output$list <- EBImage::renderDisplay({
         req(length(rois_plot1()) != 0)
@@ -644,7 +666,8 @@ server <- function(input, output) {
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
-    input$frame1 },
+    input$frame1 
+    input$remove},
     handlerExpr= {
       output$zoomImg <- EBImage::renderDisplay({
         req(length(rois_plot1()) != 0)
@@ -653,17 +676,30 @@ server <- function(input, output) {
     })
   
   ## MENU IMAGE TO PLOT
-  # UI to choose channel to display on the image
+  # UI to choose channel to display for the image
   output$channel2 <- renderUI({
-    req(!is.null(global$img))
-    sliderInput("channel2", label="Channel to display", min=1, max=dim(global$img)[3], value=1, step=1)
+    req(is.null(global$img)==FALSE)
+    sliderInput("channel2", label="Channel to display", min=1, max= global$nChan, value=global$imgChan2, step=1)
   })
   
   # UI to choose slice to display
   output$frame2 <- renderUI ({
-    req(!is.null(global$img))
-    sliderInput("frame2", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame, step=1)
+    req(is.null(global$img)==FALSE)
+    sliderInput("frame2", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame2, step=1)
   })
+  
+  # Modification of image read when modification of frame slider 
+  observeEvent(eventExpr=input$frame2,
+               handlerExpr={
+                 if (global$nFrame > 1) {
+                   global$imgFrame2 <- input$frame2
+                   global$img2 <- read_tif(input$imgFile$datapath, frames=input$frame2)
+                   global$imgChan2 <- input$channel2
+                 }
+               })
+  
+  observeEvent(eventExpr=input$channel2,
+               handlerExpr={global$imgChan2 = input$channel2})
   
   # UI to choose color of the ROIs 
   output$color2 <- renderUI ({
@@ -671,69 +707,131 @@ server <- function(input, output) {
     radioButtons("color2", label = "Color of the ROIs", choices=c("red", "blue", "green" ,"yellow", "white"), selected="red", inline=TRUE)
   })
   
+  observeEvent(eventExpr= {
+    global$img2
+    global$zip
+    input$channel2
+    input$frame2 
+    input$color2
+    input$remove},
+    handlerExpr= {
+      if ((!is.null(global$img2)) & (!is.null(global$zip))) {
+        out2 <- tempfile(fileext='.png')
+        png(out2, height=dim(global$img2)[1], width=dim(global$img2)[2])
+        display(global$img2[,,global$imgChan2,1], method="raster")
+        if (global$nFrame == 1) {
+          for (i in c(1:length(global$zip))) {
+            plot(global$zip[[i]], col=input$color2, add=TRUE) 
+          }
+        }
+        else if (global$nFrame > 1) {
+          for (i in global$data$ID) {
+            if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
+              plot(global$zip[[i]], col=input$color2, add=TRUE)
+            }
+          } 
+        }
+        dev.off()
+        out2 <- normalizePath(out2, "/")
+        global$imgPNG2 <- png::readPNG(out2)
+      }
+    })
+  
   # Plot with the image and all ROIs 
-  output$img_rois2 <- renderPlot({
-    req(!is.null(global$img))
+  output$img_rois2 <- renderPlotly({
+    req(!is.null(global$imgPNG2))
     req(!is.null(global$data))
     req(!is.null(global$zip))
-    for (i in c(1:dim(global$img)[3])) {
-      if (i==input$channel2) {
-        c <- i
+    axX <- list(
+      title = "",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE,
+      range = c(0, dim(global$imgPNG2)[2])
+    )
+    axY <- list(
+      title = "",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE,
+      range = c(0, dim(global$imgPNG2)[1])
+    )
+    xcenter = c()
+    ycenter = c()
+    if (global$nFrame > 1 ) {
+      for (i in global$data$ID[global$data$Slice==global$imgFrame2]) {
+        xcenter = c(xcenter,round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2))
+        ycenter = c(ycenter, dim(global$imgPNG2)[1]-round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2))
       }
+      p <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID[global$data$Slice==global$imgFrame2], mode="markers", type="scatter", source="i") %>%
+        layout(
+          images = list(
+            list(
+              source = raster2uri(as.raster(global$imgPNG2)),
+              xref="x",
+              yref="y",
+              x = 0, 
+              y = dim(global$imgPNG2)[1], 
+              sizex = dim(global$imgPNG2)[2],
+              sizey = dim(global$imgPNG2)[1],
+              opacity=1,
+              sizing="stretch"
+            )
+          )
+        ) 
+      p <- p %>% layout(xaxis = axX, yaxis=axY)
+      p <- p %>% event_register(event="plotly_selected")
     }
-    display(global$img[,,c,1], method="raster")
-    if (global$nFrame == 1) {
-      for (i in c(1:length(global$zip))) {
-        plot(global$zip[[i]], col=input$color2, add=TRUE) 
-      }
-    }
-    else if (global$nFrame > 1) {
+    else if (global$nFrame == 1) {
       for (i in global$data$ID) {
-        if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-          plot(global$zip[[i]], col=input$color2, add=TRUE)
-        }
-      } 
+        xcenter = c(xcenter,(global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+        ycenter = c(ycenter, dim(global$img2)[1]-(global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+      }
+      p <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID, mode="markers", type="scatter", source="i") %>%
+        layout(
+          images = list(
+            list(
+              source = raster2uri(as.raster(global$imgPNG2)),
+              xref="x",
+              yref="y",
+              x = 0, 
+              y = dim(global$imgPNG2)[1], 
+              sizex = dim(global$imgPNG2)[2],
+              sizey = dim(global$imgPNG2)[1],
+              opacity=1,
+              sizing="stretch"
+            )
+          )
+        ) 
+      p <- p %>% layout(xaxis = axX, yaxis=axY)
+      p <- p %>% event_register(event="plotly_selected")
     }
-    
   })
+  
   
   # Infos on ROIs selected on the image 
   output$rois_img2 <- renderPrint({
     req(!is.null(global$img))
     req(!is.null(global$data))
     req(!is.null(global$zip))
-    list <- c()
-    if ((input$select2 == "Click") & (is.null(input$img_click)==FALSE)){
-      for (i in global$data$ID) {
-        x_val <- c(min(global$zip[[i]]$coords[,1]):max(global$zip[[i]]$coords[,1]))
-        y_val <- c(min(global$zip[[i]]$coords[,2]):max(global$zip[[i]]$coords[,2]))
-        if ((is.element(round(input$img_click$y),y_val)) & (is.element(round(input$img_click$x), x_val))) {
-          list <- c(list, i)
-        }
-      }
+    if (!is.null(event_data("plotly_click", source="i")$customdata)) {
+      global$IDs <- event_data("plotly_click", source="i")$customdata
     }
-    else if ((input$select2 == "Brush") & (is.null(input$img_brush)==FALSE)) {
-      x_val_brush <- c(round(input$img_brush$xmin):round(input$img_brush$xmax))
-      y_val_brush <- c(round(input$img_brush$ymin):round(input$img_brush$ymax))
-      for (i in global$data$ID) {
-        x_val <- c(min(global$zip[[i]]$coords[,1]):max(global$zip[[i]]$coords[,1]))
-        y_val <- c(min(global$zip[[i]]$coords[,2]):max(global$zip[[i]]$coords[,2]))
-        if ((identical(intersect(x_val_brush, x_val), integer(0))==FALSE) & (identical(intersect(y_val_brush, y_val), integer(0))==FALSE)) {
-          list <- c(list, i)
-        }
-      }
+    if (!is.null(event_data("plotly_selected", source="i")$customdata)) {
+      global$IDs <- event_data("plotly_selected", source="i")$customdata
     }
-    global$IDs <- list
-    global$data[global$IDs,]
+    global$data[global$data$ID %in% global$IDs,]
   })
   
   # Plot corresponding to ROIs selected
-  output$plot_rois2 <- renderPlotly({
-    req(!is.null(global$img))
+  output$plot_rois2 <- renderPlot({
+    req(!is.null(global$IDs))
+    req(!is.null(global$img2))
     req(!is.null(global$data))
     req(!is.null(global$zip))
-    p <- ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2, color="`Cell.type`")) + labs(x=input$colsX2, y=input$colsY2, color="Cell type") + xlim(0,255) +ylim(0,255)
-    ggplotly(p)
+    ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2, color="`Cell.type`")) + labs(x=input$colsX2, y=input$colsY2, color="Cell type") + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
   })
   
   # UI for choosing variables to display 
@@ -743,6 +841,7 @@ server <- function(input, output) {
                    label = "Column for X coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
+                   selected = names(global$data)[3],
                    options = list(maxItems = 1))
   })
   output$colsY2 <- renderUI({
@@ -751,6 +850,7 @@ server <- function(input, output) {
                    label = "Column for Y coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
+                   selected = names(global$data)[2],
                    options = list(maxItems = 1))
   })
   
