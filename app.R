@@ -48,6 +48,7 @@ ui <- dashboardPage(
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
+                     actionButton("default", "Use default files"),
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
                      tags$hr(),
@@ -179,27 +180,38 @@ server <- function(input, output) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(data = NULL, img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  
   
   # File reactive variable : infos on file chosen & read datas
+  observeEvent(eventExpr=input$default, handlerExpr = {
+                 global$imgPath <- "www/image.tif"
+                 global$img <- read_tif("www/image.tif", frame=1)
+                 global$img2 <- read_tif("www/image.tif", frame=1)
+                 global$nChan <- dim(global$img)[3]
+                 global$nFrame <- count_frames(global$imgPath)[1]
+                 global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
+                 global$zip <- read.ijzip("www/roiset.zip")
+               })
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
+    global$imgPath <- input$imgFile$datapath
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
       if ((count_frames(input$imgFile$datapath))[1]==1) {
-        global$img <- read_tif(input$imgFile$datapath)
-        global$img2 <- read_tif(input$imgFile$datapath)
+        global$img <- read_tif(global$imgPath)
+        global$img2 <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) {
-        global$img <- read_tif(input$imgFile$datapath, frames=1)
-        global$img2 <- read_tif(input$imgFile$datapath, frames=1)
-        global$nFrame <- count_frames(input$imgFile$datapath)[1]
+        global$img <- read_tif(global$imgPath, frames=1)
+        global$img2 <- read_tif(global$imgPath, frames=1)
+        global$nFrame <- count_frames(global$imgPath)[1]
         global$nChan <- dim(global$img)[3]
       }
     }
     else {
-      if ((count_frames(input$imgFile$datapath)[1]==attr(count_frames(input$imgFile$datapath), "n_dirs"))) {
-        global$img2 <- read_tif(input$imgFile$datapath)
-        global$img <- read_tif(input$imgFile$datapath)
+      if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) {
+        global$img2 <- read_tif(global$imgPath)
+        global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
       }
       else {
@@ -434,20 +446,26 @@ server <- function(input, output) {
                   })
                }, ignoreNULL=FALSE)
 
-  
+  selectionRois <- reactive({
+    req(!is.null(global$data))
+    req(!is.null(global$colors))
+    if (!is.null(event_data("plotly_selecting", source="p"))) {
+      selectionRois <- event_data("plotly_selecting", source="p")$customdata
+    }
+    else if (!is.null(event_data("plotly_click", source="p"))) {
+      selectionRois <- event_data("plotly_click", source="p")$customdata
+    }
+  })
   # Reactive variable : points selected on the plot 
-  rois_plot1 <- reactive({
+  rois_plot1 <- eventReactive(eventExpr = {input$selectionType
+    selectionRois()
+    }, valueExpr = {
     req(!is.null(global$data))
     req(!is.null(global$colors))
     if (input$selectionType == "Free selection") {
-      if (!is.null(event_data("plotly_selecting", source="p"))) {
-        event_data("plotly_selecting", source="p")$customdata
-      }
-      else if (!is.null(event_data("plotly_click", source="p"))) {
-        event_data("plotly_click", source="p")$customdata
-      }
+      rois_plot1 <- selectionRois()
     }
-    else if (input$selectionType == "Select all ROIS of all frames") {
+    else if (input$selectionType == "Select all ROIs of all frames") {
       rois_plot1 <- global$data$ID
     }
     else if (input$selectionType == "Select all ROIs of the actual frame") {
@@ -461,7 +479,7 @@ server <- function(input, output) {
     else {
       rois_plot1 <- c()
     }
-  })
+  }, ignoreNULL=FALSE)
   
   # Reactive variable : infos on points selected on the plot 
   rois_plot_table1 <- reactive ({
@@ -519,7 +537,7 @@ server <- function(input, output) {
                handlerExpr={
                  if (global$nFrame > 1) {
                    global$imgFrame <- input$frame1
-                   global$img <- read_tif(input$imgFile$datapath, frames=input$frame1)
+                   global$img <- read_tif(global$imgPath, frames=input$frame1)
                    global$imgChan <- input$channel1
                  }
                })
@@ -531,18 +549,20 @@ server <- function(input, output) {
                  if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
                    newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
                    global$imgFrame <- newFrame
-                   global$img <- read_tif(input$imgFile$datapath, frames=newFrame)
+                   global$img <- read_tif(global$imgPath, frames=newFrame)
                    global$imgChan <- input$channel1
                  }
-               })
+               }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
   # Image plot 
   observeEvent(eventExpr= {
-              input$remove
-              input$dataFile 
+              #input$remove
+              rois_plot1()
+              input$channel1
+              input$frame1
               }, 
                handlerExpr={
                  output$imgPlot <- renderPlot ({
@@ -566,7 +586,7 @@ server <- function(input, output) {
                      }
                    }
                  }
-               })})
+               })}, ignoreNULL=FALSE)
   
   
   
@@ -714,7 +734,7 @@ server <- function(input, output) {
                handlerExpr={
                  if (global$nFrame > 1) {
                    global$imgFrame2 <- input$frame2
-                   global$img2 <- read_tif(input$imgFile$datapath, frames=input$frame2)
+                   global$img2 <- read_tif(global$imgPath, frames=input$frame2)
                    global$imgChan2 <- input$channel2
                  }
                })
