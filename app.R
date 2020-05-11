@@ -438,7 +438,7 @@ server <- function(input, output) {
                     req(!is.null(global$data))
                     req(!is.null(global$colors))
                     gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-                      labs(x=colsX1(), y=colsY1(), color= "Color") + xlim(0,255) +ylim(0,255) 
+                      labs(x=colsX1(), y=colsY1(), color= "Color") 
                     p <- ggplotly(gg, source="p")
                     p %>% 
                       layout(dragmode = "select") %>%
