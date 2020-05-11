@@ -285,9 +285,6 @@ server <- function(input, output) {
   observeEvent(eventExpr = input$remove,
                handlerExpr = {
                  global$data <- global$data[!(global$data$ID %in% rois_toRemove()$ID),]
-                 if (!is.null(global$colors)) {
-                   global$colors <- global$colors[!(global$colors$ID %in% rois_toRemove()$ID),]
-                 }
                }, ignoreNULL=FALSE)
   
   # MENU PLOT TO IMAGE 
@@ -329,7 +326,7 @@ server <- function(input, output) {
       input$remove
     },
     handlerExpr = { 
-      if (!is.null(global$data)) {
+      if ((!is.null(global$data)) & (!is.null(colsX1()))) {
         # Dataframe which will contain datas to plot depending on cols selected 
         global$colors <- data.frame(global$data$ID)
         global$colors$color <- "blue"
@@ -353,7 +350,7 @@ server <- function(input, output) {
           }
         }
       }
-    }, ignoreNULL=FALSE
+    }, ignoreNULL=FALSE 
   )
   
   # Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
