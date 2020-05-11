@@ -94,7 +94,7 @@ ui <- dashboardPage(
                         box (width = NULL, 
                              title = "Plot", solidHeader = TRUE, status = "primary",
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all", "Select none"), selected="Free selection"),
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection"),
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                         ),
@@ -237,25 +237,35 @@ server <- function(input, output) {
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectVar <- renderPlotly({
     req(!is.null(global$data))
+    req(!is.null(input$variablesHisto))
     if (length(input$variablesHisto)==1) {
-      v <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
-      ggplotly(v, source="v")
+      gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
+      v <- ggplotly(gg, source="v")
+      v %>% 
+        layout(dragmode = "select") %>%
+        event_register("plotly_selecting")
+      
     }
     else if (length(input$variablesHisto)==2) {
-      v <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto[[1]], y=input$variablesHisto[[2]], customdata="ID"))
-      ggplotly(v, source="v")
+      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto[[1]], y=input$variablesHisto[[2]], customdata="ID"))
+      v <- ggplotly(gg, source="v")
+      v %>% 
+        layout(dragmode = "select") %>%
+        event_register("plotly_selecting")
+      
     }
   })
   
   # ROIs to remove depending on selection 
   rois_toRemove <- reactive({
     req(!is.null(global$data))
+    req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
     if (length(input$variablesHisto)==1) {
       d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
-      if (!is.null(event_data("plotly_selected", source="v"))) {
-        min <- round(min(event_data("plotly_selected", source="v")$x)-d/2)
-        max <- round(max(event_data("plotly_selected", source="v")$x)+d/2)
+      if (!is.null(event_data("plotly_selecting", source="v"))) {
+        min <- event_data("plotly_selecting", source="v")$x[1]-d/2
+        max <- event_data("plotly_selecting", source="v")$x[length(event_data("plotly_selecting", source="v")$x)]+d/2
         global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
       }
       else if (!is.null(event_data("plotly_click", source="v"))) {
@@ -266,8 +276,8 @@ server <- function(input, output) {
     }
     # If scatterplot : select ROIs corresponding to points selected
     else {
-      if (!is.null(event_data("plotly_selected", source="v"))) {
-        global$data[event_data("plotly_selected", source="v")$customdata,]
+      if (!is.null(event_data("plotly_selecting", source="v"))) {
+        global$data[event_data("plotly_selecting", source="v")$customdata,]
       }
       else if (!is.null(event_data("plotly_click", source="v"))) {
         global$data[event_data("plotly_click", source="v")$customdata,]
@@ -278,6 +288,7 @@ server <- function(input, output) {
   # Print table of ROIs to remove
   output$roisRemove <- renderPrint ({
     req(!is.null(global$data))
+    req(!is.null(rois_toRemove()))
     rois_toRemove()
   })
   
@@ -414,25 +425,38 @@ server <- function(input, output) {
                   output$plot_rois1 <- renderPlotly({
                     req(!is.null(global$data))
                     req(!is.null(global$colors))
-                    p <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
+                    gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
                       labs(x=colsX1(), y=colsY1(), color= "Color") + xlim(0,255) +ylim(0,255) 
-                    ggplotly(p, source="p")
+                    p <- ggplotly(gg, source="p")
+                    p %>% 
+                      layout(dragmode = "select") %>%
+                      event_register("plotly_selecting")
                   })
                }, ignoreNULL=FALSE)
 
   
   # Reactive variable : points selected on the plot 
   rois_plot1 <- reactive({
+    req(!is.null(global$data))
+    req(!is.null(global$colors))
     if (input$selectionType == "Free selection") {
-      if (!is.null(event_data("plotly_selected", source="p"))) {
-        event_data("plotly_selected", source="p")$customdata
+      if (!is.null(event_data("plotly_selecting", source="p"))) {
+        event_data("plotly_selecting", source="p")$customdata
       }
       else if (!is.null(event_data("plotly_click", source="p"))) {
         event_data("plotly_click", source="p")$customdata
       }
     }
-    else if (input$selectionType == "Select all") {
+    else if (input$selectionType == "Select all ROIS of all frames") {
       rois_plot1 <- global$data$ID
+    }
+    else if (input$selectionType == "Select all ROIs of the actual frame") {
+      if (global$nFrame > 1) {
+        rois_plot1 <- global$data$ID[global$data$Slice==global$imgFrame]
+      }
+      else if (global$nFrame == 1) {
+        rois_plot1 <- global$data$ID
+      }
     }
     else {
       rois_plot1 <- c()
@@ -779,7 +803,7 @@ server <- function(input, output) {
           )
         ) 
       p <- p %>% layout(xaxis = axX, yaxis=axY)
-      p <- p %>% event_register(event="plotly_selected")
+      p <- p %>% event_register(event="plotly_selecting")
     }
     else if (global$nFrame == 1) {
       for (i in global$data$ID) {
@@ -803,7 +827,7 @@ server <- function(input, output) {
           )
         ) 
       p <- p %>% layout(xaxis = axX, yaxis=axY)
-      p <- p %>% event_register(event="plotly_selected")
+      p <- p %>% event_register(event="plotly_selecting")
     }
   })
   
@@ -816,8 +840,8 @@ server <- function(input, output) {
     if (!is.null(event_data("plotly_click", source="i")$customdata)) {
       global$IDs <- event_data("plotly_click", source="i")$customdata
     }
-    if (!is.null(event_data("plotly_selected", source="i")$customdata)) {
-      global$IDs <- event_data("plotly_selected", source="i")$customdata
+    if (!is.null(event_data("plotly_selecting", source="i")$customdata)) {
+      global$IDs <- event_data("plotly_selecting", source="i")$customdata
     }
     global$data[global$data$ID %in% global$IDs,]
   })
