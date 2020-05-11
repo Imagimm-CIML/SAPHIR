@@ -13,7 +13,6 @@ If the first line of the file represent the names of the columns, check the "Hea
 The table must have column headers with unique column names. Columns names are requisites : 
 - the column containing the IDs must be named "ID"
 - the column containing the areas must be names "Cell area"
-- the columns containing the cell type must be named "Cell type"
 - if there is a 4th dimension with depth, the file must contain a column "Slice" which contain for each ROI the Slice in which it is. 
 
 #### File ROIs 
@@ -55,6 +54,11 @@ Selections on the plot :
 Image : <br>
 The image is displayed on the left, channel and slice to display can be modified with the sliders. 
 ROIs selected on the plot are displayed on the image and the color of the mask correspond to the subgroups of the plot. 
+You can choose to display ROIs in different ways by clicking on the radiobuttons above the plot : 
+* "Free selection" means the ROIs displayed on the image are the one selected on the plot. If you select one ROI, the displayer will show the slice of the selected ROI. 
+* "Select all ROIs of all frames" means all the ROIs of the data file are displayed. 
+* "Select all ROIs of actual frame" means that the ROIs of the frame selected are displayed on all frames. 
+* "Select none" means none ROIs are displayed. 
 
 Cropped ROIs : <br>
 The ROIs selected on the plot can be displayed in the right lower box in the tab "ROIs". You can modify the size of the crop with a slider. 
