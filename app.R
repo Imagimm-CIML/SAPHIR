@@ -1,6 +1,6 @@
 ## AVEC MENU CHOIX & CR0P & REMOVE
 # Installation of the necessary packages
-pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar")
+pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) {
   install.packages(new.pkg)
@@ -21,6 +21,7 @@ library(ijtiff)
 library(RImageJROI)
 library(plotly)
 library(V8)
+library(shinyFiles)
 
 # User interface 
 ui <- dashboardPage(
@@ -48,10 +49,10 @@ ui <- dashboardPage(
               fluidRow(
                 box( width = 12, solidHeader=TRUE, status="primary",
                      title = "Type of analysis",
-                     radioButtons("os", "Select your OS", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
+                     radioButtons("os", "Select your OS :", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
                      radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="ImageJ", inline=TRUE),
                      uiOutput("imageJ"),
-                     radioButtons("analysis", "Select the analysis you want to make", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
+                     radioButtons("analysis", "Select the analysis you want to make :", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
                      uiOutput("macro"),
                      actionButton("launch", "Launch macro")
                      )
@@ -188,7 +189,7 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   
-  ### MENU IMAGE 
+  ### MENU SEGMENTATION
   observeEvent(input$refresh, {
     shinyjs::js$refresh()
   })
@@ -337,7 +338,7 @@ server <- function(input, output, session) {
           system(systemPath)
     })
   
-  
+  ## MENU IMAGE
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
                  global$imgPath <- "www/image.tif"
