@@ -99,17 +99,18 @@ ui <- dashboardPage(
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                         ),
-                        tabBox (width=NULL, selected="Subgroups",
+                        tabsetPanel (id="infosGroup", selected="Subgroups",
                                 tabPanel("Subgroups",
+                                         tags$br()
                                          downloadLink("downloadData", "Download Groups subtables"),
                                          tags$br(),
                                          downloadLink("downloadSummaryData", "Download summary of groups subtables"),
                                          tags$br(),
                                          tags$br(),
-                                         verbatimTextOutput("groups"),
-                                         verbatimTextOutput("summary")
+                                         verbatimTextOutput("groups")
                                 ),
                                 tabPanel("Selected", 
+                                         tabs$br()
                                          verbatimTextOutput("rois_plot1"),
                                          downloadLink("downloadSubdata", "Download selected ROIs subtable"),
                                          tags$br(),
@@ -172,7 +173,7 @@ ui <- dashboardPage(
 )
 
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   ### MENU IMAGE 
   observeEvent(input$refresh, {
@@ -193,6 +194,7 @@ server <- function(input, output) {
                  global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
                  global$zip <- read.ijzip("www/roiset.zip")
                })
+  
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
     global$imgPath <- input$imgFile$datapath
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
@@ -446,6 +448,7 @@ server <- function(input, output) {
                   })
                }, ignoreNULL=FALSE)
 
+  # Reactive variable : points selected on the plot 
   selectionRois <- reactive({
     req(!is.null(global$data))
     req(!is.null(global$colors))
@@ -456,10 +459,11 @@ server <- function(input, output) {
       selectionRois <- event_data("plotly_click", source="p")$customdata
     }
   })
-  # Reactive variable : points selected on the plot 
+
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
-    }, valueExpr = {
+    }, valueExpr = 
+      {
     req(!is.null(global$data))
     req(!is.null(global$colors))
     if (input$selectionType == "Free selection") {
@@ -480,6 +484,11 @@ server <- function(input, output) {
       rois_plot1 <- c()
     }
   }, ignoreNULL=FALSE)
+  
+  observeEvent(eventExpr={rois_plot1()}, 
+               handlerExpr= {
+                 updateTabsetPanel(session, "infosGroup", selected="Selected")
+               })
   
   # Reactive variable : infos on points selected on the plot 
   rois_plot_table1 <- reactive ({
@@ -578,11 +587,20 @@ server <- function(input, output) {
                    }
                  }
                  else if (global$nFrame > 1) {
-                   for (i in rois_plot1()) {
-                     col <- global$colors$color[global$data$ID==i]
-                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                     if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+                   if (input$selectionType == "Select all ROIs of the actual frame") {
+                     for (i in rois_plot1()) {
+                       col <- global$colors$color[global$data$ID==i]
+                       col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
                        plot(global$zip[[i]], col=col, add=TRUE)
+                     }
+                   }
+                   else {
+                     for (i in rois_plot1()) {
+                       col <- global$colors$color[global$data$ID==i]
+                       col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                       if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+                         plot(global$zip[[i]], col=col, add=TRUE)
+                       }
                      }
                    }
                  }
@@ -595,7 +613,8 @@ server <- function(input, output) {
     rois_plot1()
     input$channel1
     input$frame1
-    input$remove},
+    #input$remove
+    },
     handlerExpr= {
       out <- tempfile(fileext='.png')
       png(out, height=dim(global$img)[1], width=dim(global$img)[2])
@@ -631,7 +650,8 @@ server <- function(input, output) {
     rois_plot1()
     input$channel1
     input$frame1 
-    input$remove},
+    #input$remove
+    },
     handlerExpr= {
       output$list <- EBImage::renderDisplay({
         req(length(rois_plot1()) != 0)
@@ -708,7 +728,7 @@ server <- function(input, output) {
     rois_plot1()
     input$channel1
     input$frame1 
-    input$remove},
+    },
     handlerExpr= {
       output$zoomImg <- EBImage::renderDisplay({
         req(length(rois_plot1()) != 0)
