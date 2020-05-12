@@ -31,9 +31,10 @@ ui <- dashboardPage(
     ## Menu with 3 items
     sidebarMenu(
       id = "menu",
+      menuItem("Segmentation", tabName = "segmentation", icon=icon("images")),
       menuItem("Choose your image", tabName = "image", icon=icon("file-import")),
-      menuItem("Plot to image", tabName = "plotToImage", icon = icon("file-import")),
-      menuItem("Image to plot", tabName = "imageToPlot", icon = icon("file-import"))
+      menuItem("Plot to image", tabName = "plotToImage", icon = icon("poll")),
+      menuItem("Image to plot", tabName = "imageToPlot", icon = icon("image"))
     )
   ),
   dashboardBody(
@@ -43,6 +44,18 @@ ui <- dashboardPage(
     shinyjs::extendShinyjs(text = "shinyjs.refresh = function() { location.reload(); }"),
     # FIRST ITEM : Choose image to analyse & select values to remove
     tabItems(
+      tabItem(tabName = "segmentation",
+              fluidRow(
+                box( width = 12, solidHeader=TRUE, status="primary",
+                     title = "Type of analysis",
+                     radioButtons("os", "Select your OS", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
+                     radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="Fiji", inline=TRUE),
+                     uiOutput("imageJ"),
+                     radioButtons("analysis", "Select the analysis you want to make", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
+                     uiOutput("macro"),
+                     actionButton("launch", "Launch macro")
+                     )
+              )),
       tabItem(tabName= "image",
               # Image browser 
               fluidRow(
@@ -81,7 +94,7 @@ ui <- dashboardPage(
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
               fluidRow(
-                column( width =6,
+                column( width =5,
                         # First box : Plot & Datas
                         box( width = NULL,
                              title = "Plot parameters", solidHeader = TRUE, status = "primary", collapsible = TRUE,
@@ -101,7 +114,7 @@ ui <- dashboardPage(
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                 tabPanel("Subgroups",
-                                         tags$br()
+                                         tags$br(),
                                          downloadLink("downloadData", "Download Groups subtables"),
                                          tags$br(),
                                          downloadLink("downloadSummaryData", "Download summary of groups subtables"),
@@ -110,7 +123,7 @@ ui <- dashboardPage(
                                          verbatimTextOutput("groups")
                                 ),
                                 tabPanel("Selected", 
-                                         tabs$br()
+                                         tags$br(),
                                          verbatimTextOutput("rois_plot1"),
                                          downloadLink("downloadSubdata", "Download selected ROIs subtable"),
                                          tags$br(),
@@ -121,7 +134,7 @@ ui <- dashboardPage(
                         )
                 ),
                 # Second box : Image displayer
-                column (width=6,
+                column (width=7,
                         box( width=NULL, 
                              title = "Image display", solidHeader= TRUE, status = "primary",
                              helpText("Select channel and frame to display."),
@@ -181,7 +194,123 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(ijpath="", fijipath="", macroPath="", data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  
+  shinyDirChoose(input, 'imageJ', roots=c(home=''))
+  shinyFileChoose(input, 'macro', roots=c(home=''))
+  
+  output$imageJ <- renderUI ({
+    if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
+      shinyDirLink('imageJ', 'Select ImageJ / Fiji', 'Please select your ImageJ/Fiji app', FALSE)
+    }
+  })
+  
+  observeEvent(eventExpr = {
+                 input$imageJ
+               },
+               handlerExpr = {
+                 if (!"path" %in% names(input$imageJ)) return()
+                 if ((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) {
+                   global$ijPath <-
+                     file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
+                   if (!dir.exists("www")) {dir.create("www")}
+                   f <- file("www/ijpath.txt", open = "w")
+                   cat(global$ijPath, file = f)
+                   close(f)
+                 }
+                 if ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji")) {
+                   global$fijiPath <-
+                     file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
+                   if (!dir.exists("www")) {dir.create("www")}
+                   f <- file("www/fijipath.txt", open = "w")
+                   cat(global$fijiPath, file = f)
+                   close(f)
+                 }
+               })
+  
+  if (file.exists("www/ijpath.txt")) {
+    global$ijPath <- readtext("www/ijpath.txt")$text
+  }
+  
+  if (file.exists("www/fijipath.txt")) {
+    global$fijiPath <- readtext("www/fijipath.txt")$text
+  }
+  
+  observeEvent(eventExpr = {
+    input$software
+    input$analysis}, 
+    handlerExpr = {
+      if ((input$software=="ImageJ") & (input$analysis=="Detection")) {
+        if (file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
+          global$macroPath <- str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep="")
+        }
+        else if (file.exists("www/macroDetect.txt")) {
+          global$macroPath <- readtext("www/macroDetect.txt")$text
+        }
+      }
+      if ((input$software=="Fiji") & (input$analysis=="Detection")) {
+        if (file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
+          global$macroPath <- str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")
+        }
+        else if (file.exists("www/macroDetect.txt")) {
+          global$macroPath <- readtext("www/macroDetect.txt")$text
+        }
+      }
+    })
+  
+  output$macro <- renderUI ({
+    if ((((!file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) & (input$software=="ImageJ")) | ((!file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")))) & (input$software=="Fiji"))) {
+      if (((!file.exists("www/macroProlif.txt")) & (input$analysis=="Proliferative")) | ((!file.exists("www/macroDetect.txt")) & (input$analysis=="Detection"))) {
+        shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE)
+      }
+    }
+  })
+  
+  
+  observeEvent(eventExpr = {
+    input$macro
+  },
+  handlerExpr = {
+    if (!"path" %in% names(input$macro)) return()
+    if ((!file.exists("www/macroProlif.txt")) & (input$analysis=="Proliferative")) {
+      global$macroPath <-
+        file.path("", paste(unlist(input$macro$path[-1]), collapse = .Platform$file.sep))
+      if (!dir.exists("www")) {dir.create("www")}
+      f <- file("www/macroProlif.txt", open = "w")
+      cat(global$macroPath, file = f)
+      close(f)
+    }
+    if ((!file.exists("www/macroDetect.txt")) & (input$software=="Detection")) {
+      global$macroPath <-
+        file.path("", paste(unlist(input$macro$path[-1]), collapse = .Platform$file.sep))
+      if (!dir.exists("www")) {dir.create("www")}
+      f <- file("www/macroDetect.txt", open = "w")
+      cat(global$macroPath, file = f)
+      close(f)
+    }
+  })
+  
+  observeEvent(eventExpr={
+        input$launch}, 
+        handlerExpr={
+            if (input$os == "MacOs") {
+              if (input$software=="ImageJ") {
+                systemPath <- str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep="")
+              }
+              else if (input$software=="Fiji") {
+                systemPath <- str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
+              }
+            }
+            else if (input$os == "Windows") {
+              if (input$software == "ImageJ") {
+                systemPath <- str_c(global$ijPath, "/jre/bin/java -jar Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep="")
+              }
+              else if (input$software == "Fiji") {
+                systemPath <- str_c(global$fijiPath, "/ImageJ-win64 -macro ", global$macroPath, sep="" )
+              }
+            }
+          system(systemPath)
+    })
   
   
   # File reactive variable : infos on file chosen & read datas
@@ -440,11 +569,13 @@ server <- function(input, output, session) {
                     req(!is.null(global$data))
                     req(!is.null(global$colors))
                     gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-                      labs(x=colsX1(), y=colsY1(), color= "Color") 
+                      labs(x=colsX1(), y=colsY1(), color= "Color") + theme(legend.title=element_blank())
                     p <- ggplotly(gg, source="p")
                     p %>% 
                       layout(dragmode = "select") %>%
                       event_register("plotly_selecting")
+                    p %>% config(displayModeBar = F)  %>%
+                      layout(legend = list(orientation = "h", x = 0.2, y = -0.5))
                   })
                }, ignoreNULL=FALSE)
 
@@ -774,7 +905,7 @@ server <- function(input, output, session) {
     input$channel2
     input$frame2 
     input$color2
-    input$remove},
+    },
     handlerExpr= {
       if ((!is.null(global$img2)) & (!is.null(global$zip))) {
         out2 <- tempfile(fileext='.png')
