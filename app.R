@@ -49,7 +49,7 @@ ui <- dashboardPage(
                 box( width = 12, solidHeader=TRUE, status="primary",
                      title = "Type of analysis",
                      radioButtons("os", "Select your OS", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
-                     radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="Fiji", inline=TRUE),
+                     radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="ImageJ", inline=TRUE),
                      uiOutput("imageJ"),
                      radioButtons("analysis", "Select the analysis you want to make", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
                      uiOutput("macro"),
@@ -196,8 +196,14 @@ server <- function(input, output, session) {
   # Global reactive variable 
   global <- reactiveValues(ijpath="", fijipath="", macroPath="", data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
   
-  shinyDirChoose(input, 'imageJ', roots=c(home=''))
-  shinyFileChoose(input, 'macro', roots=c(home=''))
+  if (.Platform$OS.type=="unix") {
+    roots = c(home='/')
+  }
+  else if (.Platform$OS.type=="windows") {
+    roots = c(home='C:')
+  }
+  shinyDirChoose(input, 'imageJ', roots=roots)
+  shinyFileChoose(input, 'macro', roots=roots, filetypes=c("ijm", "txt"))
   
   output$imageJ <- renderUI ({
     if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
@@ -248,12 +254,28 @@ server <- function(input, output, session) {
           global$macroPath <- readtext("www/macroDetect.txt")$text
         }
       }
-      if ((input$software=="Fiji") & (input$analysis=="Detection")) {
+      else if ((input$software=="Fiji") & (input$analysis=="Detection")) {
         if (file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
           global$macroPath <- str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")
         }
         else if (file.exists("www/macroDetect.txt")) {
           global$macroPath <- readtext("www/macroDetect.txt")$text
+        }
+      }
+      else if ((input$software=="ImageJ") & (input$analysis=="Proliferative")) {
+        if (file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
+          global$macroPath <- str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep="")
+        }
+        else if (file.exists("www/macroProlif.txt")) {
+          global$macroPath <- readtext("www/macroProlif.txt")$text
+        }
+      }
+      else if ((input$software=="Fiji") & (input$analysis=="Proliferative")) {
+        if (file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
+          global$macroPath <- str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")
+        }
+        else if (file.exists("www/macroProlif.txt")) {
+          global$macroPath <- readtext("www/macroProlif.txt")$text
         }
       }
     })
@@ -271,24 +293,27 @@ server <- function(input, output, session) {
     input$macro
   },
   handlerExpr = {
-    if (!"path" %in% names(input$macro)) return()
-    if ((!file.exists("www/macroProlif.txt")) & (input$analysis=="Proliferative")) {
-      global$macroPath <-
-        file.path("", paste(unlist(input$macro$path[-1]), collapse = .Platform$file.sep))
-      if (!dir.exists("www")) {dir.create("www")}
-      f <- file("www/macroProlif.txt", open = "w")
-      cat(global$macroPath, file = f)
-      close(f)
-    }
-    if ((!file.exists("www/macroDetect.txt")) & (input$software=="Detection")) {
-      global$macroPath <-
-        file.path("", paste(unlist(input$macro$path[-1]), collapse = .Platform$file.sep))
-      if (!dir.exists("www")) {dir.create("www")}
+    global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath)
+    if (input$analysis=="Detection") {
+      if (!file.exists("www/macroDetect.txt")) {
+        f <- file("www/macroDetect.txt", open = "w")
+        close(f)
+      }
       f <- file("www/macroDetect.txt", open = "w")
       cat(global$macroPath, file = f)
       close(f)
     }
+    if (input$analysis=="Proliferative") {
+      if (!file.exists("www/macroProlif.txt")) {
+        f <- file("www/macroProlif.txt", open = "w")
+        close(f)
+      }
+      f <- file("www/macroProlif.txt", open = "w")
+      cat(global$macroPath, file = f)
+      close(f)
+    }
   })
+  
   
   observeEvent(eventExpr={
         input$launch}, 
