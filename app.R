@@ -34,7 +34,7 @@ ui <- dashboardPage(
     sidebarMenu(
       id = "menu",
       menuItem("Segmentation", tabName = "segmentation", icon=icon("images")),
-      menuItem("Choose your image", tabName = "image", icon=icon("file-import")),
+      menuItem("Select your results", tabName = "image", icon=icon("file-import")),
       menuItem("Plot to image", tabName = "plotToImage", icon = icon("poll")),
       menuItem("Image to plot", tabName = "imageToPlot", icon = icon("image"))
     )
@@ -51,13 +51,17 @@ ui <- dashboardPage(
                 box( width = 12, solidHeader=TRUE, status="primary",
                      title = "Type of analysis",
                      radioButtons("os", "Select your OS :", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
+                     tags$hr(),
                      radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="ImageJ", inline=TRUE),
                      uiOutput("imageJ"),
-                     verbatimTextOutput("softwarePath"),
-                     actionButton("changeIJ", "Change the path to your software."),
-                     radioButtons("analysis", "Select the analysis you want to make :", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
+                     textOutput("softwarePath"),
+                     tags$br(),
+                     actionLink("changeIJ", "Change the path to your software.", icon=icon("sync")),
+                     tags$hr(),
                      uiOutput("macro"),
-                     verbatimTextOutput("macroPath"),
+                     tags$br(),
+                     textOutput("macroPath"),
+                     tags$br(),
                      actionButton("launch", "Launch macro")
                      )
               )),
@@ -219,7 +223,7 @@ server <- function(input, output, session) {
                handlerExpr={
                  output$imageJ <- renderUI ({
                    if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
-                     shinyDirLink('imageJ', 'Select ImageJ.app / Fiji.app', 'Please select the repository ImageJ.app/Fiji.app', FALSE)
+                     shinyDirLink('imageJ', 'Select ImageJ.app / Fiji.app', 'Please select the repository ImageJ.app/Fiji.app', FALSE, icon=icon("folder"))
                    }
                  })
                  output$softwarePath <- renderText({
@@ -279,7 +283,7 @@ server <- function(input, output, session) {
   
   # Search
   output$macro <- renderUI ({
-    shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE)
+    shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
   })
   
   observeEvent(eventExpr = {
