@@ -53,8 +53,11 @@ ui <- dashboardPage(
                      radioButtons("os", "Select your OS :", choices=c("Windows", "MacOs", "Linux"), selected="Windows", inline=TRUE),
                      radioButtons("software", "Select the software you use :", choices=c("Fiji", "ImageJ"), selected="ImageJ", inline=TRUE),
                      uiOutput("imageJ"),
+                     verbatimTextOutput("softwarePath"),
+                     actionButton("changeIJ", "Change the path to your software."),
                      radioButtons("analysis", "Select the analysis you want to make :", choices=c("Proliferative", "Detection"), selected="Detection", inline=TRUE),
                      uiOutput("macro"),
+                     verbatimTextOutput("macroPath"),
                      actionButton("launch", "Launch macro")
                      )
               )),
@@ -196,23 +199,40 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijpath="", fijipath="", macroPath="", data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
   
+  # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
     roots = c(home='/')
   }
   else if (.Platform$OS.type=="windows") {
     roots = c(home='C:')
   }
+  
+  # File & Dir chooser 
   shinyDirChoose(input, 'imageJ', roots=roots)
   shinyFileChoose(input, 'macro', roots=roots, filetypes=c("ijm", "txt"))
   
-  output$imageJ <- renderUI ({
-    if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
-      shinyDirLink('imageJ', 'Select ImageJ / Fiji', 'Please select your ImageJ/Fiji app', FALSE)
-    }
-  })
   
+  # If file containing path to IJ software does not exist -> Shiny dir chooser
+  observeEvent(eventExpr=input$changeIJ, 
+               handlerExpr={
+                 output$imageJ <- renderUI ({
+                   if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
+                     shinyDirLink('imageJ', 'Select ImageJ.app / Fiji.app', 'Please select the repository ImageJ.app/Fiji.app', FALSE)
+                   }
+                 })
+                 output$softwarePath <- renderText({
+                   if (input$software=="Fiji") {
+                     paste("Your Fiji app is in the directory : ",global$fijiPath, "/", sep="")
+                   }
+                   else if (input$software=="ImageJ") {
+                     paste("Your ImageJ app is in the directory : ", global$ijPath,"/", sep="")
+                   }
+                 })
+               }, ignoreNULL=FALSE)
+  
+  # If ImageJ chooser -> store the path in global variable & in a file containing the path
   observeEvent(eventExpr = {
                  input$imageJ
                },
@@ -220,22 +240,35 @@ server <- function(input, output, session) {
                  if (!"path" %in% names(input$imageJ)) return()
                  if (input$software=="ImageJ") {
                    global$ijPath <-
-                     file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
+                     normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
                    if (!dir.exists("www")) {dir.create("www")}
                    f <- file("www/ijpath.txt", open = "w")
-                   cat(global$ijPath, file = f)
+                   cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
                    close(f)
                  }
                  if (input$software=="Fiji") {
                    global$fijiPath <-
-                     file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
+                     normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
                    if (!dir.exists("www")) {dir.create("www")}
                    f <- file("www/fijipath.txt", open = "w")
-                   cat(global$fijiPath, file = f)
+                   cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
                    close(f)
                  }
                })
   
+  observeEvent(eventExpr=input$changeIJ,
+               handlerExpr={
+                 if (input$software=="Fiji") {
+                   file.remove("www/fijipath.txt")
+                   global$fijiPath <- ""
+                 }
+                 else if (input$software=="ImageJ") {
+                   file.remove("www/ijpath.txt")
+                   global$ijPath <- ""
+                 }
+               })
+  
+  # If file containing path exists : store path to IJ in global variable. 
   if (file.exists("www/ijpath.txt")) {
     global$ijPath <- readtext("www/ijpath.txt")$text
   }
@@ -244,92 +277,52 @@ server <- function(input, output, session) {
     global$fijiPath <- readtext("www/fijipath.txt")$text
   }
   
-  observeEvent(eventExpr = {
-    input$software
-    input$analysis}, 
-    handlerExpr = {
-      if ((input$software=="ImageJ") & (input$analysis=="Detection")) {
-        if (file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
-          global$macroPath <- str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep="")
-        }
-        else if (file.exists("www/macroDetect.txt")) {
-          global$macroPath <- readtext("www/macroDetect.txt")$text
-        }
-      }
-      else if ((input$software=="Fiji") & (input$analysis=="Detection")) {
-        if (file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
-          global$macroPath <- str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")
-        }
-        else if (file.exists("www/macroDetect.txt")) {
-          global$macroPath <- readtext("www/macroDetect.txt")$text
-        }
-      }
-      else if ((input$software=="ImageJ") & (input$analysis=="Proliferative")) {
-        if (file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
-          global$macroPath <- str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep="")
-        }
-        else if (file.exists("www/macroProlif.txt")) {
-          global$macroPath <- readtext("www/macroProlif.txt")$text
-        }
-      }
-      else if ((input$software=="Fiji") & (input$analysis=="Proliferative")) {
-        if (file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) {
-          global$macroPath <- str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")
-        }
-        else if (file.exists("www/macroProlif.txt")) {
-          global$macroPath <- readtext("www/macroProlif.txt")$text
-        }
-      }
-    })
-  
+  # Search
   output$macro <- renderUI ({
-    if ((((!file.exists(str_c(global$ijPath, "/macros/Quantif_LB_Lung.ijm", sep=""))) & (input$software=="ImageJ")) | ((!file.exists(str_c(global$fijiPath, "/macros/Quantif_LB_Lung.ijm", sep="")))) & (input$software=="Fiji"))) {
-      if (((!file.exists("www/macroProlif.txt")) & (input$analysis=="Proliferative")) | ((!file.exists("www/macroDetect.txt")) & (input$analysis=="Detection"))) {
-        shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE)
-      }
-    }
+    shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE)
   })
-  
   
   observeEvent(eventExpr = {
     input$macro
   },
   handlerExpr = {
-    global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath)
-    if (input$analysis=="Detection") {
-      f <- file("www/macroDetect.txt", open = "w")
-      cat(global$macroPath, file = f)
-      close(f)
-    }
-    if (input$analysis=="Proliferative") {
-      f <- file("www/macroProlif.txt", open = "w")
-      cat(global$macroPath, file = f)
-      close(f)
-    }
+    global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath, winslash="/")
+    output$macroPath <- renderText({
+      paste("The path to your macro is : ", global$macroPath, sep="")
+    })
   })
   
   
   observeEvent(eventExpr={
         input$launch}, 
         handlerExpr={
-            if (input$os == "MacOs") {
-              if (input$software=="ImageJ") {
-                systemPath <- str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep="")
-              }
-              else if (input$software=="Fiji") {
-                systemPath <- str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
-              }
+          if (" " %in% str_split(global$macroPath, "")[[1]]) {
+            global$macroPath <- str_replace(global$macroPath, " ", "\" \"")
+          }
+          if (" " %in% str_split(global$ijPath, "")[[1]]) {
+            global$ijPath <- str_replace(global$ijPath, " ", "\" \"")
+          }
+          if (" " %in% str_split(global$fijiPath, "")[[1]]) {
+            global$fijiPath <- str_replace(global$fijiPath, " ", "\" \"")
+          }
+          if (input$os == "MacOs") {
+            if (input$software=="ImageJ") {
+              systemPath <- str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep="")
             }
-            else if (input$os == "Windows") {
-              if (input$software == "ImageJ") {
-                systemPath <- str_c(global$ijPath, "/jre/bin/java -jar Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep="")
-              }
-              else if (input$software == "Fiji") {
-                systemPath <- str_c(global$fijiPath, "/ImageJ-win64 -macro ", global$macroPath, sep="" )
-              }
+            else if (input$software=="Fiji") {
+              systemPath <- str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
             }
+          }
+          else if (input$os == "Windows") {
+            if (input$software == "ImageJ") {
+              systemPath <- str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep="")
+            }
+            else if (input$software == "Fiji") {
+              systemPath <- str_c(global$fijiPath, "/ImageJ-win64.exe -macro ", global$macroPath, sep="" )
+            }
+          }
           system(systemPath)
-    })
+    }, once=TRUE)
   
   ## MENU IMAGE
   # File reactive variable : infos on file chosen & read datas
