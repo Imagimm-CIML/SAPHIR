@@ -1,6 +1,6 @@
 ## AVEC MENU CHOIX & CR0P & REMOVE
 # Installation of the necessary packages
-pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar")
+pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) {
   install.packages(new.pkg)
@@ -11,6 +11,7 @@ if (!"EBImage" %in% installed.packages()) {
   }
   BiocManager::install("EBImage")
 }
+library(readtext)
 library(shinyjs)
 library(shiny)
 library(ggplot2)
@@ -217,7 +218,7 @@ server <- function(input, output, session) {
                },
                handlerExpr = {
                  if (!"path" %in% names(input$imageJ)) return()
-                 if ((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) {
+                 if (input$software=="ImageJ") {
                    global$ijPath <-
                      file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
                    if (!dir.exists("www")) {dir.create("www")}
@@ -225,7 +226,7 @@ server <- function(input, output, session) {
                    cat(global$ijPath, file = f)
                    close(f)
                  }
-                 if ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji")) {
+                 if (input$software=="Fiji") {
                    global$fijiPath <-
                      file.path("", paste(unlist(input$imageJ$path[-1]), collapse = .Platform$file.sep))
                    if (!dir.exists("www")) {dir.create("www")}
@@ -296,19 +297,11 @@ server <- function(input, output, session) {
   handlerExpr = {
     global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath)
     if (input$analysis=="Detection") {
-      if (!file.exists("www/macroDetect.txt")) {
-        f <- file("www/macroDetect.txt", open = "w")
-        close(f)
-      }
       f <- file("www/macroDetect.txt", open = "w")
       cat(global$macroPath, file = f)
       close(f)
     }
     if (input$analysis=="Proliferative") {
-      if (!file.exists("www/macroProlif.txt")) {
-        f <- file("www/macroProlif.txt", open = "w")
-        close(f)
-      }
       f <- file("www/macroProlif.txt", open = "w")
       cat(global$macroPath, file = f)
       close(f)
