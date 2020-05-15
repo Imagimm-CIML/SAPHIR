@@ -311,21 +311,23 @@ server <- function(input, output, session) {
           }
           if (input$os == "MacOs") {
             if (input$software=="ImageJ") {
-              systemPath <- str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep="")
+              system(str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep=""))
             }
             else if (input$software=="Fiji") {
-              systemPath <- str_c("java -Xmx4096m -jar ", global$fijiPath, "/jars/ij-1.52p.jar -ijpath ", global$ijPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
+              system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 &", sep="")) 
+              Sys.sleep(5)
+              system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 --no-splash -macro ", global$macroPath, sep=""))
             }
           }
           else if (input$os == "Windows") {
             if (input$software == "ImageJ") {
-              systemPath <- str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep="")
+              system(str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep=""))
             }
             else if (input$software == "Fiji") {
-              systemPath <- str_c(global$fijiPath, "/ImageJ-win64.exe -macro ", global$macroPath, sep="" )
+              system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 &", sep="" ), wait=FALSE)
+              system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 --no-splash -macro ", global$macroPath, sep="" ))
             }
           }
-          system(systemPath)
     }, once=TRUE)
   
   ## MENU IMAGE
