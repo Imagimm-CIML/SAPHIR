@@ -59,10 +59,19 @@ ui <- dashboardPage(
                      actionLink("changeIJ", "Change the path to your software.", icon=icon("sync")),
                      tags$hr(),
                      uiOutput("macro"),
-                     tags$br(),
                      textOutput("macroPath"),
                      tags$br(),
-                     actionButton("launch", "Launch macro")
+                     actionLink("changeMacro", "Change the path to your macro.", icon=icon("sync")),
+                     tags$br(),
+                     actionButton("launch", "Launch macro"),
+                     tags$hr(),
+                     helpText("If necessary, choose a second macro to launch."),
+                     uiOutput("macro2"),
+                     textOutput("macro2Path"),
+                     tags$br(), 
+                     actionLink("changeMacro2", "Change the path to your macro.", icon=icon("sync")),
+                     tags$br(),
+                     actionButton("launch2", "Launch second macro"),
                      )
               )),
       tabItem(tabName= "image",
@@ -216,6 +225,7 @@ server <- function(input, output, session) {
   # File & Dir chooser 
   shinyDirChoose(input, 'imageJ', roots=roots)
   shinyFileChoose(input, 'macro', roots=roots, filetypes=c("ijm", "txt"))
+  shinyFileChoose(input, 'macro2', roots=roots, filetypes=c("ijm", "txt"))
   
   
   # If file containing path to IJ software does not exist -> Shiny dir chooser
@@ -281,25 +291,39 @@ server <- function(input, output, session) {
     global$fijiPath <- readtext("www/fijipath.txt")$text
   }
   
-  # Search
-  output$macro <- renderUI ({
-    shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
-  })
+  observeEvent(eventExpr=input$changeMacro, 
+               handlerExpr={
+                 output$macro <- renderUI ({
+                   if (!file.exists("www/macropath.txt")) {
+                   shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
+                   }
+                 })
+                 output$macroPath <- renderText({
+                   paste("The path to your macro is : ", global$macroPath, sep="")
+                 })
+               }, ignoreNULL=FALSE)
   
-  observeEvent(eventExpr = {
-    input$macro
-  },
-  handlerExpr = {
-    global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath, winslash="/")
-    output$macroPath <- renderText({
-      paste("The path to your macro is : ", global$macroPath, sep="")
-    })
-  })
+  observeEvent(eventExpr = {input$macro},
+               handlerExpr = {
+                 global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath, winslash="/")
+              })
   
+  observeEvent(eventExpr=input$changeMacro,
+               handlerExpr={
+                 file.remove("www/macropath.txt")
+                 global$macroPath <- ""
+               })
+  
+  if (file.exists("www/macropath.txt")) {
+    global$macroPath <- readtext("www/macropath.txt")$text
+  }
   
   observeEvent(eventExpr={
         input$launch}, 
         handlerExpr={
+          f <- file("www/macropath.txt", open = "w")
+          cat(global$macroPath, file = f)
+          close(f)
           if (" " %in% str_split(global$macroPath, "")[[1]]) {
             global$macroPath <- str_replace(global$macroPath, " ", "\" \"")
           }
@@ -329,6 +353,67 @@ server <- function(input, output, session) {
             }
           }
     }, once=TRUE)
+  
+  
+  observeEvent(eventExpr=input$changeMacro2, 
+               handlerExpr={
+                 output$macro2 <- renderUI ({
+                   if (!file.exists("www/macro2path.txt")) {
+                     shinyFilesLink('macro2', 'Select the path to your second macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
+                   }
+                 })
+                 output$macro2Path <- renderText({
+                   paste("The path to your macro is : ", global$macro2Path, sep="")
+                 })
+               }, ignoreNULL=FALSE)
+  
+  observeEvent(eventExpr = {input$macro2},
+               handlerExpr = {
+                 global$macro2Path <- normalizePath(parseFilePaths(roots, input$macro2)$datapath, winslash="/")
+               })
+  
+  observeEvent(eventExpr=input$changeMacro2,
+               handlerExpr={
+                 file.remove("www/macro2path.txt")
+                 global$macro2Path <- ""
+               })
+  
+  if (file.exists("www/macro2path.txt")) {
+    global$macro2Path <- readtext("www/macro2path.txt")$text
+  }
+  
+  observeEvent(eventExpr={
+    input$launch2}, 
+    handlerExpr={
+      req(input$launch)
+      f <- file("www/macro
+                2path.txt", open = "w")
+      cat(global$macro2Path, file = f)
+      close(f)
+      if (" " %in% str_split(global$macro2Path, "")[[1]]) {
+        global$macro2Path <- str_replace(global$macro2Path, " ", "\" \"")
+      }
+      if (input$os == "MacOs") {
+        if (input$software=="ImageJ") {
+          system(str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macro2Path, sep=""))
+        }
+        else if (input$software=="Fiji") {
+          system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 &", sep="")) 
+          Sys.sleep(5)
+          system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 --no-splash -macro ", global$macro2Path, sep=""))
+        }
+      }
+      else if (input$os == "Windows") {
+        if (input$software == "ImageJ") {
+          system(str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macro2Path, sep=""))
+        }
+        else if (input$software == "Fiji") {
+          system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 &", sep="" ), wait=FALSE)
+          system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 --no-splash -macro ", global$macro2Path, sep="" ))
+        }
+      }
+    }, once=TRUE)
+  
   
   ## MENU IMAGE
   # File reactive variable : infos on file chosen & read datas
