@@ -83,6 +83,11 @@ ui <- dashboardPage(
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
                      tags$hr(),
+                     helpText("Select the file containing the legend for the channels in the image."),
+                     radioButtons("sepLegend", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
+                     checkboxInput("headerLegend", label = "Header", value = TRUE),
+                     fileInput("legendFile", "Choose legend file.", multiple=FALSE),
+                     tags$hr(),
                      helpText("Select the file containing the datas to analyse. (Format .txt)"),
                      radioButtons("sep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
                      radioButtons("dec", label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
@@ -155,6 +160,8 @@ ui <- dashboardPage(
                 column (width=7,
                         box( width=NULL, 
                              title = "Image display", solidHeader= TRUE, status = "primary",
+                             helpText("Legends of the channels : "),
+                             tableOutput("legend1"),
                              helpText("Select channel and frame to display."),
                              uiOutput("channel1"),
                              uiOutput("frame1"),
@@ -212,7 +219,7 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=NULL, zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=NULL, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -222,20 +229,25 @@ server <- function(input, output, session) {
     roots = c(home='C:')
   }
   
-  # File & Dir chooser 
+  ## File & Dir chooser 
+  # ImageJ/Fiji dir chooser
   shinyDirChoose(input, 'imageJ', roots=roots)
+  # First macro file chooser
   shinyFileChoose(input, 'macro', roots=roots, filetypes=c("ijm", "txt"))
+  # Second macro file chooser
   shinyFileChoose(input, 'macro2', roots=roots, filetypes=c("ijm", "txt"))
   
   
-  # If file containing path to IJ software does not exist -> Shiny dir chooser
+  ## If file containing path to IJ software does not exist -> Shiny dir chooser
   observeEvent(eventExpr=input$changeIJ, 
                handlerExpr={
+                 # Directory browser if no path registered
                  output$imageJ <- renderUI ({
                    if (((!file.exists("www/ijpath.txt")) & (input$software=="ImageJ")) | ((!file.exists("www/fijipath.txt")) & (input$software=="Fiji"))) {
                      shinyDirLink('imageJ', 'Select ImageJ.app / Fiji.app', 'Please select the repository ImageJ.app/Fiji.app', FALSE, icon=icon("folder"))
                    }
                  })
+                 # Text w/ path
                  output$softwarePath <- renderText({
                    if (input$software=="Fiji") {
                      paste("Your Fiji app is in the directory : ",global$fijiPath, "/", sep="")
@@ -246,7 +258,7 @@ server <- function(input, output, session) {
                  })
                }, ignoreNULL=FALSE)
   
-  # If ImageJ chooser -> store the path in global variable & in a file containing the path
+  ## If ImageJ browser needed (no path registered) -> store the path in global variable & in a file containing the path
   observeEvent(eventExpr = {
                  input$imageJ
                },
@@ -270,6 +282,7 @@ server <- function(input, output, session) {
                  }
                })
   
+  ## If button "Change" clicked : remove file containing registered path and possibility to choose your directory again.
   observeEvent(eventExpr=input$changeIJ,
                handlerExpr={
                  if (input$software=="Fiji") {
@@ -282,7 +295,7 @@ server <- function(input, output, session) {
                  }
                })
   
-  # If file containing path exists : store path to IJ in global variable. 
+  ## If file containing path exists : store path to IJ in global variable. 
   if (file.exists("www/ijpath.txt")) {
     global$ijPath <- readtext("www/ijpath.txt")$text
   }
@@ -291,33 +304,40 @@ server <- function(input, output, session) {
     global$fijiPath <- readtext("www/fijipath.txt")$text
   }
   
+  ## If no path registered : File browser to choose your macro 
   observeEvent(eventExpr=input$changeMacro, 
                handlerExpr={
                  output$macro <- renderUI ({
+                   # File chooser for the macro 
                    if (!file.exists("www/macropath.txt")) {
                    shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
                    }
                  })
+                 # Text w/ path
                  output$macroPath <- renderText({
                    paste("The path to your macro is : ", global$macroPath, sep="")
                  })
                }, ignoreNULL=FALSE)
   
+  ## If macro choosed with browser : store the path in a variable global
   observeEvent(eventExpr = {input$macro},
                handlerExpr = {
                  global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath, winslash="/")
               })
   
+  ## If change macro : remove file containing registered path
   observeEvent(eventExpr=input$changeMacro,
                handlerExpr={
                  file.remove("www/macropath.txt")
                  global$macroPath <- ""
                })
   
+  ## If file exists containing registered path, read the path from the file.
   if (file.exists("www/macropath.txt")) {
     global$macroPath <- readtext("www/macropath.txt")$text
   }
   
+  ## Launch the first macro 
   observeEvent(eventExpr={
         input$launch}, 
         handlerExpr={
@@ -354,7 +374,7 @@ server <- function(input, output, session) {
           }
     }, once=TRUE)
   
-  
+  ## If no second path registered : file browser to choose your second macro
   observeEvent(eventExpr=input$changeMacro2, 
                handlerExpr={
                  output$macro2 <- renderUI ({
@@ -367,29 +387,35 @@ server <- function(input, output, session) {
                  })
                }, ignoreNULL=FALSE)
   
+  ## If second macro browser : store it in a global variable
   observeEvent(eventExpr = {input$macro2},
                handlerExpr = {
                  global$macro2Path <- normalizePath(parseFilePaths(roots, input$macro2)$datapath, winslash="/")
                })
   
+  ## If change macro2 : remove file containing macro path
   observeEvent(eventExpr=input$changeMacro2,
                handlerExpr={
                  file.remove("www/macro2path.txt")
                  global$macro2Path <- ""
                })
   
+  ## If file containing macro path2 exists : read from this file
   if (file.exists("www/macro2path.txt")) {
     global$macro2Path <- readtext("www/macro2path.txt")$text
   }
   
+  ## Second launcher
   observeEvent(eventExpr={
     input$launch2}, 
     handlerExpr={
       req(input$launch)
+      # Store the path in a file
       f <- file("www/macro
                 2path.txt", open = "w")
       cat(global$macro2Path, file = f)
       close(f)
+      # Deal with spaces in paths
       if (" " %in% str_split(global$macro2Path, "")[[1]]) {
         global$macro2Path <- str_replace(global$macro2Path, " ", "\" \"")
       }
@@ -427,6 +453,7 @@ server <- function(input, output, session) {
                  global$zip <- read.ijzip("www/roiset.zip")
                })
   
+  # Image variables
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
     global$imgPath <- input$imgFile$datapath
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
@@ -456,7 +483,14 @@ server <- function(input, output, session) {
     }
   }, label = "files")
   
+  # Legend variable
+  observeEvent(eventExpr=input$legendFile, 
+               handlerExpr = {
+                 sepLegend <- switch( input$sepLegend, "Tab"="\t", "Comma"=",", "Semicolon"=";")
+                 global$legend <- read.table(input$legendFile$datapath, header=input$headerLegend, sep=sepLegend)
+               })
   
+  # Datas variables
   observeEvent(eventExpr= input$dataFile, handlerExpr = {
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
     decimal <- switch (input$dec, "Point"=".", "Comma"=",")
@@ -464,6 +498,7 @@ server <- function(input, output, session) {
     global$data <- read.table(input$dataFile$datapath,header=input$header, sep=separator, dec=decimal)
   }, label = "files")
   
+  # ROIs variables
   observeEvent(eventExpr= input$zipFile, handlerExpr = {
     #ROIzip file
     global$zip <- read.ijzip(input$zipFile$datapath)
@@ -763,6 +798,11 @@ server <- function(input, output, session) {
     }
   )
   
+  # Table with legend channel 
+  output$legend1 <- renderTable({
+    global$legend
+  })
+  
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
     req(is.null(global$img)==FALSE)
@@ -802,7 +842,6 @@ server <- function(input, output, session) {
   
   # Image plot 
   observeEvent(eventExpr= {
-              #input$remove
               rois_plot1()
               input$channel1
               input$frame1
@@ -847,7 +886,6 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1
-    #input$remove
     },
     handlerExpr= {
       out <- tempfile(fileext='.png')
@@ -884,7 +922,6 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1 
-    #input$remove
     },
     handlerExpr= {
       output$list <- EBImage::renderDisplay({
