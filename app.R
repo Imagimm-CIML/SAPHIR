@@ -314,7 +314,7 @@ server <- function(input, output, session) {
               systemPath <- str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep="")
             }
             else if (input$software=="Fiji") {
-              systemPath <- str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
+              systemPath <- str_c("java -Xmx4096m -jar ", global$fijiPath, "/jars/ij-1.52p.jar -ijpath ", global$ijPath, "/Contents/MacOS/ImageJ-macosx -macro ", global$macroPath, sep="")
             }
           }
           else if (input$os == "Windows") {
