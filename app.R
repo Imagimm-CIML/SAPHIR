@@ -72,7 +72,7 @@ ui <- dashboardPage(
                      actionLink("changeMacro2", "Change the path to your macro.", icon=icon("sync")),
                      tags$br(),
                      actionButton("launch2", "Launch second macro"),
-                     )
+                )
               )),
       tabItem(tabName= "image",
               # Image browser 
@@ -101,59 +101,51 @@ ui <- dashboardPage(
               actionButton("refresh", "Reset"),
               tags$br(),
               tags$br(),
-              # Selection of cell to remove  
-              fluidRow(
-                box (width = 12, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                     title = "Filtering ROIs",
-                     helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
-                     uiOutput("variablesHisto"),
-                     helpText("Select the ROIs (click or brush) and remove values selected by clicking on the remove button."),
-                     plotlyOutput("selectVar"),
-                     verbatimTextOutput("roisRemove"),
-                     actionButton("remove", "Remove")
-                ) 
-              )
       ),
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
               fluidRow(
                 column( width =5,
                         # First box : Plot & Datas
+                        box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
+                             title = "Filtering ROIs",
+                             helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
+                             uiOutput("variablesHisto"),
+                             helpText("Select the ROIs (click or brush) and remove values selected by clicking on the remove button."),
+                             plotlyOutput("selectVar")
+                        ), 
                         box( width = NULL,
-                             title = "Plot parameters", solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                             title = "Interactive Plot -> Image", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
                              helpText("Select the position of the cursors on the scatter plot. "),
                              sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
-                             sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150)
-                        ),
-                        box (width = NULL, 
-                             title = "Plot", solidHeader = TRUE, status = "primary",
+                             sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                              radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection"),
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
-                                tabPanel("Subgroups",
-                                         tags$br(),
-                                         downloadLink("downloadData", "Download Groups subtables"),
-                                         tags$br(),
-                                         downloadLink("downloadSummaryData", "Download summary of groups subtables"),
-                                         tags$br(),
-                                         tags$br(),
-                                         verbatimTextOutput("groups")
-                                ),
-                                tabPanel("Selected", 
-                                         tags$br(),
-                                         verbatimTextOutput("rois_plot1"),
-                                         downloadLink("downloadSubdata", "Download selected ROIs subtable"),
-                                         tags$br(),
-                                         downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
-                                         tableOutput("rois_plot_table1")
-                                )
-                                
+                                     tabPanel("Subgroups",
+                                              tags$br(),
+                                              downloadLink("downloadData", "Download Groups subtables"),
+                                              tags$br(),
+                                              downloadLink("downloadSummaryData", "Download summary of groups subtables"),
+                                              tags$br(),
+                                              tags$br(),
+                                              verbatimTextOutput("groups")
+                                     ),
+                                     tabPanel("Selected", 
+                                              tags$br(),
+                                              verbatimTextOutput("rois_plot1"),
+                                              downloadLink("downloadSubdata", "Download selected ROIs subtable"),
+                                              tags$br(),
+                                              downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
+                                              tableOutput("rois_plot_table1")
+                                     )
+                                     
                         )
                 ),
                 # Second box : Image displayer
@@ -260,27 +252,27 @@ server <- function(input, output, session) {
   
   ## If ImageJ browser needed (no path registered) -> store the path in global variable & in a file containing the path
   observeEvent(eventExpr = {
-                 input$imageJ
-               },
-               handlerExpr = {
-                 if (!"path" %in% names(input$imageJ)) return()
-                 if (input$software=="ImageJ") {
-                   global$ijPath <-
-                     normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
-                   if (!dir.exists("www")) {dir.create("www")}
-                   f <- file("www/ijpath.txt", open = "w")
-                   cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
-                   close(f)
-                 }
-                 if (input$software=="Fiji") {
-                   global$fijiPath <-
-                     normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
-                   if (!dir.exists("www")) {dir.create("www")}
-                   f <- file("www/fijipath.txt", open = "w")
-                   cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
-                   close(f)
-                 }
-               })
+    input$imageJ
+  },
+  handlerExpr = {
+    if (!"path" %in% names(input$imageJ)) return()
+    if (input$software=="ImageJ") {
+      global$ijPath <-
+        normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
+      if (!dir.exists("www")) {dir.create("www")}
+      f <- file("www/ijpath.txt", open = "w")
+      cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
+      close(f)
+    }
+    if (input$software=="Fiji") {
+      global$fijiPath <-
+        normalizePath(parseDirPath(roots, input$imageJ), winslash="/")
+      if (!dir.exists("www")) {dir.create("www")}
+      f <- file("www/fijipath.txt", open = "w")
+      cat(normalizePath(parseDirPath(roots, input$imageJ), winslash="/"), file = f)
+      close(f)
+    }
+  })
   
   ## If button "Change" clicked : remove file containing registered path and possibility to choose your directory again.
   observeEvent(eventExpr=input$changeIJ,
@@ -310,7 +302,7 @@ server <- function(input, output, session) {
                  output$macro <- renderUI ({
                    # File chooser for the macro 
                    if (!file.exists("www/macropath.txt")) {
-                   shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
+                     shinyFilesLink('macro', 'Select the path to your macro', 'Please select the path to your macro', FALSE, icon=icon("file"))
                    }
                  })
                  # Text w/ path
@@ -323,7 +315,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = {input$macro},
                handlerExpr = {
                  global$macroPath <- normalizePath(parseFilePaths(roots, input$macro)$datapath, winslash="/")
-              })
+               })
   
   ## If change macro : remove file containing registered path
   observeEvent(eventExpr=input$changeMacro,
@@ -339,39 +331,39 @@ server <- function(input, output, session) {
   
   ## Launch the first macro 
   observeEvent(eventExpr={
-        input$launch}, 
-        handlerExpr={
-          f <- file("www/macropath.txt", open = "w")
-          cat(global$macroPath, file = f)
-          close(f)
-          if (" " %in% str_split(global$macroPath, "")[[1]]) {
-            global$macroPath <- str_replace(global$macroPath, " ", "\" \"")
-          }
-          if (" " %in% str_split(global$ijPath, "")[[1]]) {
-            global$ijPath <- str_replace(global$ijPath, " ", "\" \"")
-          }
-          if (" " %in% str_split(global$fijiPath, "")[[1]]) {
-            global$fijiPath <- str_replace(global$fijiPath, " ", "\" \"")
-          }
-          if (input$os == "MacOs") {
-            if (input$software=="ImageJ") {
-              system(str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep=""))
-            }
-            else if (input$software=="Fiji") {
-              system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 &", sep="")) 
-              Sys.sleep(5)
-              system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 --no-splash -macro ", global$macroPath, sep=""))
-            }
-          }
-          else if (input$os == "Windows") {
-            if (input$software == "ImageJ") {
-              system(str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep=""))
-            }
-            else if (input$software == "Fiji") {
-              system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 &", sep="" ), wait=FALSE)
-              system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 --no-splash -macro ", global$macroPath, sep="" ))
-            }
-          }
+    input$launch}, 
+    handlerExpr={
+      f <- file("www/macropath.txt", open = "w")
+      cat(global$macroPath, file = f)
+      close(f)
+      if (" " %in% str_split(global$macroPath, "")[[1]]) {
+        global$macroPath <- str_replace(global$macroPath, " ", "\" \"")
+      }
+      if (" " %in% str_split(global$ijPath, "")[[1]]) {
+        global$ijPath <- str_replace(global$ijPath, " ", "\" \"")
+      }
+      if (" " %in% str_split(global$fijiPath, "")[[1]]) {
+        global$fijiPath <- str_replace(global$fijiPath, " ", "\" \"")
+      }
+      if (input$os == "MacOs") {
+        if (input$software=="ImageJ") {
+          system(str_c("java -Xmx4096m -jar ", global$ijPath, "/Contents/Java/ij.jar -ijpath ", global$ijPath, " -macro ", global$macroPath, sep=""))
+        }
+        else if (input$software=="Fiji") {
+          system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 &", sep="")) 
+          Sys.sleep(5)
+          system(str_c(global$fijiPath, "/Contents/MacOS/ImageJ-macosx -port2 --no-splash -macro ", global$macroPath, sep=""))
+        }
+      }
+      else if (input$os == "Windows") {
+        if (input$software == "ImageJ") {
+          system(str_c(global$ijPath, "/jre/bin/java -jar -Xmx1024m ", global$ijPath, "/ij.jar -macro ", global$macroPath, sep=""))
+        }
+        else if (input$software == "Fiji") {
+          system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 &", sep="" ), wait=FALSE)
+          system(str_c(global$fijiPath, "/ImageJ-win64.exe -port1 --no-splash -macro ", global$macroPath, sep="" ))
+        }
+      }
     }, once=TRUE)
   
   ## If no second path registered : file browser to choose your second macro
@@ -444,14 +436,14 @@ server <- function(input, output, session) {
   ## MENU IMAGE
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
-                 global$imgPath <- "www/image.tif"
-                 global$img <- read_tif("www/image.tif", frame=1)
-                 global$img2 <- read_tif("www/image.tif", frame=1)
-                 global$nChan <- dim(global$img)[3]
-                 global$nFrame <- count_frames(global$imgPath)[1]
-                 global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
-                 global$zip <- read.ijzip("www/roiset.zip")
-               })
+    global$imgPath <- "www/image.tif"
+    global$img <- read_tif("www/image.tif", frame=1)
+    global$img2 <- read_tif("www/image.tif", frame=1)
+    global$nChan <- dim(global$img)[3]
+    global$nFrame <- count_frames(global$imgPath)[1]
+    global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
+    global$zip <- read.ijzip("www/roiset.zip")
+  })
   
   # Image variables
   observeEvent(eventExpr= input$imgFile, handlerExpr = {
@@ -525,7 +517,6 @@ server <- function(input, output, session) {
       v %>% 
         layout(dragmode = "select") %>%
         event_register("plotly_selecting")
-      
     }
     else if (length(input$variablesHisto)==2) {
       gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto[[1]], y=input$variablesHisto[[2]], customdata="ID"))
@@ -533,23 +524,22 @@ server <- function(input, output, session) {
       v %>% 
         layout(dragmode = "select") %>%
         event_register("plotly_selecting")
-      
     }
   })
   
   # ROIs to remove depending on selection 
-  rois_toRemove <- reactive({
+  rois_toPlot <- reactive({
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
     if (length(input$variablesHisto)==1) {
       d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
-      if (!is.null(event_data("plotly_selecting", source="v"))) {
+      if (!is.null(event_data("plotly_selecting", source="v")$x)) {
         min <- event_data("plotly_selecting", source="v")$x[1]-d/2
         max <- event_data("plotly_selecting", source="v")$x[length(event_data("plotly_selecting", source="v")$x)]+d/2
         global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
       }
-      else if (!is.null(event_data("plotly_click", source="v"))) {
+      else if (!is.null(event_data("plotly_click", source="v")$x)) {
         min <- (event_data("plotly_click", source="v")$x)-d/2
         max <- (event_data("plotly_click", source="v")$x)+d/2
         global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
@@ -557,27 +547,15 @@ server <- function(input, output, session) {
     }
     # If scatterplot : select ROIs corresponding to points selected
     else {
-      if (!is.null(event_data("plotly_selecting", source="v"))) {
+      if (!is.null(event_data("plotly_selecting", source="v")$customdata)) {
         global$data[event_data("plotly_selecting", source="v")$customdata,]
       }
-      else if (!is.null(event_data("plotly_click", source="v"))) {
+      else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
         global$data[event_data("plotly_click", source="v")$customdata,]
       }
     }
   })
   
-  # Print table of ROIs to remove
-  output$roisRemove <- renderPrint ({
-    req(!is.null(global$data))
-    req(!is.null(rois_toRemove()))
-    rois_toRemove()
-  })
-  
-  # Observe event : when clicked, remove selected ROIs
-  observeEvent(eventExpr = input$remove,
-               handlerExpr = {
-                 global$data <- global$data[!(global$data$ID %in% rois_toRemove()$ID),]
-               }, ignoreNULL=FALSE)
   
   # MENU PLOT TO IMAGE 
   # UI for choosing variables to display 
@@ -615,26 +593,26 @@ server <- function(input, output, session) {
       input$colsY1
       input$x_limit1
       input$y_limit1
-      input$remove
+      rois_toPlot()
     },
     handlerExpr = { 
-      if ((!is.null(global$data)) & (!is.null(colsX1()))) {
+      req(!is.null(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))
+      if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(rois_toPlot()$ID))) {
         # Dataframe which will contain datas to plot depending on cols selected 
-        global$colors <- data.frame(global$data$ID)
+        global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
         global$colors$color <- "blue"
         colnames(global$colors) <- c("ID","color")
-        # Add columns corresponding to selected columns in the dataset plotted
-        global$colors[colsX1()] <- global$data[colsX1()]
-        global$colors[colsY1()] <- global$data[colsY1()]
+        global$colors[colsX1()] <- global$data[colsX1()][global$data$ID %in% rois_toPlot()$ID,]
+        global$colors[colsY1()] <- global$data[colsY1()][global$data$ID %in% rois_toPlot()$ID,]
         # Add columns "color" with position of the group the cell belong to
-        for (i in c(1:nrow(global$data))) {
-          if ((global$data[colsX1()][i,] < input$x_limit1) & (global$data[colsY1()][i,] < input$y_limit1)){
+        for (i in c(1:nrow(global$colors))) {
+          if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] < input$y_limit1)){
             global$colors$color[i] <- "LLgroup"
           }
-          else if ((global$data[colsX1()][i,] > input$x_limit1) & (global$data[colsY1()][i,] > input$y_limit1)){
+          else if ((global$colors[colsX1()][i,] > input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)){
             global$colors$color[i] <- "URgroup"
           }
-          else if ((global$data[colsX1()][i,] < input$x_limit1) & (global$data[colsY1()][i,] > input$y_limit1)) {
+          else if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)) {
             global$colors$color[i] <- "ULgroup"
           }
           else {
@@ -642,7 +620,7 @@ server <- function(input, output, session) {
           }
         }
       }
-    }, ignoreNULL=FALSE 
+    }, ignoreNULL=TRUE 
   )
   
   # Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
@@ -701,22 +679,21 @@ server <- function(input, output, session) {
   })
   
   # Scatter plot
-  observeEvent(eventExpr=input$remove,
+  observeEvent(eventExpr=rois_toPlot(),
                handlerExpr= {
-                  output$plot_rois1 <- renderPlotly({
-                    req(!is.null(global$data))
-                    req(!is.null(global$colors))
-                    gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-                      labs(x=colsX1(), y=colsY1(), color= "Color") + theme(legend.title=element_blank())
-                    p <- ggplotly(gg, source="p")
-                    p %>% 
-                      layout(dragmode = "select") %>%
-                      event_register("plotly_selecting")
-                    p %>% config(displayModeBar = F)  %>%
-                      layout(legend = list(orientation = "h", x = 0.2, y = -0.5))
-                  })
-               }, ignoreNULL=FALSE)
-
+                 output$plot_rois1 <- renderPlotly({
+                   req(!is.null(global$data))
+                   req(!is.null(global$colors))
+                   gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
+                     labs(x=colsX1(), y=colsY1(), color= "Color") + theme(legend.title=element_blank())
+                   p <- ggplotly(gg, source="p")
+                   p %>% 
+                     layout(dragmode = "select") %>%
+                     event_register("plotly_selecting") %>% 
+                     layout(legend = list(orientation = "h", x = 0.2, y = -0.5))
+                 })
+               }, ignoreNULL=TRUE)
+  
   # Reactive variable : points selected on the plot 
   selectionRois <- reactive({
     req(!is.null(global$data))
@@ -728,31 +705,31 @@ server <- function(input, output, session) {
       selectionRois <- event_data("plotly_click", source="p")$customdata
     }
   })
-
+  
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
-    }, valueExpr = 
-      {
-    req(!is.null(global$data))
-    req(!is.null(global$colors))
-    if (input$selectionType == "Free selection") {
-      rois_plot1 <- selectionRois()
-    }
-    else if (input$selectionType == "Select all ROIs of all frames") {
-      rois_plot1 <- global$data$ID
-    }
-    else if (input$selectionType == "Select all ROIs of the actual frame") {
-      if (global$nFrame > 1) {
-        rois_plot1 <- global$data$ID[global$data$Slice==global$imgFrame]
+  }, valueExpr = 
+    {
+      req(!is.null(global$data))
+      req(!is.null(global$colors))
+      if (input$selectionType == "Free selection") {
+        rois_plot1 <- selectionRois()
       }
-      else if (global$nFrame == 1) {
+      else if (input$selectionType == "Select all ROIs of all frames") {
         rois_plot1 <- global$data$ID
       }
-    }
-    else {
-      rois_plot1 <- c()
-    }
-  }, ignoreNULL=FALSE)
+      else if (input$selectionType == "Select all ROIs of the actual frame") {
+        if (global$nFrame > 1) {
+          rois_plot1 <- global$data$ID[global$data$Slice==global$imgFrame]
+        }
+        else if (global$nFrame == 1) {
+          rois_plot1 <- global$data$ID
+        }
+      }
+      else {
+        rois_plot1 <- c()
+      }
+    }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr={rois_plot1()}, 
                handlerExpr= {
@@ -826,70 +803,31 @@ server <- function(input, output, session) {
                })
   
   observeEvent(eventExpr= {
-                rois_plot1()
-                input$remove},
-               handlerExpr={
-                 if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
-                   newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
-                   global$imgFrame <- newFrame
-                   global$img <- read_tif(global$imgPath, frames=newFrame)
-                   global$imgChan <- input$channel1
-                 }
-               }, ignoreNULL=FALSE)
+    rois_plot1()
+    },
+    handlerExpr={
+      if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
+        newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
+        global$imgFrame <- newFrame
+        global$img <- read_tif(global$imgPath, frames=newFrame)
+        global$imgChan <- input$channel1
+      }
+    }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
   # Image plot 
   observeEvent(eventExpr= {
-              rois_plot1()
-              input$channel1
-              input$frame1
-              }, 
-               handlerExpr={
-                 output$imgPlot <- renderPlot ({
-                 req(!is.null(global$img))
-                 req(!is.null(global$data))
-                 req(!is.null(global$zip))
-                 display(global$img[,,global$imgChan,1], method="raster")
-                 if (global$nFrame==1) {
-                   for (i in rois_plot1()) {
-                     col <- global$colors$color[global$data$ID==i]
-                     col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                     plot(global$zip[[i]], col=col, add=TRUE)
-                   }
-                 }
-                 else if (global$nFrame > 1) {
-                   if (input$selectionType == "Select all ROIs of the actual frame") {
-                     for (i in rois_plot1()) {
-                       col <- global$colors$color[global$data$ID==i]
-                       col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                       plot(global$zip[[i]], col=col, add=TRUE)
-                     }
-                   }
-                   else {
-                     for (i in rois_plot1()) {
-                       col <- global$colors$color[global$data$ID==i]
-                       col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-                       if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-                         plot(global$zip[[i]], col=col, add=TRUE)
-                       }
-                     }
-                   }
-                 }
-               })}, ignoreNULL=FALSE)
-  
-  
-  
-  # Image PNG
-  observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
     input$frame1
-    },
-    handlerExpr= {
-      out <- tempfile(fileext='.png')
-      png(out, height=dim(global$img)[1], width=dim(global$img)[2])
+  }, 
+  handlerExpr={
+    output$imgPlot <- renderPlot ({
+      req(!is.null(global$img))
+      req(!is.null(global$data))
+      req(!is.null(global$zip))
       display(global$img[,,global$imgChan,1], method="raster")
       if (global$nFrame==1) {
         for (i in rois_plot1()) {
@@ -899,18 +837,57 @@ server <- function(input, output, session) {
         }
       }
       else if (global$nFrame > 1) {
-        for (i in rois_plot1()) {
-          col <- global$colors$color[global$data$ID==i]
-          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-          if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+        if (input$selectionType == "Select all ROIs of the actual frame") {
+          for (i in rois_plot1()) {
+            col <- global$colors$color[global$data$ID==i]
+            col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
             plot(global$zip[[i]], col=col, add=TRUE)
           }
         }
+        else {
+          for (i in rois_plot1()) {
+            col <- global$colors$color[global$data$ID==i]
+            col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+            if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+              plot(global$zip[[i]], col=col, add=TRUE)
+            }
+          }
+        }
       }
-      dev.off()
-      out <- normalizePath(out, "/")
-      global$imgPNG <- EBImage::readImage(out)
-    })
+    })}, ignoreNULL=FALSE)
+  
+  
+  
+  # Image PNG
+  observeEvent(eventExpr= {
+    rois_plot1()
+    input$channel1
+    input$frame1
+  },
+  handlerExpr= {
+    out <- tempfile(fileext='.png')
+    png(out, height=dim(global$img)[1], width=dim(global$img)[2])
+    display(global$img[,,global$imgChan,1], method="raster")
+    if (global$nFrame==1) {
+      for (i in rois_plot1()) {
+        col <- global$colors$color[global$data$ID==i]
+        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+        plot(global$zip[[i]], col=col, add=TRUE)
+      }
+    }
+    else if (global$nFrame > 1) {
+      for (i in rois_plot1()) {
+        col <- global$colors$color[global$data$ID==i]
+        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+        if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+          plot(global$zip[[i]], col=col, add=TRUE)
+        }
+      }
+    }
+    dev.off()
+    out <- normalizePath(out, "/")
+    global$imgPNG <- EBImage::readImage(out)
+  })
   # CROP ROIS
   output$size <- renderUI ({
     val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
@@ -922,90 +899,90 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1 
-    },
-    handlerExpr= {
-      output$list <- EBImage::renderDisplay({
-        req(length(rois_plot1()) != 0)
-        if (global$nFrame==1) {
-          d <- (input$size-1)/2
-          dim <- 2*d+1
-          prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+  },
+  handlerExpr= {
+    output$list <- EBImage::renderDisplay({
+      req(length(rois_plot1()) != 0)
+      if (global$nFrame==1) {
+        d <- (input$size-1)/2
+        dim <- 2*d+1
+        prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+        for (i in rois_plot1()) {
+          xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+          ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+          xmin = xcenter-d
+          xmax= xcenter+d
+          ymin = ycenter-d
+          ymax = ycenter+d
+          if (xmin < 0) { 
+            xmin <- 0
+            xmax <- dim}
+          if (ymin < 0) { 
+            ymin <- 0
+            ymax <- dim}
+          if (ymax > dim(global$imgPNG)[2]) { 
+            ymin <- dim(global$imgPNG)[2] - dim +1
+            ymax <- dim(global$imgPNG)[2]}
+          if (xmax > dim(global$imgPNG)[1]) { 
+            xmax <- dim(global$imgPNG)[1]
+            xmin <- dim(global$imgPNG)[1] - dim +1}
+          cross <- global$imgPNG
+          cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+          prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+        }
+        nbCell <- nrow(rois_plot_table1())
+        EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
+      }
+      else if (global$nFrame >1) {
+        d <- (input$size-1)/2
+        dim <- 2*d+1
+        prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
+        if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
           for (i in rois_plot1()) {
-            xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-            ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-            xmin = xcenter-d
-            xmax= xcenter+d
-            ymin = ycenter-d
-            ymax = ycenter+d
-            if (xmin < 0) { 
-              xmin <- 0
-              xmax <- dim}
-            if (ymin < 0) { 
-              ymin <- 0
-              ymax <- dim}
-            if (ymax > dim(global$imgPNG)[2]) { 
-              ymin <- dim(global$imgPNG)[2] - dim +1
-              ymax <- dim(global$imgPNG)[2]}
-            if (xmax > dim(global$imgPNG)[1]) { 
-              xmax <- dim(global$imgPNG)[1]
-              xmin <- dim(global$imgPNG)[1] - dim +1}
-            cross <- global$imgPNG
-            cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-            prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+            if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+              xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+              ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+              xmin = xcenter-d
+              xmax= xcenter+d
+              ymin = ycenter-d
+              ymax = ycenter+d
+              if (xmin < 0) { 
+                xmin <- 0
+                xmax <- dim}
+              if (ymin < 0) { 
+                ymin <- 0
+                ymax <- dim}
+              if (ymax > dim(global$imgPNG)[2]) { 
+                ymin <- dim(global$imgPNG)[2] - dim +1
+                ymax <- dim(global$imgPNG)[2]}
+              if (xmax > dim(global$imgPNG)[1]) { 
+                xmax <- dim(global$imgPNG)[1]
+                xmin <- dim(global$imgPNG)[1] - dim +1
+              }
+              cross <- global$imgPNG
+              cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+              prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+            }
           }
-          nbCell <- nrow(rois_plot_table1())
+          nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==global$imgFrame)
           EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
         }
-        else if (global$nFrame >1) {
-          d <- (input$size-1)/2
-          dim <- 2*d+1
-          prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-          if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
-            for (i in rois_plot1()) {
-              if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-                xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-                ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-                xmin = xcenter-d
-                xmax= xcenter+d
-                ymin = ycenter-d
-                ymax = ycenter+d
-                if (xmin < 0) { 
-                  xmin <- 0
-                  xmax <- dim}
-                if (ymin < 0) { 
-                  ymin <- 0
-                  ymax <- dim}
-                if (ymax > dim(global$imgPNG)[2]) { 
-                  ymin <- dim(global$imgPNG)[2] - dim +1
-                  ymax <- dim(global$imgPNG)[2]}
-                if (xmax > dim(global$imgPNG)[1]) { 
-                  xmax <- dim(global$imgPNG)[1]
-                  xmin <- dim(global$imgPNG)[1] - dim +1
-                }
-                cross <- global$imgPNG
-                cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-                prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
-              }
-            }
-            nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==global$imgFrame)
-            EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
-          }
-        }
-      })
+      }
     })
+  })
   
   
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
     input$frame1 
-    },
-    handlerExpr= {
-      output$zoomImg <- EBImage::renderDisplay({
-        req(length(rois_plot1()) != 0)
-        EBImage::display(global$imgPNG, method = 'browser')
-      })
+  },
+  handlerExpr= {
+    output$zoomImg <- EBImage::renderDisplay({
+      req(length(rois_plot1()) != 0)
+      EBImage::display(global$imgPNG, method = 'browser')
     })
+  })
   
   ## MENU IMAGE TO PLOT
   # UI to choose channel to display for the image
@@ -1045,29 +1022,29 @@ server <- function(input, output, session) {
     input$channel2
     input$frame2 
     input$color2
-    },
-    handlerExpr= {
-      if ((!is.null(global$img2)) & (!is.null(global$zip))) {
-        out2 <- tempfile(fileext='.png')
-        png(out2, height=dim(global$img2)[1], width=dim(global$img2)[2])
-        display(global$img2[,,global$imgChan2,1], method="raster")
-        if (global$nFrame == 1) {
-          for (i in c(1:length(global$zip))) {
-            plot(global$zip[[i]], col=input$color2, add=TRUE) 
-          }
+  },
+  handlerExpr= {
+    if ((!is.null(global$img2)) & (!is.null(global$zip))) {
+      out2 <- tempfile(fileext='.png')
+      png(out2, height=dim(global$img2)[1], width=dim(global$img2)[2])
+      display(global$img2[,,global$imgChan2,1], method="raster")
+      if (global$nFrame == 1) {
+        for (i in c(1:length(global$zip))) {
+          plot(global$zip[[i]], col=input$color2, add=TRUE) 
         }
-        else if (global$nFrame > 1) {
-          for (i in global$data$ID) {
-            if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
-              plot(global$zip[[i]], col=input$color2, add=TRUE)
-            }
-          } 
-        }
-        dev.off()
-        out2 <- normalizePath(out2, "/")
-        global$imgPNG2 <- png::readPNG(out2)
       }
-    })
+      else if (global$nFrame > 1) {
+        for (i in global$data$ID) {
+          if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
+            plot(global$zip[[i]], col=input$color2, add=TRUE)
+          }
+        } 
+      }
+      dev.off()
+      out2 <- normalizePath(out2, "/")
+      global$imgPNG2 <- png::readPNG(out2)
+    }
+  })
   
   # Plot with the image and all ROIs 
   output$img_rois2 <- renderPlotly({
