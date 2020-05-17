@@ -116,6 +116,7 @@ ui <- dashboardPage(
                         ),
                         box (width = NULL, solidHeader = TRUE, status="primary", 
                              title="Filtering ROIs",
+                             radioButtons("filterType", "Type of selection", choices=c("Free selection", "Select all"), selected="Free selection"),
                              helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
                              plotlyOutput("selectVar")
                         ), 
@@ -553,28 +554,33 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
-    if (input$plotType == "Histogram") {
-      d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
-      if (!is.null(event_data("plotly_selecting", source="v")$x)) {
-        min <- event_data("plotly_selecting", source="v")$x[1]-d/2
-        max <- event_data("plotly_selecting", source="v")$x[length(event_data("plotly_selecting", source="v")$x)]+d/2
-        global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
+    if (input$filterType == "Free selection") {
+      if (input$plotType == "Histogram") {
+        d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
+        if (!is.null(event_data("plotly_selecting", source="v")$x)) {
+          min <- event_data("plotly_selecting", source="v")$x[1]-d/2
+          max <- event_data("plotly_selecting", source="v")$x[length(event_data("plotly_selecting", source="v")$x)]+d/2
+          global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
+        }
+        else if (!is.null(event_data("plotly_click", source="v")$x)) {
+          min <- (event_data("plotly_click", source="v")$x)-d/2
+          max <- (event_data("plotly_click", source="v")$x)+d/2
+          global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
+        }
       }
-      else if (!is.null(event_data("plotly_click", source="v")$x)) {
-        min <- (event_data("plotly_click", source="v")$x)-d/2
-        max <- (event_data("plotly_click", source="v")$x)+d/2
-        global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
+      # If scatterplot : select ROIs corresponding to points selected
+      else {
+        req(!is.null(input$variablesScatter))
+        if (!is.null(event_data("plotly_selecting", source="v")$customdata)) {
+          global$data[event_data("plotly_selecting", source="v")$customdata,]
+        }
+        else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
+          global$data[event_data("plotly_click", source="v")$customdata,]
+        }
       }
     }
-    # If scatterplot : select ROIs corresponding to points selected
-    else {
-      req(!is.null(input$variablesScatter))
-      if (!is.null(event_data("plotly_selecting", source="v")$customdata)) {
-        global$data[event_data("plotly_selecting", source="v")$customdata,]
-      }
-      else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
-        global$data[event_data("plotly_click", source="v")$customdata,]
-      }
+    else if (input$filterType == "Select all") {
+      global$data
     }
   })
   
@@ -607,25 +613,21 @@ server <- function(input, output, session) {
     input$colsY1
   })
   
-  # Observe event for colors of groups in the plot 
-  observeEvent (
-    eventExpr = { 
-      # Depends of columns selected and sliders
+  observeEvent(
+    eventExpr = {
       input$colsX1
       input$colsY1
       input$x_limit1
       input$y_limit1
-      rois_toPlot()
     },
-    handlerExpr = { 
-      req(!is.null(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))
-      if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(rois_toPlot()$ID))) {
+    handlerExpr = {
+      if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1()))) {
         # Dataframe which will contain datas to plot depending on cols selected 
-        global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
+        global$colors <- data.frame(global$data$ID)
         global$colors$color <- "blue"
         colnames(global$colors) <- c("ID","color")
-        global$colors[colsX1()] <- global$data[colsX1()][global$data$ID %in% rois_toPlot()$ID,]
-        global$colors[colsY1()] <- global$data[colsY1()][global$data$ID %in% rois_toPlot()$ID,]
+        global$colors[colsX1()] <- global$data[colsX1()]
+        global$colors[colsY1()] <- global$data[colsY1()]
         # Add columns "color" with position of the group the cell belong to
         for (i in c(1:nrow(global$colors))) {
           if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] < input$y_limit1)){
@@ -642,7 +644,45 @@ server <- function(input, output, session) {
           }
         }
       }
-    }, ignoreNULL=TRUE 
+    }, ignoreNULL=FALSE)
+  
+  # Observe event for colors of groups in the plot 
+  observeEvent (
+    eventExpr = { 
+      # Depends of columns selected and sliders
+      input$colsX1
+      input$colsY1
+      input$x_limit1
+      input$y_limit1
+      rois_toPlot()
+    },
+    handlerExpr = { 
+      if (!is.null(data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))) {
+        if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1())) & (!is.null(rois_toPlot()$ID))) {
+          # Dataframe which will contain datas to plot depending on cols selected 
+          global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
+          global$colors$color <- "blue"
+          colnames(global$colors) <- c("ID","color")
+          global$colors[colsX1()] <- global$data[colsX1()][global$data$ID %in% rois_toPlot()$ID,]
+          global$colors[colsY1()] <- global$data[colsY1()][global$data$ID %in% rois_toPlot()$ID,]
+          # Add columns "color" with position of the group the cell belong to
+          for (i in c(1:nrow(global$colors))) {
+            if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] < input$y_limit1)){
+              global$colors$color[i] <- "LLgroup"
+            }
+            else if ((global$colors[colsX1()][i,] > input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)){
+              global$colors$color[i] <- "URgroup"
+            }
+            else if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)) {
+              global$colors$color[i] <- "ULgroup"
+            }
+            else {
+              global$colors$color[i] <- "LRgroup"
+            }
+          }
+        }
+      }
+    }, ignoreNULL=FALSE 
   )
   
   # Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
@@ -701,7 +741,7 @@ server <- function(input, output, session) {
   })
   
   # Scatter plot
-  observeEvent(eventExpr=rois_toPlot(),
+  observeEvent(eventExpr=global$colors,
                handlerExpr= {
                  output$plot_rois1 <- renderPlotly({
                    req(!is.null(global$data))
@@ -714,7 +754,7 @@ server <- function(input, output, session) {
                      event_register("plotly_selecting") %>% 
                      layout(legend = list(orientation = "h", x = 0.2, y = -0.5))
                  })
-               }, ignoreNULL=TRUE)
+               }, ignoreNULL=FALSE)
   
   # Reactive variable : points selected on the plot 
   selectionRois <- reactive({
@@ -849,6 +889,7 @@ server <- function(input, output, session) {
     output$imgPlot <- renderPlot ({
       req(!is.null(global$img))
       req(!is.null(global$data))
+      req(!is.null(global$colors))
       req(!is.null(global$zip))
       display(global$img[,,global$imgChan,1], method="raster")
       if (global$nFrame==1) {
