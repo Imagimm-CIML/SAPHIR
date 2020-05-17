@@ -115,7 +115,7 @@ ui <- dashboardPage(
                              plotlyOutput("selectVar")
                         ), 
                         box( width = NULL,
-                             title = "Interactive Plot -> Image", solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                             title = "Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
@@ -403,8 +403,7 @@ server <- function(input, output, session) {
     handlerExpr={
       req(input$launch)
       # Store the path in a file
-      f <- file("www/macro
-                2path.txt", open = "w")
+      f <- file("www/macro2path.txt", open = "w")
       cat(global$macro2Path, file = f)
       close(f)
       # Deal with spaces in paths
