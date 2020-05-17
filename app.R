@@ -108,24 +108,32 @@ ui <- dashboardPage(
                 column( width =5,
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                             title = "Filtering ROIs",
-                             helpText("Select the variables you want to plot. If you select one variable, an histogram will be made. If you select two variables, the first one will be in X, the second in Y. "),
+                             title = "Parameters - Filtering ROIs",
+                             helpText("Select the variables you want to plot."),
+                             radioButtons("plotType", "Type of plot", choices=c("Histogram", "Scatterplot"), selected="Histogram", inline=TRUE),
                              uiOutput("variablesHisto"),
-                             helpText("Select the ROIs (click or brush) and remove values selected by clicking on the remove button."),
+                             uiOutput("variablesScatter")
+                        ),
+                        box (width = NULL, solidHeader = TRUE, status="primary", 
+                             title="Filtering ROIs",
+                             helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
                              plotlyOutput("selectVar")
                         ), 
                         box( width = NULL,
-                             title = "Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                             title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
-                             uiOutput("colsY1"),
+                             uiOutput("colsY1")
+                        ),
+                        box( width = NULL, 
+                             title = "Interactive Plot", solidHeader=TRUE, status="primary",
+                             withSpinner(
+                               plotlyOutput("plot_rois1")),
+                             helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection"),
                              helpText("Select the position of the cursors on the scatter plot. "),
                              sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
                              sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150),
-                             helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection"),
-                             withSpinner(
-                               plotlyOutput("plot_rois1")),
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                      tabPanel("Subgroups",
@@ -500,25 +508,39 @@ server <- function(input, output, session) {
   output$variablesHisto <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "variablesHisto",
-                   label = "Variable to analyse",
+                   label = "Column to plot in X",
                    multiple = TRUE,
                    choices = names(global$data),
-                   options = list(maxItems = 2))
+                   options = list(maxItems = 1))
+  })
+  
+  observeEvent(eventExpr=input$plotType, handlerExpr= {
+    if (input$plotType=="Scatterplot") {
+      output$variablesScatter <- renderUI({
+        req(!is.null(global$data))
+        selectizeInput(inputId = "variablesScatter",
+                       label = "Column to plot in Y",
+                       multiple = TRUE,
+                       choices = names(global$data),
+                       options = list(maxItems = 1))
+      })
+    }
   })
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectVar <- renderPlotly({
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
-    if (length(input$variablesHisto)==1) {
+    if (input$plotType == "Histogram") {
       gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
         event_register("plotly_selecting")
     }
-    else if (length(input$variablesHisto)==2) {
-      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto[[1]], y=input$variablesHisto[[2]], customdata="ID"))
+    else if (input$plotType == "Scatterplot") {
+      req(!is.null(input$variablesScatter))
+      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto, y=input$variablesScatter, customdata="ID"))
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
@@ -531,7 +553,7 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
-    if (length(input$variablesHisto)==1) {
+    if (input$plotType == "Histogram") {
       d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20
       if (!is.null(event_data("plotly_selecting", source="v")$x)) {
         min <- event_data("plotly_selecting", source="v")$x[1]-d/2
@@ -546,6 +568,7 @@ server <- function(input, output, session) {
     }
     # If scatterplot : select ROIs corresponding to points selected
     else {
+      req(!is.null(input$variablesScatter))
       if (!is.null(event_data("plotly_selecting", source="v")$customdata)) {
         global$data[event_data("plotly_selecting", source="v")$customdata,]
       }
