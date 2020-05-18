@@ -131,10 +131,7 @@ ui <- dashboardPage(
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection"),
-                             helpText("Select the position of the cursors on the scatter plot. "),
-                             sliderInput("x_limit1", label = "Vertical cursor", min = 0, max = 255, value = 150),
-                             sliderInput("y_limit1", label = "Horizontal cursor", min = 0, max=255, value=150),
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection")
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                      tabPanel("Subgroups",
@@ -167,7 +164,7 @@ ui <- dashboardPage(
                              uiOutput("channel1"),
                              uiOutput("frame1"),
                              tags$hr(),
-                             helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in DARK BLUE,", tags$br(), "- Upper left group in GREEN,", tags$br(), "- Upper right group in PINK."),
+                             helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in GREEN,", tags$br(), "- Upper left group in DARK BLUE,", tags$br(), "- Upper right group in PINK."),
                              withSpinner(
                                plotOutput("imgPlot")
                              )
@@ -617,8 +614,8 @@ server <- function(input, output, session) {
     eventExpr = {
       input$colsX1
       input$colsY1
-      input$x_limit1
-      input$y_limit1
+      x()
+      y()
     },
     handlerExpr = {
       if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1()))) {
@@ -630,13 +627,13 @@ server <- function(input, output, session) {
         global$colors[colsY1()] <- global$data[colsY1()]
         # Add columns "color" with position of the group the cell belong to
         for (i in c(1:nrow(global$colors))) {
-          if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] < input$y_limit1)){
+          if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
             global$colors$color[i] <- "LLgroup"
           }
-          else if ((global$colors[colsX1()][i,] > input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)){
+          else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
             global$colors$color[i] <- "URgroup"
           }
-          else if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)) {
+          else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
             global$colors$color[i] <- "ULgroup"
           }
           else {
@@ -652,8 +649,8 @@ server <- function(input, output, session) {
       # Depends of columns selected and sliders
       input$colsX1
       input$colsY1
-      input$x_limit1
-      input$y_limit1
+      x()
+      y()
       rois_toPlot()
     },
     handlerExpr = { 
@@ -667,13 +664,13 @@ server <- function(input, output, session) {
           global$colors[colsY1()] <- global$data[colsY1()][global$data$ID %in% rois_toPlot()$ID,]
           # Add columns "color" with position of the group the cell belong to
           for (i in c(1:nrow(global$colors))) {
-            if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] < input$y_limit1)){
+            if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
               global$colors$color[i] <- "LLgroup"
             }
-            else if ((global$colors[colsX1()][i,] > input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)){
+            else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
               global$colors$color[i] <- "URgroup"
             }
-            else if ((global$colors[colsX1()][i,] < input$x_limit1) & (global$colors[colsY1()][i,] > input$y_limit1)) {
+            else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
               global$colors$color[i] <- "ULgroup"
             }
             else {
@@ -746,15 +743,51 @@ server <- function(input, output, session) {
                  output$plot_rois1 <- renderPlotly({
                    req(!is.null(global$data))
                    req(!is.null(global$colors))
-                   gg <- ggplot(data=global$colors) + geom_point(aes_string(x=colsX1(), y=colsY1(), customdata="ID", color="color")) + geom_hline(yintercept = input$y_limit1, linetype="dashed") + geom_vline(xintercept = input$x_limit1, linetype="dashed") + 
-                     labs(x=colsX1(), y=colsY1(), color= "Color") + theme(legend.title=element_blank())
-                   p <- ggplotly(gg, source="p")
+                   p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], customdata=global$colors[,"ID"], color=global$colors[,"color"], source="p", type="scatter", mode="markers")
                    p %>% 
                      layout(dragmode = "select") %>%
-                     event_register("plotly_selecting") %>% 
-                     layout(legend = list(orientation = "h", x = 0.2, y = -0.5))
+                     event_register("plotly_selecting") %>%
+                     layout(
+                     xaxis = list(range = c(0, 300)),
+                     yaxis = list(range = c(0, 300)),
+                     shapes = list(list(
+                       type = "line", 
+                       line = list(color = "black"),
+                       dash = "dashdot",
+                       x0 = x(), x1 = x(),
+                       y0 = -100, y1 = 300
+                     ),
+                     list(
+                       type = "line", 
+                       line = list(color = "black"),
+                       dash = "dashdot",
+                       x0 = -100, x1 = 300,
+                       y0 = y(), y1 = y()
+                     ))
+                     
+                   ) %>%
+                     config(edits = list(shapePosition = TRUE))
                  })
                }, ignoreNULL=FALSE)
+  
+  y <- reactiveVal(150)
+  x <- reactiveVal(150)
+  
+  observe ({
+    shape1_y <- event_data("plotly_relayout", source="p")$`shapes[1].y0`
+    if (!is.null(shape1_y)) {
+      y(shape1_y)
+    }
+    y()
+  })
+  
+  observe ({
+    shape2_x <- event_data("plotly_relayout", source="p")$`shapes[0].x0`
+    if (!is.null(shape2_x)) {
+      x(shape2_x)
+    }
+    x()
+  })
   
   # Reactive variable : points selected on the plot 
   selectionRois <- reactive({
@@ -926,6 +959,8 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1
+    x()
+    y()
   },
   handlerExpr= {
     out <- tempfile(fileext='.png')
