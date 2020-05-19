@@ -78,8 +78,13 @@ ui <- dashboardPage(
               # Image browser 
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
+                     title = "Use files stored in the www directory",
+                     helpText("To use this button, you will need 3 files with predetermined names stored in a repertory \"www\" in your working directory. For prerequisites, click on the \"Prerequisites\" link."),
+                     actionLink("help", "Prerequisites"),
+                     tags$br(),
+                     actionButton("default", "Use default files")),
+                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
-                     actionButton("default", "Use default files"),
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
                      tags$hr(),
@@ -114,7 +119,7 @@ ui <- dashboardPage(
                              uiOutput("variablesHisto"),
                              uiOutput("variablesScatter")
                         ),
-                        box (width = NULL, solidHeader = TRUE, status="primary", 
+                        box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Filtering ROIs",
                              radioButtons("filterType", "Type of selection", choices=c("Free selection", "Select all"), selected="Free selection"),
                              helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
@@ -160,11 +165,12 @@ ui <- dashboardPage(
                              title = "Image display", solidHeader= TRUE, status = "primary",
                              helpText("Legends of the channels : "),
                              tableOutput("legend1"),
+                             helpText("Legends of the colors : "), 
+                             tableOutput("colorLegend"),
                              helpText("Select channel and frame to display."),
                              uiOutput("channel1"),
                              uiOutput("frame1"),
                              tags$hr(),
-                             helpText("Colors :", tags$br(), "- Lower left group in RED, ", tags$br(), "- Lower right group in GREEN,", tags$br(), "- Upper left group in DARK BLUE,", tags$br(), "- Upper right group in PINK."),
                              withSpinner(
                                plotOutput("imgPlot")
                              )
@@ -439,6 +445,19 @@ server <- function(input, output, session) {
   
   
   ## MENU IMAGE
+  # Prerequisites button
+  observeEvent(input$help, {
+    showModal(modalDialog(
+      title = "Prerequisites for default files",
+      "4 files needed : ", tags$br(), "- image.tif containing your image in TIF format", tags$br(), 
+      "- intensity.csv containing your intensity results in csv format, with a TAB separator and a HEADER", tags$br(),
+      "- legend.csv containing your legends result in csv format, with a TAB separator and a HEADER", tags$br(), 
+      "- roiset.zip containing your ImageJ ROIs. ", tags$br(),
+      "WARNING : If the names does not match, they are not going to be read.", tags$br(), 
+      "Store these files in a repository named www in your working directory and click on the button, you won't have to choose your files after, the files in the directory will be used.",
+      easyClose = TRUE
+    ))
+  })
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
     global$imgPath <- "www/image.tif"
@@ -448,6 +467,7 @@ server <- function(input, output, session) {
     global$nFrame <- count_frames(global$imgPath)[1]
     global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
     global$zip <- read.ijzip("www/roiset.zip")
+    global$legend <- read.table("www/legend.csv", header=TRUE, sep="\t", dec=".")
   })
   
   # Image variables
@@ -875,6 +895,12 @@ server <- function(input, output, session) {
     global$legend
   })
   
+  # Table with color legend channel 
+  output$colorLegend <- renderTable({
+    tableColor <- data.frame("Lower left" = "Red", "Lower right"= "Green", "Upper left"="Dark blue", "Upper right"= "Pink")
+    colnames(tableColor) <- c("Lower left", "Lower right", "Upper left", "Upper right")
+    tableColor
+  })
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
     req(is.null(global$img)==FALSE)
