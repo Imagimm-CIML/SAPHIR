@@ -1020,9 +1020,14 @@ server <- function(input, output, session) {
             xmin <- dim(global$imgPNG)[1] - dim +1}
           cross <- global$imgPNG
           cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-          prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+          cross <- cross[xmin:xmax,ymin:ymax,]
+          cross <- magick::image_read(cross)
+          cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
+          cross <- magick::as_EBImage(cross)
+          prem <- EBImage::combine(prem, cross)
         }
-        nbCell <- nrow(rois_plot_table1())
+        nbCell <- nrow
+        (rois_plot_table1())
         EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
       }
       else if (global$nFrame >1) {
@@ -1053,7 +1058,11 @@ server <- function(input, output, session) {
               }
               cross <- global$imgPNG
               cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-              prem <- EBImage::combine(prem, cross[xmin:xmax,ymin:ymax,])
+              cross <- cross[xmin:xmax,ymin:ymax,]
+              cross <- magick::image_read(cross)
+              cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
+              cross <- magick::as_EBImage(cross)
+              prem <- EBImage::combine(prem, cross)
             }
           }
           nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==global$imgFrame)
