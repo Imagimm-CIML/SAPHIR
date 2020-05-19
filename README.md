@@ -18,26 +18,26 @@ The table must have column headers with unique column names. Columns names are r
 #### File ROIs 
 Zip file containing the ROIs of the image defined with ImageJ. 
 
+#### Legend file
+A txt or csv file containing as many columns as channels on the image. The first line contains the number of the channel and the second line the object it corresponds to. 
+
 ### Using the application 
 To launch the app, you have to open the app.R file in RStudio and click on the "Run app" button on the right top corner. 
 
+#### Preliminary step : ImageJ Macro
+If you first need to launch a macro in ImageJ to obtain your results, you can use the first menu "Segmentation". This menu allows you to choose your software (ImageJ or Fiji) and a macro and to launch it. 
+To do so, you need to choose your OS and the software to use. Then, you will need to search for your ImageJ/Fiji app : after clicking on the "Choose" link, a browser will appear and you will have to select the repository containing your app (often something like Fiji.app or ImageJ.app). The path to your file will be save in a txt file in a repository "www" created in your R Working directory. If you are still in the same working directory when you re-run the app next time, the path will be found automatically and you won't need to search for it again. 
+After that, you have to choose your macro to launch. The same principle of path saving is used. 
+You can also launch a second macro after the first one. 
+
 #### First step : upload the files you want to analyse 
-Use the first item of the menu "Choose your image". 
-First, click on the top "Browse" button. Select the image you want to analyse. After, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
+Use the second item of the menu "Choose your results". 
+First, click on the top "Browse" button. Select the image you want to analyse. After, you can also choose a file containing the legends for the channel in the image. 
+Then, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
 Then, upload your zip file containing the ROIs of your image. 
 
 
-#### Second step : select ROIs to remove
-Under the browse box, you can plot variables of the results or the intensity file and select ROIs with extreme values to remove them from the datas to analyse. For choosing the variables to plot, use the select widget : 
-* if you select ONE variable, an histogram of this variable will be plotted with a bin width of 10. 
-* if you select TWO variables, a scatter plot will be displayed with the first selected variable in X and the second in Y. 
-
-Make a selection on the plot and click on the "Remove" button. 
-* for the histogram, the ROIs having the values selected for the plotted variable will be selected 
-* for the scatterplot, the ROIs corresponding to the points will be selected
-The selection will be removed from the intensity and result files and from the Roi set. 
-
-#### Third step 
+#### Second step 
 ##### Part 1 : Plot to Image
 Use the second item of the menu : "Plot to Image". <br>
 Zones of the plot : 
