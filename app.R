@@ -172,17 +172,15 @@ ui <- dashboardPage(
                              uiOutput("frame1"),
                              tags$hr(),
                              withSpinner(
-                               plotOutput("imgPlot")
+                               EBImage::displayOutput("zoomImg")
                              )
                         ),
-                        tabBox (width=NULL, selected="ROIs",
-                                tabPanel(title="ROIs", 
-                                         uiOutput("size"),
-                                         EBImage::displayOutput("list")
-                                ),
-                                tabPanel(title="Zoom",
-                                         EBImage::displayOutput("zoomImg")
-                                )
+                        box (width=NULL, 
+                             title = "ROIs", solidHeader=TRUE, status="primary",
+                             uiOutput("size"),
+                             withSpinner(
+                               EBImage::displayOutput("list")
+                             )
                         )
                 )
               )
@@ -938,19 +936,20 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
-  # Image plot 
+  # Image PNG
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
     input$frame1
-  }, 
-  handlerExpr={
-    output$imgPlot <- renderPlot ({
-      req(!is.null(global$img))
-      req(!is.null(global$data))
-      req(!is.null(global$colors))
-      req(!is.null(global$zip))
-      display(global$img[,,global$imgChan,1], method="raster")
+    x()
+    y()
+  },
+  handlerExpr= {
+    req(global$img)
+    out <- tempfile(fileext='.png')
+    png(out, height=dim(global$img)[1], width=dim(global$img)[2])
+    display(global$img[,,global$imgChan,1], method="raster")
+    if (length(rois_plot1()) > 0) {
       if (global$nFrame==1) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$data$ID==i]
@@ -976,47 +975,16 @@ server <- function(input, output, session) {
           }
         }
       }
-    })}, ignoreNULL=FALSE)
-  
-  
-  
-  # Image PNG
-  observeEvent(eventExpr= {
-    rois_plot1()
-    input$channel1
-    input$frame1
-    x()
-    y()
-  },
-  handlerExpr= {
-    out <- tempfile(fileext='.png')
-    png(out, height=dim(global$img)[1], width=dim(global$img)[2])
-    display(global$img[,,global$imgChan,1], method="raster")
-    if (global$nFrame==1) {
-      for (i in rois_plot1()) {
-        col <- global$colors$color[global$data$ID==i]
-        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-        plot(global$zip[[i]], col=col, add=TRUE)
-      }
-    }
-    else if (global$nFrame > 1) {
-      for (i in rois_plot1()) {
-        col <- global$colors$color[global$data$ID==i]
-        col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-        if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-          plot(global$zip[[i]], col=col, add=TRUE)
-        }
-      }
     }
     dev.off()
     out <- normalizePath(out, "/")
     global$imgPNG <- EBImage::readImage(out)
-  })
+  }, ignoreNULL=FALSE)
   # CROP ROIS
   output$size <- renderUI ({
     val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
     max <- min(dim(global$img)[1], dim(global$img)[2])
-    sliderInput("size", label = "Size of the image", min = 0, max = max, value = val)
+    sliderInput("size", label = "Size of the ROI crop (micron)", min = 0, max = max, value = val)
   })
   
   observeEvent(eventExpr= {
@@ -1102,8 +1070,8 @@ server <- function(input, output, session) {
     input$frame1 
   },
   handlerExpr= {
+    req(global$imgPNG)
     output$zoomImg <- EBImage::renderDisplay({
-      req(length(rois_plot1()) != 0)
       EBImage::display(global$imgPNG, method = 'browser')
     })
   })
