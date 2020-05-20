@@ -136,7 +136,8 @@ ui <- dashboardPage(
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all ROIs of all frames", "Select all ROIs of the actual frame", "Select none"), selected="Free selection")
+                             checkboxInput("associated", "Associate with slice", value=TRUE),
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all", "Select all ROIs of the actual frame", "Select none"), selected="Free selection")
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                      tabPanel("Subgroups",
@@ -828,7 +829,7 @@ server <- function(input, output, session) {
       if (input$selectionType == "Free selection") {
         rois_plot1 <- selectionRois()
       }
-      else if (input$selectionType == "Select all ROIs of all frames") {
+      else if (input$selectionType == "Select all") {
         rois_plot1 <- global$data$ID
       }
       else if (input$selectionType == "Select all ROIs of the actual frame") {
@@ -945,6 +946,7 @@ server <- function(input, output, session) {
     y()
     input$ids
     input$size
+    input$associated
   },
   handlerExpr= {
     req(global$img)
@@ -952,22 +954,15 @@ server <- function(input, output, session) {
     png(out, height=dim(global$img)[1], width=dim(global$img)[2])
     display(global$img[,,global$imgChan,1], method="raster")
     if (length(rois_plot1()) > 0) {
-      if (global$nFrame==1) {
-        for (i in rois_plot1()) {
-          col <- global$colors$color[global$data$ID==i]
-          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
-          plot(global$zip[[i]], col=col, add=TRUE)
-        }
-      }
-      else if (global$nFrame > 1) {
-        if (input$selectionType == "Select all ROIs of the actual frame") {
+      if (input$associated == TRUE) {
+        if (global$nFrame==1) {
           for (i in rois_plot1()) {
             col <- global$colors$color[global$data$ID==i]
             col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
             plot(global$zip[[i]], col=col, add=TRUE)
           }
         }
-        else {
+        else if (global$nFrame > 1) {
           for (i in rois_plot1()) {
             col <- global$colors$color[global$data$ID==i]
             col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
@@ -975,6 +970,13 @@ server <- function(input, output, session) {
               plot(global$zip[[i]], col=col, add=TRUE)
             }
           }
+        }
+      }
+      else if (input$associated == FALSE) {
+        for (i in rois_plot1()) {
+          col <- global$colors$color[global$data$ID==i]
+          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+          plot(global$zip[[i]], col=col, add=TRUE)
         }
       }
     }
