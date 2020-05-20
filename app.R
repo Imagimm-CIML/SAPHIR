@@ -167,13 +167,13 @@ ui <- dashboardPage(
                              tableOutput("legend1"),
                              helpText("Legends of the colors : "), 
                              tableOutput("colorLegend"),
-                             helpText("Select channel and frame to display."),
-                             uiOutput("channel1"),
-                             uiOutput("frame1"),
                              tags$hr(),
+                             checkboxInput("ids", "Display IDs"),
                              withSpinner(
                                EBImage::displayOutput("zoomImg")
-                             )
+                             ),
+                             uiOutput("channel1"),
+                             uiOutput("frame1"),
                         ),
                         box (width=NULL, 
                              title = "ROIs", solidHeader=TRUE, status="primary",
@@ -761,7 +761,7 @@ server <- function(input, output, session) {
                  output$plot_rois1 <- renderPlotly({
                    req(!is.null(global$data))
                    req(!is.null(global$colors))
-                   p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], customdata=global$colors[,"ID"], color=global$colors[,"color"], source="p", type="scatter", mode="markers")
+                   p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
                    p %>% 
                      layout(dragmode = "select") %>%
                      event_register("plotly_selecting") %>%
@@ -943,6 +943,8 @@ server <- function(input, output, session) {
     input$frame1
     x()
     y()
+    input$ids
+    input$size
   },
   handlerExpr= {
     req(global$img)
@@ -991,6 +993,7 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1 
+    input$ids
   },
   handlerExpr= {
     output$list <- EBImage::renderDisplay({
@@ -1021,9 +1024,11 @@ server <- function(input, output, session) {
           cross <- global$imgPNG
           cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
           cross <- cross[xmin:xmax,ymin:ymax,]
-          cross <- magick::image_read(cross)
-          cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
-          cross <- magick::as_EBImage(cross)
+          if (input$ids == FALSE) {
+            cross <- magick::image_read(cross)
+            cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
+            cross <- magick::as_EBImage(cross)
+          }
           prem <- EBImage::combine(prem, cross)
         }
         nbCell <- nrow
@@ -1059,9 +1064,11 @@ server <- function(input, output, session) {
               cross <- global$imgPNG
               cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
               cross <- cross[xmin:xmax,ymin:ymax,]
-              cross <- magick::image_read(cross)
-              cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
-              cross <- magick::as_EBImage(cross)
+              if (input$ids == FALSE) {
+                cross <- magick::image_read(cross)
+                cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
+                cross <- magick::as_EBImage(cross)
+              }
               prem <- EBImage::combine(prem, cross)
             }
           }
@@ -1077,9 +1084,35 @@ server <- function(input, output, session) {
     rois_plot1()
     input$channel1
     input$frame1 
+    input$ids
+    input$size
   },
   handlerExpr= {
     req(global$imgPNG)
+    if (input$ids==TRUE) {
+      if ((global$nFrame==1) & (length(rois_plot1()) != 0)) {
+        for (i in rois_plot1()) {
+          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
+          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2) - (input$size-1)/2
+          coord <- paste("+", xID, "+", yID, sep="")
+          global$imgPNG <- magick::image_read(global$imgPNG)
+          global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+          global$imgPNG <- magick::as_EBImage(global$imgPNG)
+        }
+      }
+      if ((global$nFrame > 1) & (length(rois_plot1()) != 0) & (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1))) {
+        for (i in rois_plot1()) {
+          if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
+            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2) - (input$size-1)/2
+            coord <- paste("+", xID, "+", yID, sep="")
+            global$imgPNG <- magick::image_read(global$imgPNG)
+            global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+            global$imgPNG <- magick::as_EBImage(global$imgPNG)
+          }
+        }
+      }
+    }
     output$zoomImg <- EBImage::renderDisplay({
       EBImage::display(global$imgPNG, method = 'browser')
     })
