@@ -137,7 +137,7 @@ ui <- dashboardPage(
                                plotlyOutput("plot_rois1")),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                              checkboxInput("associated", "Associate with slice", value=TRUE),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all", "Select all ROIs of the actual frame", "Select none"), selected="Free selection")
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection")
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                      tabPanel("Subgroups",
@@ -820,8 +820,20 @@ server <- function(input, output, session) {
     }
   })
   
+  observeEvent(eventExpr=input$selectionType,
+               handlerExpr={
+                 if (input$selectionType=="Select all ROIs of a specific frame") {
+                   showModal(modalDialog(
+                     title = "Specific frame",
+                     numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1),
+                     easyClose = TRUE
+                   ))
+                 }
+               })
+   
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
+    input$specificFrame
   }, valueExpr = 
     {
       req(!is.null(global$data))
@@ -832,9 +844,9 @@ server <- function(input, output, session) {
       else if (input$selectionType == "Select all") {
         rois_plot1 <- global$data$ID
       }
-      else if (input$selectionType == "Select all ROIs of the actual frame") {
-        if (global$nFrame > 1) {
-          rois_plot1 <- global$data$ID[global$data$Slice==global$imgFrame]
+      else if (input$selectionType == "Select all ROIs of a specific frame") {
+        if ((global$nFrame > 1) & (!is.null(input$specificFrame))){
+          rois_plot1 <- global$data$ID[global$data$Slice==input$specificFrame]
         }
         else if (global$nFrame == 1) {
           rois_plot1 <- global$data$ID
