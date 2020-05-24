@@ -136,8 +136,6 @@ ui <- dashboardPage(
                              withSpinner(
                                plotlyOutput("plot_rois1")),
                              uiOutput("nextSel"),
-                             tags$br(),
-                             actionLink("resetAllSel", "Reset all selections"),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                              checkboxInput("associated", "Associate with slice", value=TRUE),
                              uiOutput("colorType"),
@@ -888,6 +886,7 @@ server <- function(input, output, session) {
                  output$colorType <- renderUI({
                    if (input$selectionType=="Multiple selection") {
                       checkboxInput("colorType", "Associate colors with different selections", value=TRUE)
+                      
                    }
                  })
                })
@@ -907,7 +906,8 @@ server <- function(input, output, session) {
                        tagList(
                          helpText("Select your gate and click on the button to select an other gate."),
                          actionButton("nextSel", "Next selection"),
-                         tags$br()
+                         tags$br(),
+                         actionLink("resetAllSel", "Reset all selections")
                        )
                      }
                    })
@@ -929,6 +929,10 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = {
     input$resetAllSel},
                handlerExpr = {
+                 selectionRois <- event_data("plotly_deselect", source="p")
+                 rois_plot1 <- c()
+                 js$resetSelect()
+                 js$resetClick()
                  if ((input$selectionType=="Multiple selection") & (!is.null(input$colorType))) {
                    multiSelect$indiv <- c()
                    multiSelect$total <- c()
@@ -937,10 +941,6 @@ server <- function(input, output, session) {
                      global$colors$color <- 1
                    }
                  }
-                 selectionRois <- event_data("plotly_deselect", source="p")
-                 rois_plot1 <- c()
-                 js$resetSelect()
-                 js$resetClick()
                })
   
   observeEvent(input$selectionType,
