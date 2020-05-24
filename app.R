@@ -712,8 +712,7 @@ server <- function(input, output, session) {
   # Datas to plot if no Filtering 
   observeEvent(
     eventExpr = {
-      input$selectionType
-      input$colorType
+      global$data
       input$colsX1
       input$colsY1
       x()
@@ -725,43 +724,9 @@ server <- function(input, output, session) {
         global$colors <- data.frame(global$data$ID)
         global$colors$color <- 1
         colnames(global$colors) <- c("ID","color")
+        global$colors$shape <- "Neg"
         global$colors[colsX1()] <- global$data[colsX1()]
         global$colors[colsY1()] <- global$data[colsY1()]
-        # Add columns "color" with position of the group the cell belong to
-        if (is.null(input$colorType) | input$selectionType!="Multiple selection") {
-          for (i in c(1:nrow(global$colors))) {
-            if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-              global$colors$color[i] <- "LLgroup"
-            }
-            else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-              global$colors$color[i] <- "URgroup"
-            }
-            else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-              global$colors$color[i] <- "ULgroup"
-            }
-            else {
-              global$colors$color[i] <- "LRgroup"
-            }
-          }
-        }
-        else {
-          if (input$colorType==FALSE) {
-            for (i in c(1:nrow(global$colors))) {
-              if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-                global$colors$color[i] <- "LLgroup"
-              }
-              else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-                global$colors$color[i] <- "URgroup"
-              }
-              else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-                global$colors$color[i] <- "ULgroup"
-              }
-              else {
-                global$colors$color[i] <- "LRgroup"
-              }
-            }
-          }
-        }
       }
     }, ignoreNULL=FALSE)
   
@@ -769,8 +734,7 @@ server <- function(input, output, session) {
   observeEvent (
     eventExpr = { 
       # Depends of columns selected and sliders
-      input$selectionType
-      input$colorType
+      global$data
       input$colsX1
       input$colsY1
       x()
@@ -778,54 +742,70 @@ server <- function(input, output, session) {
       rois_toPlot()
     },
     handlerExpr = { 
-      if (!is.null(data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))) {
+      if (nrow(data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))>0) {
         if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1())) & (!is.null(rois_toPlot()$ID))) {
           # Dataframe which will contain datas to plot depending on cols selected 
           global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
           global$colors$color <- 1
           colnames(global$colors) <- c("ID","color")
+          global$colors$shape <- "Neg"
           global$colors[colsX1()] <- global$data[colsX1()][global$data$ID %in% rois_toPlot()$ID,]
           global$colors[colsY1()] <- global$data[colsY1()][global$data$ID %in% rois_toPlot()$ID,]
-          # Add columns "color" with position of the group the cell belong to
-          if (is.null(input$colorType)) {
-            for (i in c(1:nrow(global$colors))) {
-              if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-                global$colors$color[i] <- "LLgroup"
-              }
-              else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-                global$colors$color[i] <- "URgroup"
-              }
-              else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-                global$colors$color[i] <- "ULgroup"
-              }
-              else {
-                global$colors$color[i] <- "LRgroup"
-              }
-            }
-          }
-          else {
-            if (input$colorType==FALSE) {
-              for (i in c(1:nrow(global$colors))) {
-                if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-                  global$colors$color[i] <- "LLgroup"
-                }
-                else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-                  global$colors$color[i] <- "URgroup"
-                }
-                else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-                  global$colors$color[i] <- "ULgroup"
-                }
-                else {
-                  global$colors$color[i] <- "LRgroup"
-                }
-              }
-            }
-          }
         }
       }
     }, ignoreNULL=FALSE 
   )
-  
+  # Color datas 
+  observeEvent(eventExpr= {
+    global$colors
+    input$selectionType
+    input$colorType
+    input$colsX1
+    input$colsY1
+    x()
+    y()
+  },
+   handlerExpr={
+     req(!is.null(global$colors))
+     # Add columns "color" with position of the group the cell belong to
+     if (is.null(input$colorType) | input$selectionType!="Multiple selection") {
+       for (i in c(1:nrow(global$colors))) {
+         if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
+           global$colors$color[i] <- "LLgroup"
+         }
+         else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
+           global$colors$color[i] <- "URgroup"
+         }
+         else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
+           global$colors$color[i] <- "ULgroup"
+         }
+         else {
+           global$colors$color[i] <- "LRgroup"
+         }
+       }
+     }
+     else {
+       if (input$colorType==FALSE) {
+         for (i in c(1:nrow(global$colors))) {
+           if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
+             global$colors$color[i] <- "LLgroup"
+           }
+           else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
+             global$colors$color[i] <- "URgroup"
+           }
+           else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
+             global$colors$color[i] <- "ULgroup"
+           }
+           else {
+             global$colors$color[i] <- "LRgroup"
+           }
+         }
+       }
+       else {
+         global$colors$color <- 1
+       }
+     }
+   })
   ## Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
   output$downloadData <- downloadHandler(
     filename = function(){
@@ -1007,6 +987,7 @@ server <- function(input, output, session) {
                  if (input$selectionType=="Multiple selection") {
                    selection <- unique(selectionRois())
                    multiSelect$indiv <- unique(selection)
+                   multiSelect$indiv <- global$data$ID[global$data$ID %in% multiSelect$indiv]
                    output$nextSel <- renderUI ({
                      if (input$selectionType=="Multiple selection") {
                        tagList(
