@@ -71,7 +71,7 @@ ui <- dashboardPage(
                      tags$br(), 
                      actionLink("changeMacro2", "Change the path to your macro.", icon=icon("sync")),
                      tags$br(),
-                     actionButton("launch2", "Launch second macro"),
+                     actionButton("launch2", "Launch second macro")
                 )
               )),
       tabItem(tabName= "image",
@@ -176,6 +176,8 @@ ui <- dashboardPage(
                              tableOutput("colorLegend"),
                              tags$hr(),
                              checkboxInput("ids", "Display IDs"),
+                             checkboxInput("ring", "Display ring ROI"),
+                             uiOutput("ringSlider"),
                              withSpinner(
                                EBImage::displayOutput("zoomImg")
                              ),
@@ -635,7 +637,8 @@ server <- function(input, output, session) {
     input$colsY1
   })
   
-  # Local contrast 
+  ## Local contrast 
+  # Modal dialog window with columns to use and threshold
   observeEvent(
     eventExpr={
       input$localContrast},
@@ -655,6 +658,7 @@ server <- function(input, output, session) {
     }
   )
   
+  # Modification of the "shape" columns depending on the thresholds
   observeEvent(
     eventExpr = {
       input$apply
@@ -675,6 +679,7 @@ server <- function(input, output, session) {
       removeModal(session = getDefaultReactiveDomain())
     })
   
+  # UI Output for the names of the columns used for local contrast
   output$colsContrast <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colsContrast", 
@@ -685,6 +690,7 @@ server <- function(input, output, session) {
                    options = list(maxItems = 3))
   })
   
+  # Sliders input for threshold
   output$contrastThreshold <- renderUI({
     req(!is.null(global$data))
     req(!is.null(input$colsContrast))
@@ -695,14 +701,14 @@ server <- function(input, output, session) {
     })
   })
   
-  
+  # Reactive values with thresholds
   thresholds <- reactive({
     nbCols <- length(input$colsContrast)
     thresholds <- sapply(1:nbCols, function(i) {
       as.numeric(input[[paste0("threshold", i)]]) })
     }) 
   
-  
+  ## Global colors
   # Datas to plot if no Filtering 
   observeEvent(
     eventExpr = {
@@ -760,7 +766,6 @@ server <- function(input, output, session) {
     }, ignoreNULL=FALSE)
   
   # Datas to plot if filtering
-  
   observeEvent (
     eventExpr = { 
       # Depends of columns selected and sliders
@@ -821,7 +826,7 @@ server <- function(input, output, session) {
     }, ignoreNULL=FALSE 
   )
   
-  # Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
+  ## Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
   output$downloadData <- downloadHandler(
     filename = function(){
       paste("groupDatas.zip")
@@ -876,7 +881,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Scatter plot
+  ## Scatter plot
   observeEvent(eventExpr= {global$colors
                input$colorType
                input$localContrast
@@ -972,6 +977,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Modal dialog to select specific frame if wanted + renderUI associate colors
   observeEvent(eventExpr=input$selectionType,
                handlerExpr={
                  if (input$selectionType=="Select all ROIs of a specific frame") {
@@ -989,8 +995,10 @@ server <- function(input, output, session) {
                  })
                })
   
+  # Global values for multiple selection
   multiSelect <- reactiveValues(indiv = c(), total=c(), indice=1)
   
+  # Render UI Next selection + reset all selections 
   observeEvent(eventExpr= {
     input$selectionType
     input$colorType
@@ -1012,6 +1020,7 @@ server <- function(input, output, session) {
                  }
                })
   
+  # Save ROIs selected when Next button pushed
   observeEvent(eventExpr=input$nextSel,
                handlerExpr={
                  multiSelect$indice <- multiSelect$indice + 1
@@ -1024,6 +1033,7 @@ server <- function(input, output, session) {
                  multiSelect$indiv <- c()
                })
   
+  # Remove all selections 
   observeEvent(eventExpr = {
     input$resetAllSel},
                handlerExpr = {
@@ -1041,12 +1051,14 @@ server <- function(input, output, session) {
                  }
                })
   
+  # Remove all selections when selection type radiobutton moved 
   observeEvent(input$selectionType,
                handlerExpr={
                  js$resetSelect()
                  js$resetClick()
                })
   
+  # ROI selected 
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
     input$specificFrame
@@ -1171,6 +1183,46 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
+  observeEvent(eventExpr={
+    input$ring
+  }, handlerExpr={
+    output$ringSlider <- renderUI({
+      if (input$ring==TRUE) {
+        sliderInput("ringSlider", label="Size of the ring (microns)", min=1, max=10, step=0.5, value=2)
+      }
+    })
+  })
+  
+  ring <- reactiveValues(ringCoords = list())
+  
+  observeEvent(eventExpr={
+    input$ring
+    input$ringSlider
+    rois_plot1()
+  }, handlerExpr = {
+    ring$ringCoords <- list()
+    if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
+      for (i in 1:length(global$zip)) {ring$ringCoords <- append(ring$ringCoords, list(global$zip[[i]]$coords))}
+      for (j in rois_plot1()) {  
+        for (i in 1:nrow(ring$ringCoords[[j]])) {
+          if (ring$ringCoords[[j]][i,1] >= mean(global$zip[[j]]$coords[,1])) { 
+            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] - as.numeric(input$ringSlider)
+          } 
+          else { 
+            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] + as.numeric(input$ringSlider)
+          } 
+          if (ring$ringCoords[[j]][i,2] >= mean(global$zip[[j]]$coords[,2])) {
+            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] - as.numeric(input$ringSlider)
+          }
+          else {
+            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] + as.numeric(input$ringSlider)
+          }
+        }
+      }
+    }
+  })
+
+  
   # Image PNG
   observeEvent(eventExpr= {
     rois_plot1()
@@ -1182,6 +1234,9 @@ server <- function(input, output, session) {
     input$size
     input$associated
     multiSelect$indiv
+    ring$ringCoords
+    input$ring
+    input$ringSlider
   },
   handlerExpr= {
     req(global$img)
@@ -1195,17 +1250,26 @@ server <- function(input, output, session) {
             col <- global$colors$color[global$data$ID==i]
             col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
             plot(global$zip[[i]], col=col, add=TRUE)
+            if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+              lines(ring$ringCoords[[i]], col=col)
+            }
           }
         }
         if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
           for (i in multiSelect$indiv) {
             if (input$colorType==TRUE) {
               plot(global$zip[[i]], col="yellow", add=TRUE)
+              if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+                lines(ring$ringCoords[[i]], col=col)
+              }
             }
             else {
               col <- global$colors$color[global$data$ID==i]
               col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
               plot(global$zip[[i]], col=col, add=TRUE)
+              if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+                lines(ring$ringCoords[[i]], col=col)
+              }
             }
           }
         } 
@@ -1217,6 +1281,9 @@ server <- function(input, output, session) {
             col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
               plot(global$zip[[i]], col=col, add=TRUE)
+              if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+                lines(ring$ringCoords[[i]], col=col)
+              }
             }
           }
         }
@@ -1225,11 +1292,17 @@ server <- function(input, output, session) {
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
               if (input$colorType==TRUE) {
                 plot(global$zip[[i]], col="yellow", add=TRUE)
+                if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+                  lines(ring$ringCoords[[i]], col=col)
+                }
               }
               else {
                 col <- global$colors$color[global$data$ID==i]
                 col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
                 plot(global$zip[[i]], col=col, add=TRUE)
+                if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+                  lines(ring$ringCoords[[i]], col=col)
+                }
               }
             }
           }
@@ -1242,17 +1315,26 @@ server <- function(input, output, session) {
           col <- global$colors$color[global$data$ID==i]
           col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
           plot(global$zip[[i]], col=col, add=TRUE)
+          if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+            lines(ring$ringCoords[[i]], col=col)
+          }
         }
       }
       if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
         for (i in multiSelect$indiv) {
           if (input$colorType==TRUE) {
             plot(global$zip[[i]], col="yellow", add=TRUE)
+            if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+              lines(ring$ringCoords[[i]], col=col)
+            }
           }
           else {
             col <- global$colors$color[global$data$ID==i]
             col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
             plot(global$zip[[i]], col=col, add=TRUE)
+            if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+              lines(ring$ringCoords[[i]], col=col)
+            }
           }
         }
       } 
@@ -1364,6 +1446,10 @@ server <- function(input, output, session) {
     input$frame1 
     input$ids
     input$size
+    global$imgPNG
+    ring$ringCoords
+    input$ring
+    input$ringSlider
   },
   handlerExpr= {
     req(global$imgPNG)
@@ -1394,7 +1480,7 @@ server <- function(input, output, session) {
     output$zoomImg <- EBImage::renderDisplay({
       EBImage::display(global$imgPNG, method = 'browser')
     })
-  })
+  }, ignoreNULL=FALSE)
   
   ## MENU IMAGE TO PLOT
   # UI to choose channel to display for the image
