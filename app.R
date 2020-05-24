@@ -129,7 +129,8 @@ ui <- dashboardPage(
                              title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
-                             uiOutput("colsY1")
+                             uiOutput("colsY1"),
+                             checkboxInput("localContrast", "Use local contrast for the shape of the points")
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
@@ -525,7 +526,7 @@ server <- function(input, output, session) {
     global$zip <- read.ijzip(input$zipFile$datapath)
   }, label = "files")
   
-  
+  ## MENU PLOT TO IMAGE
   # Output "selectize input" of the variable(s) to plot for selection  
   # X variable
   output$variablesHisto <- renderUI({
@@ -606,9 +607,7 @@ server <- function(input, output, session) {
       global$data
     }
   })
-  
-  
-  # MENU PLOT TO IMAGE 
+
   # UI for choosing variables to display 
   output$colsX1 <- renderUI({
     req(!is.null(global$data))
@@ -635,6 +634,74 @@ server <- function(input, output, session) {
   colsY1 <- reactive({
     input$colsY1
   })
+  
+  # Local contrast 
+  observeEvent(
+    eventExpr={
+      input$localContrast},
+    handlerExpr={
+      if (input$localContrast==TRUE) {
+        global$colors$shape <- "Neg"
+        showModal(modalDialog(
+          title = "Select threshold and columns to use",
+          uiOutput("colsContrast"),
+          uiOutput("contrastThreshold"),
+          footer=tagList(
+            modalButton("Cancel"),
+            actionButton("apply", "Apply")),
+          easyClose = TRUE
+        ))
+      }
+    }
+  )
+  
+  observeEvent(
+    eventExpr = {
+      input$apply
+      },
+    handlerExpr = {
+      req(length(input$colsContrast) >= 1)
+      req(length(thresholds())==length(input$colsContrast))
+      for (i in global$colors$ID) {
+        comparisons <- c()
+        for (j in 1:length(input$colsContrast)) {
+          comparisons <- c(comparisons, (global$data[input$colsContrast[[j]]][global$data$ID==i,] >= thresholds()[j]))
+        }
+        if (sum(comparisons) == 1) {
+          trueCol <- which(comparisons==TRUE)
+          global$colors$shape[global$colors$ID==i] <- paste("Cell type ", trueCol)
+        }
+      }
+      removeModal(session = getDefaultReactiveDomain())
+    })
+  
+  output$colsContrast <- renderUI({
+    req(!is.null(global$data))
+    selectizeInput(inputId = "colsContrast", 
+                   label = "Columns to use",
+                   multiple = FALSE,
+                   choices = names(global$data),
+                   selected = names(global$data)[10],
+                   options = list(maxItems = 3))
+  })
+  
+  output$contrastThreshold <- renderUI({
+    req(!is.null(global$data))
+    req(!is.null(input$colsContrast))
+    nbCols <- length(input$colsContrast)
+    lapply(1:nbCols, function(i) {
+      sliderInput(inputId = paste0("threshold", i), label = paste("Threshold for column ", input$colsContrast[[i]]),
+                  min = 0, max = 100, value = 50, step = 1)
+    })
+  })
+  
+  
+  thresholds <- reactive({
+    nbCols <- length(input$colsContrast)
+    thresholds <- sapply(1:nbCols, function(i) {
+      as.numeric(input[[paste0("threshold", i)]]) })
+    }) 
+  
   
   # Datas to plot if no Filtering 
   observeEvent(
@@ -812,34 +879,65 @@ server <- function(input, output, session) {
   # Scatter plot
   observeEvent(eventExpr= {global$colors
                input$colorType
+               input$localContrast
+               input$colsContrast
+               input$contrastThreshold
                },
                handlerExpr= {
                  output$plot_rois1 <- renderPlotly({
                    req(!is.null(global$data))
                    req(!is.null(global$colors))
-                   p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
-                   p %>% 
-                     layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
-                     layout(dragmode = "select") %>%
-                     event_register("plotly_selecting") %>%
-                     layout(
-                     xaxis = list(range = c(0, 300)),
-                     yaxis = list(range = c(0, 300)),
-                     shapes = list(list(
-                       type = "line", 
-                       line = list(color = "black",dash = "dash"),
-                       x0 = x(), x1 = x(),
-                       y0 = -100, y1 = 300
-                     ),
-                     list(
-                       type = "line", 
-                       line = list(color = "black",dash = "dash"),
-                       x0 = -100, x1 = 300,
-                       y0 = y(), y1 = y()
-                     ))
-                     
-                   ) %>%
-                     config(edits = list(shapePosition = TRUE))
+                   if (input$localContrast==FALSE) {
+                     p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
+                     p %>% 
+                       layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
+                       layout(dragmode = "select") %>%
+                       event_register("plotly_selecting") %>%
+                       layout(
+                         xaxis = list(range = c(0, 300)),
+                         yaxis = list(range = c(0, 300)),
+                         shapes = list(list(
+                           type = "line", 
+                           line = list(color = "black",dash = "dash"),
+                           x0 = x(), x1 = x(),
+                           y0 = -100, y1 = 300
+                         ),
+                         list(
+                           type = "line", 
+                           line = list(color = "black",dash = "dash"),
+                           x0 = -100, x1 = 300,
+                           y0 = y(), y1 = y()
+                         ))
+                         
+                       ) %>%
+                       config(edits = list(shapePosition = TRUE))
+                   }
+                   else if (input$localContrast==TRUE & "shape" %in% names(global$colors)) {
+                     p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors[,"color"], symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
+                     p %>% 
+                       layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
+                       layout(dragmode = "select") %>%
+                       event_register("plotly_selecting") %>%
+                       layout(
+                         xaxis = list(range = c(0, 300)),
+                         yaxis = list(range = c(0, 300)),
+                         shapes = list(list(
+                           type = "line", 
+                           line = list(color = "black",dash = "dash"),
+                           x0 = x(), x1 = x(),
+                           y0 = -100, y1 = 300
+                         ),
+                         list(
+                           type = "line", 
+                           line = list(color = "black",dash = "dash"),
+                           x0 = -100, x1 = 300,
+                           y0 = y(), y1 = y()
+                         ))
+                         
+                       ) %>%
+                       config(edits = list(shapePosition = TRUE))
+                   }
+                   
                  })
                }, ignoreNULL=FALSE)
   
