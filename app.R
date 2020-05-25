@@ -1,4 +1,3 @@
-## AVEC MENU CHOIX & CR0P & REMOVE
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
@@ -239,7 +238,7 @@ server <- function(input, output, session) {
   else if (.Platform$OS.type=="windows") {
     roots = c(home='C:')
   }
-  
+  ## MENU IMAGEJ
   ## File & Dir chooser 
   # ImageJ/Fiji dir chooser
   shinyDirChoose(input, 'imageJ', roots=roots)
@@ -451,8 +450,8 @@ server <- function(input, output, session) {
     }, once=TRUE)
   
   
-  ## MENU IMAGE
-  # Prerequisites button
+  ## MENU IMAGE & FILES 
+  # Prerequisites button for www files 
   observeEvent(input$help, {
     showModal(modalDialog(
       title = "Prerequisites for default files",
@@ -658,7 +657,7 @@ server <- function(input, output, session) {
     }
   )
   
-  # Modification of the "shape" columns depending on the thresholds
+  # Modification of the "shape" column depending on the thresholds
   observeEvent(
     eventExpr = {
       input$apply
@@ -753,7 +752,7 @@ server <- function(input, output, session) {
   )
   # Color datas 
   observeEvent(eventExpr= {
-    global$data
+    global$colors
     input$selectionType
     input$colorType
     input$colsX1
@@ -798,10 +797,13 @@ server <- function(input, output, session) {
          }
        }
        else {
-         global$colors$color <- 1
+         if (!2 %in% unique(global$colors$color)) {
+           global$colors$color <- 1
+         }
        }
      }
    }, ignoreNULL=FALSE)
+  
   ## Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
   output$downloadData <- downloadHandler(
     filename = function(){
@@ -838,7 +840,7 @@ server <- function(input, output, session) {
     }, contentType = "application/zip")
   
   
-  # Text output to see number of cells in each group 
+  ## Text output to see number of cells in each group 
   output$groups <- renderText ({
     req(!is.null(global$data))
     groups <- c()
@@ -868,7 +870,7 @@ server <- function(input, output, session) {
                  output$plot_rois1 <- renderPlotly({
                    req(!is.null(global$data))
                    req(!is.null(global$colors))
-                   if (input$localContrast==FALSE) {
+                   if (input$localContrast==FALSE) { # No shape attribute
                      p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
                      p %>% 
                        layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
@@ -893,7 +895,7 @@ server <- function(input, output, session) {
                        ) %>%
                        config(edits = list(shapePosition = TRUE))
                    }
-                   else if (input$localContrast==TRUE & "shape" %in% names(global$colors)) {
+                   else if (input$localContrast==TRUE & "shape" %in% names(global$colors)) { # Modification of the shape of the points
                      p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
                      p %>% 
                        layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
@@ -922,6 +924,7 @@ server <- function(input, output, session) {
                  })
                }, ignoreNULL=FALSE)
   
+  ## Reactive values for the lines on the plot 
   y <- reactiveVal(150)
   x <- reactiveVal(150)
   
@@ -998,7 +1001,8 @@ server <- function(input, output, session) {
                })
   
   # Save ROIs selected when Next button pushed
-  observeEvent(eventExpr=input$nextSel,
+  observeEvent(eventExpr={
+    input$nextSel},
                handlerExpr={
                  multiSelect$indice <- multiSelect$indice + 1
                  if (!is.null(input$colorType) & input$colorType==TRUE) {
@@ -1046,15 +1050,18 @@ server <- function(input, output, session) {
       req(!is.null(global$colors))
       if (input$selectionType == "Free selection") {
         rois_plot1 <- selectionRois()
+        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
       else if (input$selectionType=="Multiple selection") {
         rois_plot1 <- unique(multiSelect$total)
+        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
       else if (input$selectionType == "Select all") {
-        rois_plot1 <- global$data$ID
+        rois_plot1 <- global$colors$ID
+        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
       else if (input$selectionType == "Select all ROIs of a specific frame") {
-        if ((global$nFrame > 1) & (!is.null(input$specificFrame))){
+        if ((global$nFrame > 1) & (!is.null(input$specificFrame))) {
           rois_plot1 <- global$colors$ID[global$colors$ID %in% global$data$ID[global$data$Slice==input$specificFrame]]
         }
         else if (global$nFrame == 1) {
@@ -1064,7 +1071,6 @@ server <- function(input, output, session) {
       else {
         rois_plot1 <- event_data("plotly_deselect", source="p")
       }
-      rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
     }, ignoreNULL=FALSE)
   
   
@@ -1160,6 +1166,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
+  # Displaying ring of the ROI 
   observeEvent(eventExpr={
     input$ring
   }, handlerExpr={
