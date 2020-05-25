@@ -715,8 +715,6 @@ server <- function(input, output, session) {
       global$data
       input$colsX1
       input$colsY1
-      x()
-      y()
     },
     handlerExpr = {
       if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1()))) {
@@ -737,8 +735,6 @@ server <- function(input, output, session) {
       global$data
       input$colsX1
       input$colsY1
-      x()
-      y()
       rois_toPlot()
     },
     handlerExpr = { 
@@ -757,7 +753,7 @@ server <- function(input, output, session) {
   )
   # Color datas 
   observeEvent(eventExpr= {
-    global$colors
+    global$data
     input$selectionType
     input$colorType
     input$colsX1
@@ -805,7 +801,7 @@ server <- function(input, output, session) {
          global$colors$color <- 1
        }
      }
-   })
+   }, ignoreNULL=FALSE)
   ## Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
   output$downloadData <- downloadHandler(
     filename = function(){
@@ -898,7 +894,7 @@ server <- function(input, output, session) {
                        config(edits = list(shapePosition = TRUE))
                    }
                    else if (input$localContrast==TRUE & "shape" %in% names(global$colors)) {
-                     p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors[,"color"], symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
+                     p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
                      p %>% 
                        layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
                        layout(dragmode = "select") %>%
