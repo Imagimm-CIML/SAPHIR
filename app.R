@@ -129,7 +129,7 @@ ui <- dashboardPage(
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
-                             checkboxInput("localContrast", "Use local contrast for the shape of the points")
+                             checkboxInput("localContrast", "Use an other variable for the shape of the points")
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
@@ -696,7 +696,7 @@ server <- function(input, output, session) {
     nbCols <- length(input$colsContrast)
     lapply(1:nbCols, function(i) {
       sliderInput(inputId = paste0("threshold", i), label = paste("Threshold for column ", input$colsContrast[[i]]),
-                  min = 0, max = 100, value = 50, step = 1)
+                  min = min(global$data[input$colsContrast[[i]]]), max = max(global$data[input$colsContrast[[i]]]), value = mean(global$data[input$colsContrast[[i]]]))
     })
   })
   
@@ -991,7 +991,7 @@ server <- function(input, output, session) {
                      if (input$selectionType=="Multiple selection") {
                        tagList(
                          helpText("Select your gate and click on the button to select an other gate."),
-                         actionButton("nextSel", "Next selection"),
+                         actionButton("nextSel", "Validate selection"),
                          tags$br(),
                          actionLink("resetAllSel", "Reset all selections")
                        )
