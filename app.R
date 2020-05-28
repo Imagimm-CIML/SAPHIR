@@ -139,6 +139,7 @@ ui <- dashboardPage(
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                              checkboxInput("associated", "Associate with slice", value=TRUE),
                              uiOutput("colorType"),
+                             uiOutput("colorSelection"),
                              useShinyjs(),
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selecting', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
@@ -685,7 +686,7 @@ server <- function(input, output, session) {
                    label = "Columns to use",
                    multiple = FALSE,
                    choices = names(global$data),
-                   selected = names(global$data)[10],
+                   selected = names(global$data)[1],
                    options = list(maxItems = 3))
   })
   
@@ -875,7 +876,7 @@ server <- function(input, output, session) {
                      p %>% 
                        layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
                        layout(dragmode = "select") %>%
-                       event_register("plotly_selecting") %>%
+                       event_register("plotly_selected") %>%
                        layout(
                          xaxis = list(range = c(0, 300)),
                          yaxis = list(range = c(0, 300)),
@@ -948,8 +949,8 @@ server <- function(input, output, session) {
   selectionRois <- reactive({
     req(!is.null(global$data))
     req(!is.null(global$colors))
-    if (!is.null(event_data("plotly_selecting", source="p"))) {
-      selectionRois <- event_data("plotly_selecting", source="p")$customdata
+    if (!is.null(event_data("plotly_selected", source="p"))) {
+      selectionRois <- event_data("plotly_selected", source="p")$customdata
     }
     else if (!is.null(event_data("plotly_click", source="p"))) {
       selectionRois <- event_data("plotly_click", source="p")$customdata
@@ -1039,6 +1040,45 @@ server <- function(input, output, session) {
                  js$resetClick()
                })
   
+  # Colors of the selections 
+  output$colorSelection <- renderUI ({
+    if (input$selectionType=="Multiple selection" & length(multiSelect$total)!=0) {
+        actionLink("colorSelection", "Change colors of groups") 
+    }
+  })
+  
+  observeEvent(input$colorSelection, {
+    showModal(modalDialog(
+      title = "Colors of the group",
+      uiOutput("colorButtons"),
+      footer=tagList(
+        modalButton("Cancel"),
+        actionButton("colorApply", "Apply"))
+    ))
+  })
+  
+  observeEvent(input$colorApply, {
+    req(!is.null(global$colors))
+    for (j in unique(global$colors$color)) {
+      global$colors$newColor[global$colors$color==j] <- colorSels()[which(unique(global$colors$color)==j)]
+    }
+    global$colors$color <- global$colors$newColor
+    removeModal(session = getDefaultReactiveDomain())
+  })
+  
+  colorSels <- reactive({
+    nbGroups <- length(unique(global$colors$color))
+    colorSels <- sapply(1:nbGroups, function(i) {
+      input[[paste0("colorSel", i)]] })
+  }) 
+  
+  output$colorButtons <- renderUI({
+    req(!is.null(global$colors))
+    nbGroups <- length(unique(global$colors$color))
+    lapply(1:nbGroups, function(i) {
+      radioButtons(inputId = paste0("colorSel", i), label = paste("Color for group ", i),choiceNames=c("Red", "Blue", "Green", "Pink", "Orange"), choiceValues=c(2,4,3,6,7), inline=TRUE)
+    })
+  })
   # ROI selected 
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
@@ -1151,17 +1191,6 @@ server <- function(input, output, session) {
                  }
                })
   
-  observeEvent(eventExpr= {
-    rois_plot1()
-    },
-    handlerExpr={
-      if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
-        newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
-        global$imgFrame <- newFrame
-        global$img <- read_tif(global$imgPath, frames=newFrame)
-        global$imgChan <- input$channel1
-      }
-    }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
@@ -1209,6 +1238,7 @@ server <- function(input, output, session) {
   
   # Image PNG
   observeEvent(eventExpr= {
+    global$colors
     rois_plot1()
     input$channel1
     input$frame1
@@ -1231,8 +1261,8 @@ server <- function(input, output, session) {
       if (global$nFrame==1) {
         if (length(rois_plot1())>0) {
           for (i in rois_plot1()) {
-            col <- global$colors$color[global$data$ID==i]
-            col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+            col <- global$colors$color[global$colors$ID==i]
+            col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
             plot(global$zip[[i]], col=col, add=TRUE)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
@@ -1240,7 +1270,7 @@ server <- function(input, output, session) {
           }
         }
         if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
-          for (i in multiSelect$indiv) {
+          for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
             if (input$colorType==TRUE) {
               plot(global$zip[[i]], col="yellow", add=TRUE)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
@@ -1248,8 +1278,8 @@ server <- function(input, output, session) {
               }
             }
             else {
-              col <- global$colors$color[global$data$ID==i]
-              col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+              col <- global$colors$color[global$colors$ID==i]
+              col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
               plot(global$zip[[i]], col=col, add=TRUE)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                 lines(ring$ringCoords[[i]], col=col)
@@ -1261,8 +1291,8 @@ server <- function(input, output, session) {
       else if (global$nFrame > 1) {
         if (length(rois_plot1())>0) {
           for (i in rois_plot1()) {
-            col <- global$colors$color[global$data$ID==i]
-            col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+            col <- global$colors$color[global$colors$ID==i]
+            col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
               plot(global$zip[[i]], col=col, add=TRUE)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
@@ -1272,7 +1302,7 @@ server <- function(input, output, session) {
           }
         }
         if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
-          for (i in multiSelect$indiv) {
+          for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
               if (input$colorType==TRUE) {
                 plot(global$zip[[i]], col="yellow", add=TRUE)
@@ -1281,8 +1311,8 @@ server <- function(input, output, session) {
                 }
               }
               else {
-                col <- global$colors$color[global$data$ID==i]
-                col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+                col <- global$colors$color[global$colors$ID==i]
+                col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
                 plot(global$zip[[i]], col=col, add=TRUE)
                 if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                   lines(ring$ringCoords[[i]], col=col)
@@ -1296,8 +1326,8 @@ server <- function(input, output, session) {
     else if (input$associated == FALSE) {
       if (length(rois_plot1())>0) {
         for (i in rois_plot1()) {
-          col <- global$colors$color[global$data$ID==i]
-          col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+          col <- global$colors$color[global$colors$ID==i]
+          col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
           plot(global$zip[[i]], col=col, add=TRUE)
           if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
             lines(ring$ringCoords[[i]], col=col)
@@ -1305,7 +1335,7 @@ server <- function(input, output, session) {
         }
       }
       if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
-        for (i in multiSelect$indiv) {
+        for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
           if (input$colorType==TRUE) {
             plot(global$zip[[i]], col="yellow", add=TRUE)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
@@ -1313,8 +1343,8 @@ server <- function(input, output, session) {
             }
           }
           else {
-            col <- global$colors$color[global$data$ID==i]
-            col <- switch (col, "LLgroup"=2, "LRgroup"=3, "ULgroup"=4, "URgroup"=6)
+            col <- global$colors$color[global$colors$ID==i]
+            col <- switch (col, "2"=2, "LLgroup"=2, "3"=3, "LRgroup"=3, "4"=4 ,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9)
             plot(global$zip[[i]], col=col, add=TRUE)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
@@ -1343,7 +1373,7 @@ server <- function(input, output, session) {
   handlerExpr= {
     output$list <- EBImage::renderDisplay({
       req(length(rois_plot1()) != 0)
-      if (global$nFrame==1) {
+      if (global$nFrame==1 | input$associated==FALSE) {
         d <- (input$size-1)/2
         dim <- 2*d+1
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
