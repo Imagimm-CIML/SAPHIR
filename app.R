@@ -186,6 +186,7 @@ ui <- dashboardPage(
                              ),
                              uiOutput("channel1"),
                              uiOutput("frame1"),
+                             checkboxInput("contrastImg", "Enhance contrast in image")
                         ),
                         box (width=NULL, 
                              title = "ROIs", solidHeader=TRUE, status="primary",
@@ -1288,7 +1289,6 @@ server <- function(input, output, session) {
       }
     }
   })
-
   
   # Image PNG
   observeEvent(eventExpr= {
@@ -1411,7 +1411,7 @@ server <- function(input, output, session) {
     out <- normalizePath(out, "/")
     global$imgPNG <- EBImage::readImage(out)
   }, ignoreNULL=FALSE)
-  # CROP ROIS
+  # Crop ROIs
   output$size <- renderUI ({
     val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
     max <- min(dim(global$img)[1], dim(global$img)[2])
@@ -1507,7 +1507,7 @@ server <- function(input, output, session) {
     })
   })
   
-  
+  # Zoom displayer
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
@@ -1518,6 +1518,7 @@ server <- function(input, output, session) {
     input$ring
     input$ringSlider
     input$associated
+    input$contrastImg
   },
   handlerExpr= {
     req(global$imgPNG)
@@ -1544,6 +1545,11 @@ server <- function(input, output, session) {
           }
         }
       }
+    }
+    if (input$contrastImg==TRUE) {
+      global$imgPNG <- magick::image_read(global$imgPNG)
+      global$imgPNG <- magick::image_normalize(global$imgPNG)
+      global$imgPNG <- magick::as_EBImage(global$imgPNG)
     }
     output$zoomImg <- EBImage::renderDisplay({
       EBImage::display(global$imgPNG, method = 'browser')
