@@ -129,7 +129,8 @@ ui <- dashboardPage(
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
-                             checkboxInput("localContrast", "Use an other variable for the shape of the points")
+                             checkboxInput("localContrast", "Use an other variable for the shape of the points"),
+                             uiOutput("changeShape")
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
@@ -144,7 +145,8 @@ ui <- dashboardPage(
                              useShinyjs(),
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Multiple selection","Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection")
+                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Multiple selection","Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection"),
+                             uiOutput("changeSpecificFrame")
                         ),
                         tabsetPanel (id="infosGroup", selected="Subgroups",
                                      tabPanel("Subgroups",
@@ -638,11 +640,12 @@ server <- function(input, output, session) {
     input$colsY1
   })
   
-  ## Local contrast 
+  ## Local contrast or other variables to change shape of the points 
   # Modal dialog window with columns to use and threshold
   observeEvent(
     eventExpr={
-      input$localContrast},
+      input$localContrast
+      input$changeShape},
     handlerExpr={
       if (input$localContrast==TRUE) {
         global$colors$shape <- "Neg"
@@ -656,8 +659,15 @@ server <- function(input, output, session) {
           easyClose = TRUE
         ))
       }
-    }
+    }, ignoreNULL=FALSE
   )
+  
+  # Action button to change shape variable or threshold
+  output$changeShape <- renderUI ({
+    if (input$localContrast==TRUE & !is.null(global$colors$shape)) {
+      actionLink("changeShape", "Modify the variable or the threshold")
+    }
+  })
   
   # Modification of the "shape" column depending on the thresholds
   observeEvent(
@@ -962,22 +972,43 @@ server <- function(input, output, session) {
   })
   
   # Modal dialog to select specific frame if wanted + renderUI associate colors
-  observeEvent(eventExpr=input$selectionType,
+  observeEvent(eventExpr={
+    input$selectionType
+    },
                handlerExpr={
-                 if (input$selectionType=="Select all ROIs of a specific frame") {
+                 if (input$selectionType=="Select all ROIs of a specific frame" & global$nFrame > 1) {
                    showModal(modalDialog(
                      title = "Specific frame",
                      numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1),
                      easyClose = TRUE
                    ))
                  }
-                 output$colorType <- renderUI({
-                   if (input$selectionType=="Multiple selection") {
-                      checkboxInput("colorType", "Associate colors with different selections", value=TRUE)
-                      
-                   }
-                 })
                })
+  
+  output$colorType <- renderUI({
+    if (input$selectionType=="Multiple selection") {
+      checkboxInput("colorType", "Associate colors with different selections", value=TRUE)
+    }
+  })
+  
+  output$changeSpecificFrame <- renderUI({
+    if (input$selectionType=="Select all ROIs of a specific frame" & !is.null(input$specificFrame)) {
+      actionLink("changeSpecificFrame", "Modify specific frame chosen")
+    }
+  })
+  
+  observeEvent(eventExpr={
+    input$changeSpecificFrame
+  },
+  handlerExpr={
+    if (input$selectionType=="Select all ROIs of a specific frame" & global$nFrame > 1) {
+      showModal(modalDialog(
+        title = "Specific frame",
+        numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1),
+        easyClose = TRUE
+      ))
+    }
+  })
   
   # Global values for multiple selection
   multiSelect <- reactiveValues(indiv = c(), total=c(), indice=1)
@@ -1483,15 +1514,15 @@ server <- function(input, output, session) {
     input$frame1 
     input$ids
     input$size
-    global$imgPNG
     ring$ringCoords
     input$ring
     input$ringSlider
+    input$associated
   },
   handlerExpr= {
     req(global$imgPNG)
     if (input$ids==TRUE) {
-      if ((global$nFrame==1) & (length(rois_plot1()) != 0)) {
+      if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
         for (i in rois_plot1()) {
           xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
           yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2) - (input$size-1)/2
@@ -1501,7 +1532,7 @@ server <- function(input, output, session) {
           global$imgPNG <- magick::as_EBImage(global$imgPNG)
         }
       }
-      if ((global$nFrame > 1) & (length(rois_plot1()) != 0) & (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1))) {
+      if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
         for (i in rois_plot1()) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
             xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
