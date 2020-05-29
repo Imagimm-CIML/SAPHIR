@@ -142,7 +142,7 @@ ui <- dashboardPage(
                              uiOutput("colorType"),
                              uiOutput("colorSelection"),
                              useShinyjs(),
-                             extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selecting', 'null'); }"),
+                             extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
                              radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Multiple selection","Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection")
                         ),
@@ -564,7 +564,7 @@ server <- function(input, output, session) {
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
-        event_register("plotly_selecting")
+        event_register("plotly_selected")
     }
     else if (input$plotType == "Scatterplot") {
       req(!is.null(input$variablesScatter))
@@ -572,7 +572,7 @@ server <- function(input, output, session) {
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
-        event_register("plotly_selecting")
+        event_register("plotly_selected")
     }
   })
   
@@ -584,9 +584,9 @@ server <- function(input, output, session) {
     if (input$filterType == "Free selection") {
       if (input$plotType == "Histogram") {
         d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
-        if (!is.null(event_data("plotly_selecting", source="v")$x)) {
-          min <- event_data("plotly_selecting", source="v")$x[1]-d/2 
-          max <- event_data("plotly_selecting", source="v")$x[length(event_data("plotly_selecting", source="v")$x)]+d/2
+        if (!is.null(event_data("plotly_selected", source="v")$x)) {
+          min <- event_data("plotly_selected", source="v")$x[1]-d/2 
+          max <- event_data("plotly_selected", source="v")$x[length(event_data("plotly_selected", source="v")$x)]+d/2
           global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
         }
         else if (!is.null(event_data("plotly_click", source="v")$x)) {
@@ -598,8 +598,8 @@ server <- function(input, output, session) {
       # If scatterplot : select ROIs corresponding to points selected
       else {
         req(!is.null(input$variablesScatter))
-        if (!is.null(event_data("plotly_selecting", source="v")$customdata)) {
-          global$data[event_data("plotly_selecting", source="v")$customdata,]
+        if (!is.null(event_data("plotly_selected", source="v")$customdata)) {
+          global$data[event_data("plotly_selected", source="v")$customdata,]
         }
         else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
           global$data[event_data("plotly_click", source="v")$customdata,]
@@ -902,7 +902,7 @@ server <- function(input, output, session) {
                      p %>% 
                        layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
                        layout(dragmode = "select") %>%
-                       event_register("plotly_selecting") %>%
+                       event_register("plotly_selected") %>%
                        layout(
                          xaxis = list(range = c(0, 300)),
                          yaxis = list(range = c(0, 300)),
@@ -1626,7 +1626,7 @@ server <- function(input, output, session) {
           )
         ) 
       p <- p %>% layout(xaxis = axX, yaxis=axY)
-      p <- p %>% event_register(event="plotly_selecting")
+      p <- p %>% event_register(event="plotly_selected")
     }
     else if (global$nFrame == 1) {
       for (i in global$data$ID) {
@@ -1650,7 +1650,7 @@ server <- function(input, output, session) {
           )
         ) 
       p <- p %>% layout(xaxis = axX, yaxis=axY)
-      p <- p %>% event_register(event="plotly_selecting")
+      p <- p %>% event_register(event="plotly_selected")
     }
   })
   
@@ -1663,8 +1663,8 @@ server <- function(input, output, session) {
     if (!is.null(event_data("plotly_click", source="i")$customdata)) {
       global$IDs <- event_data("plotly_click", source="i")$customdata
     }
-    if (!is.null(event_data("plotly_selecting", source="i")$customdata)) {
-      global$IDs <- event_data("plotly_selecting", source="i")$customdata
+    if (!is.null(event_data("plotly_selected", source="i")$customdata)) {
+      global$IDs <- event_data("plotly_selected", source="i")$customdata
     }
     global$data[global$data$ID %in% global$IDs,]
   })
