@@ -230,7 +230,7 @@ ui <- dashboardPage(
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
                              title = "Parameters - Select ROIs",
                              helpText("Select the variables you want to plot."),
-                             radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot"), selected="Histogram", inline=TRUE),
+                             radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE),
                              uiOutput("variablesHistoAnnot"),
                              uiOutput("variablesScatterAnnot")
                         ),
@@ -278,7 +278,7 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, img2=list(), imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -518,22 +518,19 @@ server <- function(input, output, session) {
     global$imgPath <- "www/image.tif"
     if (read_tags(global$imgPath)$frame1$color_space!="palette") {
       if ((count_frames(global$imgPath))[1]==1) { # If only one frame
-        global$img <- read_tif(global$imgPath) # Image menu plot to image
-        global$img2 <- read_tif(global$imgPath) # Image menu image to plot
+        global$img <- read_tif(global$imgPath) # Image 
         global$nChan <- dim(global$img)[3] # Number of channel on the image
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frame=i)
-          global$img2[[i]] <- read_tif(global$imgPath, frame=i)
         }
         global$nChan <- dim(global$img[[1]])[3] 
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
-        global$img2 <- read_tif(global$imgPath)
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
       }
@@ -554,21 +551,18 @@ server <- function(input, output, session) {
     if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
       if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image menu plot to image
-        global$img2 <- read_tif(global$imgPath) # Image menu image to plot
         global$nChan <- dim(global$img)[3] # Number of channel on the image
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frame=i)
-          global$img2[[i]] <- read_tif(global$imgPath, frame=i)
         }
         global$nChan <- dim(global$img[[1]])[3] 
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
-        global$img2 <- read_tif(global$imgPath)
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
       }
@@ -1498,9 +1492,6 @@ server <- function(input, output, session) {
       else if (global$nFrame > 1) {
         display(global$img[[global$imgFrame]][,,global$imgChan,], method="raster")
       }
-      if (input$overlay==TRUE & !is.null(overlays$imgOverlay)) {
-        display(overlays$imgOverlay, method="raster")
-      }
     }
     if (input$associated == TRUE) {
       if (global$nFrame==1) {
@@ -1762,13 +1753,13 @@ server <- function(input, output, session) {
   ## MENU IMAGE TO PLOT
   # UI to choose channel to display for the image
   output$channel2 <- renderUI({
-    req(length(global$img2) != 0)
+    req(length(global$img) != 0)
     sliderInput("channel2", label="Channel to display", min=1, max= global$nChan, value=global$imgChan2, step=1)
   })
   
   # UI to choose slice to display
   output$frame2 <- renderUI ({
-    req(length(global$img2) != 0)
+    req(length(global$img) != 0)
     sliderInput("frame2", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame2, step=1)
   })
   
@@ -1786,12 +1777,12 @@ server <- function(input, output, session) {
   
   # UI to choose color of the ROIs 
   output$color2 <- renderUI ({
-    req(length(global$img2) != 0)
+    req(length(global$img) != 0)
     radioButtons("color2", label = "Color of the ROIs", choices=c("red", "blue", "green" ,"yellow", "white"), selected="red", inline=TRUE)
   })
   
   observeEvent(eventExpr= {
-    global$img2
+    global$img
     global$zip
     input$channel2
     input$frame2 
@@ -1800,18 +1791,18 @@ server <- function(input, output, session) {
     input$color2
   },
   handlerExpr= {
-    if ((length(global$img2) != 0) & (!is.null(global$zip))) {
+    if ((length(global$img) != 0) & (!is.null(global$zip))) {
       out2 <- tempfile(fileext='.png')
       if (global$nFrame == 1) {
-        png(out2, height=dim(global$img2)[1], width=dim(global$img2)[2])
-        display(global$img2[,,global$imgChan2,1], method="raster")
+        png(out2, height=dim(global$img)[1], width=dim(global$img)[2])
+        display(global$img[,,global$imgChan2,1], method="raster")
         for (i in c(1:length(global$zip))) {
           plot(global$zip[[i]], col=input$color2, add=TRUE) 
         }
       }
       else if (global$nFrame > 1) {
-        png(out2, height=dim(global$img2[[global$imgFrame2]])[1], width=dim(global$img2[[global$imgFrame2]])[2])
-        display(global$img2[[global$imgFrame2]][,,global$imgChan2,1], method="raster")
+        png(out2, height=dim(global$img[[global$imgFrame2]])[1], width=dim(global$img[[global$imgFrame2]])[2])
+        display(global$img[[global$imgFrame2]][,,global$imgChan2,1], method="raster")
         for (i in global$data$ID) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
             plot(global$zip[[i]], col=input$color2, add=TRUE)
@@ -1901,7 +1892,7 @@ server <- function(input, output, session) {
   
   # Infos on ROIs selected on the image 
   output$rois_img2 <- renderPrint({
-    req(length(global$img2) != 0)
+    req(length(global$img) != 0)
     req(!is.null(global$data))
     req(!is.null(global$zip))
     if (!is.null(event_data("plotly_click", source="i")$customdata)) {
@@ -1916,7 +1907,7 @@ server <- function(input, output, session) {
   # Plot corresponding to ROIs selected
   output$plot_rois2 <- renderPlot({
     req(!is.null(global$IDs))
-    req(length(global$img2) != 0)
+    req(length(global$img) != 0)
     req(!is.null(global$data))
     req(!is.null(global$zip))
     ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2)) + labs(x=input$colsX2, y=input$colsY2) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
@@ -1986,6 +1977,13 @@ server <- function(input, output, session) {
         layout(dragmode = "select") %>%
         event_register("plotly_selected")
     }
+    else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
+      gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$variablesHistoAnnot, customdata=input$variablesHistoAnnot))
+      v <- ggplotly(gg, source="a")
+      v %>% 
+        layout(dragmode = "select") %>%
+        event_register("plotly_selected")
+    }
   })
   
   # ROIs to annotate depending on selection 
@@ -2008,13 +2006,21 @@ server <- function(input, output, session) {
         }
       }
       # If scatterplot : select ROIs corresponding to points selected
-      else {
+      else if (input$plotTypeAnnot == "Scatterplot") {
         req(!is.null(input$variablesScatterAnnot))
         if (!is.null(event_data("plotly_selected", source="a")$customdata)) {
           global$data[event_data("plotly_selected", source="a")$customdata,]
         }
         else if (!is.null(event_data("plotly_click", source="a")$customdata)) {
           global$data[event_data("plotly_click", source="a")$customdata,]
+        }
+      }
+      else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
+        if (!is.null(event_data("plotly_selected", source="a")$x)) {
+          global$data[global$data[input$variablesHistoAnnot][,1] %in% event_data("plotly_selected", source="a")$customdata,]
+        }
+        else if (!is.null(event_data("plotly_click", source="a")$x)) {
+          global$data[global$data[input$variablesHistoAnnot] == event_data("plotly_click", source="a")$customdata,]
         }
       }
     }
@@ -2178,7 +2184,6 @@ server <- function(input, output, session) {
                  handlerExpr = {
                    output$annotRoi <- EBImage::renderDisplay({
                      req(!is.null(annote$imgPNG)) 
-                     req(!is.null(annote$actual))
                      EBImage::display(annote$imgPNG, method = 'browser')
                    })
                  })
@@ -2197,7 +2202,7 @@ server <- function(input, output, session) {
   
   output$annotValue <- renderText ({
     req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
-    if (input$plotTypeAnnot=="Histogram") {
+    if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
       value = global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]
       paste0("Actual value of ", input$variablesHistoAnnot, " for ROI ", annote$actual, " : ", "\n", value)
     }
@@ -2215,8 +2220,7 @@ server <- function(input, output, session) {
                     annotOverlays$imgOverlay
                     input$annotOverlay}, 
                 handlerExpr = 
-                  {req(!is.null(annote$actual))
-                    if ((length(global$img) != 0) & (!is.null(global$zip))) {
+                  { if ((length(global$img) != 0) & (!is.null(global$zip))) {
                       out3 <- tempfile(fileext='.png')
                       if (global$nFrame == 1) {
                         png(out3, height=dim(global$img)[1], width=dim(global$img)[2])
@@ -2226,7 +2230,9 @@ server <- function(input, output, session) {
                         if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
                           display(annotOverlays$imgOverlay, method="raster")
                         }
-                        plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                        if (!is.null(annote$actual)) {
+                          plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                        }
                       }
                       else if (global$nFrame > 1) {
                         if (input$annotAssociate==TRUE) {
@@ -2237,8 +2243,10 @@ server <- function(input, output, session) {
                           if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
                             display(annotOverlays$imgOverlay, method="raster")
                           }
-                          if (global$data$Slice[global$data$ID==annote$actual]==annote$imgFrame) {
-                            plot(global$zip[[annote$actual]], col="yellow", add=TRUE)
+                          if (!is.null(annote$actual)) {
+                            if (global$data$Slice[global$data$ID==annote$actual]==annote$imgFrame) {
+                              plot(global$zip[[annote$actual]], col="yellow", add=TRUE)
+                            }
                           }
                         }
                         else {
@@ -2249,7 +2257,9 @@ server <- function(input, output, session) {
                           if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
                             display(annotOverlays$imgOverlay, method="raster")
                           }
-                          plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                          if (!is.null(annote$actual)) {
+                            plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                          }
                         }
                       }
                       dev.off()
@@ -2269,7 +2279,7 @@ server <- function(input, output, session) {
   
   output$modifyAnnot <- renderUI ({
     req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
-    if (input$plotTypeAnnot=="Histogram") {
+    if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
       radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
     }
     else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])) {
@@ -2287,19 +2297,28 @@ server <- function(input, output, session) {
                     req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
                     if (input$modifyAnnot=="Yes") {
                       output$numModifyAnnot <- renderUI ({
-                      tagList(
-                      numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
-                      actionButton("validateNumModifyAnnot", "Ok"))
+                        if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
+                          tagList(
+                          numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
+                          actionButton("validateNumModifyAnnot", "Ok"))
+                        }
+                        else if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Barplot (non numerical datas)") {
+                          tagList(
+                            textInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), ""),
+                            actionButton("validateNumModifyAnnot", "Ok"))
+                        }
                       })
                     }
                     if (input$plotTypeAnnot=="Scatterplot") {
                       if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
                         output$numModifyAnnot <- renderUI ({
-                          tagList(
-                            numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
-                            actionButton("validateNumModifyAnnot", "Ok"),
-                            numericInput("numModifySecondAnnot", paste0("Input new value for ", input$variablesScatterAnnot), 0),
-                            actionButton("validateNumModifySecondAnnot", "Ok"))
+                          if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
+                            tagList(
+                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
+                              actionButton("validateNumModifyAnnot", "Ok"),
+                              numericInput("numModifySecondAnnot", paste0("Input new value for ", input$variablesScatterAnnot), 0),
+                              actionButton("validateNumModifySecondAnnot", "Ok"))
+                          }
                         })
                       }
                     }
@@ -2343,12 +2362,15 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr = input$validateModifAnnot, 
                handlerExpr = {
-                 global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
-                 global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
+                 if (any(global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesHistoAnnot)])) {
+                   global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
+                   global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
+                 }
                  if (input$plotTypeAnnot=="Scatterplot") {
-                   correctedVarScatter <- paste0("corrected_", input$variablesScatterAnnot)
-                   global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data$varScatter
-                   global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
+                   if (any(global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesScatterAnnot)])) {
+                     global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot]
+                     global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
+                   }
                  }
                  annote$imgPNG <- NULL
                  annote$rois <- NULL 
