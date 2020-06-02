@@ -240,7 +240,27 @@ ui <- dashboardPage(
                              helpText("Select the ROIs (click or brush) to annotate."),
                              plotlyOutput("selectRoisAnnot"),
                              uiOutput("annotate"),
+                             tags$br(),
                              verbatimTextOutput("roisAnnot")
+                        )
+                ),
+                column( width = 6,
+                        box (width = NULL, solidHeader=TRUE, status="primary", collapsible = TRUE,
+                             title = "Image of the ROI",
+                             uiOutput("annotChan"),
+                             uiOutput("annotFrame"),
+                             checkboxInput("annotAssociate", "Associate with slice", value=TRUE),
+                             checkboxInput("annotOverlay", "Overlay channels (up to 3)"),
+                             withSpinner(EBImage::displayOutput("annotRoi")),
+                             verbatimTextOutput("annotValue"),
+                             tags$br(),
+                             uiOutput("modifyAnnot"),
+                             uiOutput("numModifyAnnot"),
+                             tags$br(),
+                             uiOutput("nextAnnot"),
+                             uiOutput("validateModifAnnot"),
+                             tags$br(),
+                             verbatimTextOutput("annoteData"),
                         )
                 )
               )
@@ -1407,7 +1427,7 @@ server <- function(input, output, session) {
   }, handlerExpr={
     output$ringSlider <- renderUI({
       if (input$ring==TRUE) {
-        sliderInput("ringSlider", label="Size of the ring (microns)", min=1, max=10, step=0.5, value=2)
+        sliderInput("ringSlider", label="Size of the ring (pixels)", min=1, max=10, step=0.5, value=2)
       }
     })
   })
@@ -1477,6 +1497,9 @@ server <- function(input, output, session) {
       }
       else if (global$nFrame > 1) {
         display(global$img[[global$imgFrame]][,,global$imgChan,], method="raster")
+      }
+      if (input$overlay==TRUE & !is.null(overlays$imgOverlay)) {
+        display(overlays$imgOverlay, method="raster")
       }
     }
     if (input$associated == TRUE) {
@@ -1582,14 +1605,20 @@ server <- function(input, output, session) {
   # Crop ROIs
   output$size <- renderUI ({
     req(length(global$img) != 0)
-    val <- (2*(2*round(sqrt(max(global$data$Cell.area)/pi))+10)+1)
+    req(length(global$zip) != 0)
+    val <- 0
+    for (i in length(global$zip)) {
+      if (max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1]) > val) {
+        val <- max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1])
+      }
+    }
     if (global$nFrame == 1) {
       max <- min(dim(global$img)[1], dim(global$img)[2])
     }
     else if (global$nFrame > 1) {
       max <- min(dim(global$img[[global$imgFrame]])[1], dim(global$img[[global$imgFrame]])[2])
     }
-    sliderInput("size", label = "Size of the ROI crop (micron)", min = 0, max = max, value = val)
+    sliderInput("size", label = "Size of the ROI crop (pixels)", min = 0, max = max, value = val)
   })
   
   observeEvent(eventExpr= {
@@ -1959,7 +1988,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # ROIs to plot on the interactive plot depending on selection 
+  # ROIs to annotate depending on selection 
   rois_toAnnotate <- reactive({
     req(!is.null(global$data))
     req(!is.null(input$variablesHistoAnnot))
@@ -2002,6 +2031,333 @@ server <- function(input, output, session) {
     req(length(rois_toAnnotate()) > 0)
     actionButton("annotate", "Validate and annotate")
   })
+  
+  annote <- reactiveValues(rois = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL)
+  
+  observeEvent (eventExpr = 
+                  {input$annotate},
+                handlerExpr = 
+                  {annote$rois <- rois_toAnnotate()$ID
+                   annote$index <- 1
+                   annote$actual <- annote$rois[annote$index]
+                   annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
+                   annote$data <- data.frame(annote$rois)
+                   colnames(annote$data) <- c("ID")
+                   if (!is.null(global$data[input$variablesHistoAnnot])) {
+                     annote$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,]
+                   }
+                   if (input$plotTypeAnnot=="Scatterplot") {
+                     if (!is.null(global$data[input$variablesScatterAnnot])) {
+                       annote$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,]
+                     }
+                   }
+                   output$nextAnnot <- renderUI ({
+                     if (length(annote$rois) != 1) {
+                       actionButton("nextAnnot", "Next ROI")
+                     }
+                   })
+                  })
+  
+  # Overlay channels 
+  observeEvent(eventExpr = input$annotOverlay,
+               handlerExpr = {
+                 if (input$annotOverlay==TRUE) {
+                   showModal(modalDialog(
+                     title = "Channel to overlay",
+                     uiOutput("annotChannelOverlay"),
+                     footer=tagList(
+                       modalButton("Cancel"),
+                       actionButton("annotOverlayApply", "Apply"))
+                   ))
+                 }
+               })
+  
+  output$annotChannelOverlay <- renderUI ({
+    req(global$nChan)
+    tagList(
+      radioButtons("annotRedOverlay", "First channel to overlay (in RED)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+      radioButtons("annotGreenOverlay", "Second channel to overlay (in GREEN)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+      radioButtons("annotBlueOverlay", "Third channel to overlay (in BLUE)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+    )
+  })
+  
+  annotOverlays <- reactiveValues(red=NULL, green=NULL, blue=NULL, redChan=NULL, blueChan=NULL, greenChan=NULL, imgOverlay=NULL)
+  
+  observeEvent(eventExpr = {input$annotOverlayApply
+    input$annotFrame},
+    handlerExpr = {
+      req(global$img)
+      if (!is.null(input$annotRedOverlay) & !is.null(input$annotGreenOverlay) & !is.null(input$annotBlueOverlay)) {
+        if (global$nFrame == 1) {
+          if (input$annotRedOverlay!="None") {
+            annotOverlays$redChan <- as.numeric(input$annotRedOverlay)
+            annotOverlays$red <- as_EBImage(global$img[,,annotOverlays$redChan,1])
+          }
+          else {
+            annotOverlays$redChan <- NULL
+            annotOverlays$red <- NULL
+          }
+          if (input$annotGreenOverlay!="None") {
+            annotOverlays$greenChan <- as.numeric(input$annotGreenOverlay)
+            annotOverlays$green <- as_EBImage(global$img[,,annotOverlays$greenChan,1])
+          }
+          else {
+            annotOverlays$greenChan <- NULL
+            annotOverlays$green <- NULL
+          }
+          if (input$annotBlueOverlay!="None") {
+            annotOverlays$blueChan <- as.numeric(input$annotBlueOverlay)
+            annotOverlays$blue <- as_EBImage(global$img[,,annotOverlays$blueChan,1])
+          }
+          else {
+            annotOverlays$blueChan <- NULL
+            annotOverlays$blue <- NULL
+          }
+        }
+        else if (global$nFrame > 1) {
+          if (input$annotRedOverlay!="None") {
+            annotOverlays$redChan <- as.numeric(input$annotRedOverlay)
+            annotOverlays$red <- as_EBImage(global$img[[annote$imgFrame]][,,annotOverlays$redChan,1])
+          }
+          else {
+            annotOverlays$redChan <- NULL
+            annotOverlays$red <- NULL
+          }
+          if (input$annotGreenOverlay!="None") {
+            annotOverlays$greenChan <- as.numeric(input$annotGreenOverlay)
+            annotOverlays$green <- as_EBImage(global$img[[annote$imgFrame]][,,annotOverlays$greenChan,1])
+          }
+          else {
+            annotOverlays$greenChan <- NULL
+            annotOverlays$green <- NULL
+          }
+          if (input$annotBlueOverlay!="None") {
+            annotOverlays$blueChan <- as.numeric(input$annotBlueOverlay)
+            annotOverlays$blue <- as_EBImage(global$img[[annote$imgFrame]][,,annotOverlays$blueChan,1])
+          }
+          else {
+            annotOverlays$blueChan <- NULL
+            annotOverlays$blue <- NULL
+          }
+        }
+      }
+    })
+  
+  observeEvent(eventExpr = input$annotOverlayApply,
+               handlerExpr = {
+                 removeModal(session=getDefaultReactiveDomain())
+               })
+  
+  observeEvent(eventExpr = {
+    input$annotOverlay
+    annotOverlays$blue
+    annotOverlays$red
+    annotOverlays$green
+  }, 
+  handlerExpr = {
+    if (input$annotOverlay==TRUE & any(!is.null(c(annotOverlays$redChan, annotOverlays$greenChan, annotOverlays$blueChan)))) {
+      annotOverlays$imgOverlay <- EBImage::rgbImage(red=annotOverlays$red, green=annotOverlays$green, blue=annotOverlays$blue)
+    }
+  })
+  
+  # UI to choose channel to display for the image
+  output$annotChan <- renderUI({
+    req(length(global$img) != 0)
+    req(input$annotOverlay==FALSE)
+    sliderInput("annotChan", label="Channel to display", min=1, max= global$nChan, value=annote$imgChan, step=1)
+  })
+  
+  # UI to choose slice to display
+  output$annotFrame <- renderUI ({
+    req(length(global$img) != 0)
+    sliderInput("annotFrame", label = "Slice to display", min = 1, max = global$nFrame, value = annote$imgFrame, step=1)
+  })
+  
+  observeEvent ( eventExpr = 
+                   {annote$imgPNG},
+                 handlerExpr = {
+                   output$annotRoi <- EBImage::renderDisplay({
+                     req(!is.null(annote$imgPNG)) 
+                     req(!is.null(annote$actual))
+                     EBImage::display(annote$imgPNG, method = 'browser')
+                   })
+                 })
+
+  # Modification of image read when modification of frame slider 
+  observeEvent(eventExpr=input$annotFrame,
+               handlerExpr={
+                 if (global$nFrame > 1) {
+                   annote$imgFrame <- input$annotFrame
+                   annote$imgChan <- input$annotChan
+                 }
+               })
+  
+  observeEvent(eventExpr=input$annotChan,
+               handlerExpr={annote$imgChan = input$annotChan})
+  
+  output$annotValue <- renderText ({
+    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+    if (input$plotTypeAnnot=="Histogram") {
+      value = global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]
+      paste0("Actual value of ", input$variablesHistoAnnot, " for ROI ", annote$actual, " : ", "\n", value)
+    }
+    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])) {
+      value = c(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,], global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])
+      paste0("Actual value for ROI ", annote$actual, " of ", input$variablesHistoAnnot, " : ", value[1], "\n", "and  ", input$variablesScatterAnnot," : ", value[2])
+    }
+  })
+  
+  observeEvent (eventExpr = 
+                  {annote$actual
+                    annote$imgFrame
+                    annote$imgChan
+                    input$annotAssociate
+                    annotOverlays$imgOverlay
+                    input$annotOverlay}, 
+                handlerExpr = 
+                  {req(!is.null(annote$actual))
+                    if ((length(global$img) != 0) & (!is.null(global$zip))) {
+                      out3 <- tempfile(fileext='.png')
+                      if (global$nFrame == 1) {
+                        png(out3, height=dim(global$img)[1], width=dim(global$img)[2])
+                        if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
+                          display(global$img[,,annote$imgChan,1], method="raster")
+                        }
+                        if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
+                          display(annotOverlays$imgOverlay, method="raster")
+                        }
+                        plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                      }
+                      else if (global$nFrame > 1) {
+                        if (input$annotAssociate==TRUE) {
+                          png(out3, height=dim(global$img[[annote$imgFrame]])[1], width=dim(global$img[[annote$imgFrame]])[2])
+                          if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
+                            display(global$img[[annote$imgFrame]][,,annote$imgChan,1], method="raster")
+                          }
+                          if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
+                            display(annotOverlays$imgOverlay, method="raster")
+                          }
+                          if (global$data$Slice[global$data$ID==annote$actual]==annote$imgFrame) {
+                            plot(global$zip[[annote$actual]], col="yellow", add=TRUE)
+                          }
+                        }
+                        else {
+                          png(out3, height=dim(global$img[[annote$imgFrame]])[1], width=dim(global$img[[annote$imgFrame]])[2])
+                          if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
+                            display(global$img[[annote$imgFrame]][,,annote$imgChan,1], method="raster")
+                          }
+                          if (input$annotOverlay==TRUE & !is.null(annotOverlays$imgOverlay)) {
+                            display(annotOverlays$imgOverlay, method="raster")
+                          }
+                          plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                        }
+                      }
+                      dev.off()
+                      out3 <- normalizePath(out3, "/")
+                      annote$imgPNG <- EBImage::readImage(out3)
+                    }
+                    })
+  
+  observeEvent(eventExpr = input$nextAnnot,
+               handlerExpr = {
+                 if (annote$index < length(annote$rois)) {
+                   annote$index <- annote$index + 1
+                 }
+                 annote$actual <- annote$rois[annote$index]
+                 annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
+               })
+  
+  output$modifyAnnot <- renderUI ({
+    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+    if (input$plotTypeAnnot=="Histogram") {
+      radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
+    }
+    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])) {
+      tagList(
+      radioButtons("modifyAnnot", "Modify the first value", choices=c("Yes", "No"), selected="No"),
+      radioButtons("modifySecondAnnot", "Modify the second value", choices=c("Yes", "No"), selected="No"))
+    }
+  })
+  
+  
+  observeEvent (eventExpr = 
+                  {input$modifyAnnot
+                    input$modifySecondAnnot},
+                handlerExpr = {
+                    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+                    if (input$modifyAnnot=="Yes") {
+                      output$numModifyAnnot <- renderUI ({
+                      tagList(
+                      numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
+                      actionButton("validateNumModifyAnnot", "Ok"))
+                      })
+                    }
+                    if (input$plotTypeAnnot=="Scatterplot") {
+                      if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
+                        output$numModifyAnnot <- renderUI ({
+                          tagList(
+                            numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
+                            actionButton("validateNumModifyAnnot", "Ok"),
+                            numericInput("numModifySecondAnnot", paste0("Input new value for ", input$variablesScatterAnnot), 0),
+                            actionButton("validateNumModifySecondAnnot", "Ok"))
+                        })
+                      }
+                    }
+                }, ignoreNULL=FALSE)
+  
+  
+  observeEvent (eventExpr = input$validateNumModifyAnnot,
+                handlerExpr = {
+                  annote$data[paste0("corrected_", input$variablesHistoAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
+                })
+  
+  observeEvent (eventExpr = input$validateNumModifySecondAnnot,
+                handlerExpr = {
+                  annote$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID==annote$actual,] <- input$numModifySecondAnnot
+                })
+  
+  output$annoteData <- renderPrint ({
+    annote$data
+  })
+  
+  observeEvent(eventExpr = 
+                 {annote$index
+                   annote$rois},
+               handlerExpr = {
+                 if (annote$index == length(annote$rois)) {
+                   removeUI(selector = "#nextAnnot")
+                   output$validateModifAnnot <- renderUI ({
+                     if (annote$index == length(annote$rois)) {
+                       actionButton("validateModifAnnot", "Validate modifications")
+                     }
+                   })
+                 }
+                 if (length(annote$rois)==1) {
+                   output$validateModifAnnot <- renderUI ({
+                     if (length(annote$rois)==1) {
+                       actionButton("validateModifAnnot", "Validate modifications")
+                     }
+                   })
+                 }
+               })
+  
+  observeEvent(eventExpr = input$validateModifAnnot, 
+               handlerExpr = {
+                 global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
+                 global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
+                 if (input$plotTypeAnnot=="Scatterplot") {
+                   correctedVarScatter <- paste0("corrected_", input$variablesScatterAnnot)
+                   global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data$varScatter
+                   global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
+                 }
+                 annote$imgPNG <- NULL
+                 annote$rois <- NULL 
+                 annote$actual <- NULL
+                 annote$index=1
+                 annote$imgChan=1
+                 annote$imgFrame=1
+                 annote$data=NULL
+               })
   
   
 }
