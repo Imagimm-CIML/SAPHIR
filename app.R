@@ -261,6 +261,8 @@ ui <- dashboardPage(
                              tags$br(),
                              uiOutput("validateModifAnnot"),
                              tags$br(),
+                             uiOutput("downloadAnnotDataUI"),
+                             tags$br(),
                              verbatimTextOutput("annoteData"),
                         )
                 )
@@ -1708,7 +1710,6 @@ server <- function(input, output, session) {
     input$channel1
     input$frame1 
     input$ids
-    input$size
     ring$ringCoords
     input$ring
     input$ringSlider
@@ -1720,8 +1721,8 @@ server <- function(input, output, session) {
     if (input$ids==TRUE) {
       if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
         for (i in rois_plot1()) {
-          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
-          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2) - (input$size-1)/2
+          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
           coord <- paste("+", xID, "+", yID, sep="")
           global$imgPNG <- magick::image_read(global$imgPNG)
           global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
@@ -1731,8 +1732,8 @@ server <- function(input, output, session) {
       if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
         for (i in rois_plot1()) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2) - (input$size-1)/2
-            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2) - (input$size-1)/2
+            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
             coord <- paste("+", xID, "+", yID, sep="")
             global$imgPNG <- magick::image_read(global$imgPNG)
             global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
@@ -2385,7 +2386,22 @@ server <- function(input, output, session) {
                  annote$imgChan=1
                  annote$imgFrame=1
                  annote$data=NULL
+                 
+                 output$downloadAnnotDataUI <- renderUI ({
+                   downloadLink("downloadAnnotData", "Download data")
+                 })
+                 
+                 output$downloadAnnotData <- downloadHandler(
+                   filename = function() {
+                     paste("data-", Sys.Date(), ".csv", sep="")
+                   },
+                   content = function(file) {
+                     write.csv(global$data, file)
+                   }
+                 )
+                 
                })
+  
   
   
 }
