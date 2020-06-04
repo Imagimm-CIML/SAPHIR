@@ -254,10 +254,11 @@ ui <- dashboardPage(
                              withSpinner(EBImage::displayOutput("annotRoi")),
                              verbatimTextOutput("annotValue"),
                              tags$br(),
-                             uiOutput("modifyAnnot"),
-                             uiOutput("numModifyAnnot"),
+                             fluidRow(column(6, uiOutput("modifyAnnot"), uiOutput("numModifyAnnot")),
+                             column (6, div(style="display: inline-block;vertical-align:top;",uiOutput("prevAnnot")),
+                                     div(style="display: inline-block;vertical-align:top;",uiOutput("nextAnnot")))),
                              tags$br(),
-                             uiOutput("nextAnnot"),
+                             tags$br(),
                              uiOutput("validateModifAnnot"),
                              tags$br(),
                              verbatimTextOutput("annoteData"),
@@ -2057,12 +2058,28 @@ server <- function(input, output, session) {
                        annote$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,]
                      }
                    }
-                   output$nextAnnot <- renderUI ({
-                     if (length(annote$rois) != 1) {
-                       actionButton("nextAnnot", "Next ROI")
-                     }
+                   output$validateModifAnnot <- renderUI ({
+                     actionButton("validateModifAnnot", "Validate modifications")
                    })
                   })
+  
+  observeEvent (eventExpr = {input$annotate
+    annote$index}, handlerExpr = {
+      if (length(annote$rois) != 1 & annote$index > 1) {
+        output$prevAnnot <- renderUI ({
+          if (length(annote$rois) != 1 & annote$index > 1) {
+            actionButton("prevAnnot", "Previous ROI")
+          }
+        })
+      }
+      if (length(annote$rois) != 1 & annote$index < length(annote$rois)) {
+        output$nextAnnot <- renderUI ({
+          if (length(annote$rois) != 1 & annote$index < length(annote$rois)) {
+            actionButton("nextAnnot", "Next ROI")
+          }
+        })
+      }
+    })
   
   # Overlay channels 
   observeEvent(eventExpr = input$annotOverlay,
@@ -2201,7 +2218,7 @@ server <- function(input, output, session) {
                handlerExpr={annote$imgChan = input$annotChan})
   
   output$annotValue <- renderText ({
-    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
     if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
       value = global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]
       paste0("Actual value of ", input$variablesHistoAnnot, " for ROI ", annote$actual, " : ", "\n", value)
@@ -2277,8 +2294,17 @@ server <- function(input, output, session) {
                  annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
                })
   
+  observeEvent(eventExpr = input$prevAnnot,
+               handlerExpr = {
+                 if (annote$index <= length(annote$rois) & annote$index > 1) {
+                   annote$index <- annote$index - 1
+                 }
+                 annote$actual <- annote$rois[annote$index]
+                 annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
+               })
+  
   output$modifyAnnot <- renderUI ({
-    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
     if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
       radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
     }
@@ -2294,7 +2320,7 @@ server <- function(input, output, session) {
                   {input$modifyAnnot
                     input$modifySecondAnnot},
                 handlerExpr = {
-                    req(!is.null(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]))
+                    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
                     if (input$modifyAnnot=="Yes") {
                       output$numModifyAnnot <- renderUI ({
                         if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
@@ -2310,7 +2336,7 @@ server <- function(input, output, session) {
                       })
                     }
                     if (input$plotTypeAnnot=="Scatterplot") {
-                      if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
+                      if (length(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,] != 0) & (input$modifySecondAnnot=="Yes")) {
                         output$numModifyAnnot <- renderUI ({
                           if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
                             tagList(
@@ -2336,29 +2362,9 @@ server <- function(input, output, session) {
                 })
   
   output$annoteData <- renderPrint ({
+    req(length(annote$data)!=0)
     annote$data
   })
-  
-  observeEvent(eventExpr = 
-                 {annote$index
-                   annote$rois},
-               handlerExpr = {
-                 if (annote$index == length(annote$rois)) {
-                   removeUI(selector = "#nextAnnot")
-                   output$validateModifAnnot <- renderUI ({
-                     if (annote$index == length(annote$rois)) {
-                       actionButton("validateModifAnnot", "Validate modifications")
-                     }
-                   })
-                 }
-                 if (length(annote$rois)==1) {
-                   output$validateModifAnnot <- renderUI ({
-                     if (length(annote$rois)==1) {
-                       actionButton("validateModifAnnot", "Validate modifications")
-                     }
-                   })
-                 }
-               })
   
   observeEvent(eventExpr = input$validateModifAnnot, 
                handlerExpr = {
