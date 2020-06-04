@@ -229,14 +229,14 @@ ui <- dashboardPage(
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
                              title = "Parameters - Select ROIs",
-                             helpText("Select the variables you want to plot."),
+                             helpText("Select the variables you want to plot and to annotate."),
                              radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE),
                              uiOutput("variablesHistoAnnot"),
                              uiOutput("variablesScatterAnnot")
                         ),
                         box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Select ROIs",
-                             radioButtons("filterTypeAnnot", "Type of selection", choices=c("Free selection", "Select all"), selected="Free selection"),
+                             radioButtons("filterTypeAnnot", "Type of selection", choices=c("Free selection", "Select ROI(s) with their ID" ,"Select all"), selected="Free selection"),
                              helpText("Select the ROIs (click or brush) to annotate."),
                              plotlyOutput("selectRoisAnnot"),
                              uiOutput("annotate"),
@@ -1435,7 +1435,8 @@ server <- function(input, output, session) {
     input$ring
     input$ringSlider
     rois_plot1()
-  }, handlerExpr = {
+  }, 
+  handlerExpr = {
     ring$ringCoords <- list()
     if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
       for (i in 1:length(global$zip)) {ring$ringCoords <- append(ring$ringCoords, list(global$zip[[i]]$coords))}
@@ -1988,6 +1989,61 @@ server <- function(input, output, session) {
     }
   })
   
+  # Choice of ROIs ID 
+  observeEvent(eventExpr = input$filterTypeAnnot,
+               handlerExpr = {
+                 if (input$filterTypeAnnot == "Select ROI(s) with their ID") {
+                   showModal(modalDialog(
+                     title = "ROIs to annotate",
+                     radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one ID", "Select ID 1 -> n", "Select ID n -> m", "Select IDs")),
+                     uiOutput("annotSelID"),
+                     footer=tagList(
+                       modalButton("Cancel"),
+                       actionButton("annotValidateID", "Ok"))
+                   ))
+                 }
+               })
+  
+  observeEvent(eventExpr = input$annotTypeSelID,
+               handlerExpr = {
+                 if (!is.null(input$annotTypeSelID)) {
+                   output$annotSelID <- renderUI({
+                     if (input$annotTypeSelID == "Select one ID") {
+                       selectizeInput("annotSelectOneID", "Select the ID to use", choices=global$data$ID, multiple=FALSE)
+                     }
+                     else if (input$annotTypeSelID == "Select ID 1 -> n") {
+                       numericInput("annotSelect1nID", "Select the number of the last ID to use (1 -> n)", value=1, min=1, max=length(global$data$ID), step=1)
+                     }
+                     else if (input$annotTypeSelID == "Select ID n -> m") {
+                       tagList(
+                         numericInput("annotSelectnID", "Select the number of the first ID to use (n in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
+                         numericInput("annotSelectmID", "Select the number of the last ID to use (m in n -> m)", value=1, min=1, max=length(global$data$ID), step=1)
+                       )
+                     }
+                     else if (input$annotTypeSelID == "Select IDs") {
+                       selectizeInput("annotSelectIDs", "Select IDs to use", choices=global$data$ID, multiple=TRUE)
+                     }
+                   })
+                 }
+               })
+  
+  observeEvent(eventExpr=input$annotValidateID,
+               handlerExpr={
+                 if (input$annotTypeSelID == "Select one ID" & length(input$annotSelectOneID)==1) {
+                   annote$ID <- input$annotSelectOneID
+                 }
+                 else if (input$annotTypeSelID == "Select ID 1 -> n" & !is.null(input$annotSelect1nID)) {
+                   annote$ID <- global$data$ID[global$data$ID %in% c(1:input$annotSelect1nID)]
+                 }
+                 else if (input$annotTypeSelID == "Select ID n -> m") {
+                   annote$ID <- global$data$ID[global$data$ID %in% c(input$annotSelectnID:input$annotSelectmID)]
+                 }
+                 else if (input$annotTypeSelID == "Select IDs") {
+                   annote$ID <- input$annotSelectIDs
+                 }
+                 removeModal(session=getDefaultReactiveDomain())
+               })
+  
   # ROIs to annotate depending on selection 
   rois_toAnnotate <- reactive({
     req(!is.null(global$data))
@@ -2029,6 +2085,11 @@ server <- function(input, output, session) {
     else if (input$filterTypeAnnot == "Select all") {
       global$data
     }
+    else if (input$filterTypeAnnot == "Select ROI(s) with their ID") {
+      if (!is.null(global$data[global$data$ID %in% annote$rois,])) {
+        global$data[global$data$ID %in% annote$ID,]
+      }
+    }
   })
   
   output$roisAnnot <- renderPrint({
@@ -2040,7 +2101,7 @@ server <- function(input, output, session) {
     actionButton("annotate", "Validate and annotate")
   })
   
-  annote <- reactiveValues(rois = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL)
+  annote <- reactiveValues(rois = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL, ID=NULL)
   
   observeEvent (eventExpr = 
                   {input$annotate},
