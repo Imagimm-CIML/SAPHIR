@@ -232,11 +232,14 @@ ui <- dashboardPage(
                              helpText("Select the variables you want to plot and to annotate."),
                              radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE),
                              uiOutput("variablesHistoAnnot"),
-                             uiOutput("variablesScatterAnnot")
+                             uiOutput("variablesScatterAnnot"),
+                             checkboxInput("columnToAnnot", "Annotate the plot variables", value=TRUE),
+                             uiOutput("choiceColumnToAnnot")
                         ),
                         box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Select ROIs",
                              radioButtons("filterTypeAnnot", "Type of selection", choices=c("Free selection", "Select ROI(s) with their ID" ,"Select all"), selected="Free selection"),
+                             uiOutput("annotModifySelectID"),
                              helpText("Select the ROIs (click or brush) to annotate."),
                              plotlyOutput("selectRoisAnnot"),
                              uiOutput("annotate"),
@@ -599,8 +602,9 @@ server <- function(input, output, session) {
   }, label = "files")
   
   ## MENU PLOT TO IMAGE
+  # Filtering Plot
   # Output "selectize input" of the variable(s) to plot for selection  
-  # X variable
+  # X variable 
   output$variablesHisto <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "variablesHisto",
@@ -680,6 +684,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Interactive plot
   # UI for choosing variables to display 
   output$colsX1 <- renderUI({
     req(!is.null(global$data))
@@ -1025,7 +1030,6 @@ server <- function(input, output, session) {
   
   # Reactive variable : points selected on the plot 
   selectionRois <- reactive({
-    req(!is.null(global$data))
     req(!is.null(global$colors))
     if (!is.null(event_data("plotly_selected", source="p"))) {
       selectionRois <- event_data("plotly_selected", source="p")$customdata
@@ -1038,7 +1042,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Modal dialog to select specific frame if wanted + renderUI associate colors
+  # Modal dialog to select specific frame if wanted
   observeEvent(eventExpr={
     input$selectionType
   },
@@ -1052,18 +1056,14 @@ server <- function(input, output, session) {
     }
   })
   
-  output$colorType <- renderUI({
-    if (input$selectionType=="Multiple selection") {
-      checkboxInput("colorType", "Associate colors with different selections", value=TRUE)
-    }
-  })
-  
+  # UI Output -> change specific frame if one chosen
   output$changeSpecificFrame <- renderUI({
     if (input$selectionType=="Select all ROIs of a specific frame" & !is.null(input$specificFrame)) {
       actionLink("changeSpecificFrame", "Modify specific frame chosen")
     }
   })
   
+  # Observe event -> if change specific frame clicked : modal dialog to change this frame
   observeEvent(eventExpr={
     input$changeSpecificFrame
   },
@@ -1077,10 +1077,17 @@ server <- function(input, output, session) {
     }
   })
   
+  # Render UI -> if multiple selection, choose to associate color with selection or with plot lines
+  output$colorType <- renderUI({
+    if (input$selectionType=="Multiple selection") {
+      checkboxInput("colorType", "Associate colors with different selections", value=TRUE)
+    }
+  })
+
   # Global values for multiple selection
   multiSelect <- reactiveValues(indiv = c(), total=c(), indice=1)
   
-  # Render UI Next selection + reset all selections 
+  # Render UI Validate selection + reset all selections 
   observeEvent(eventExpr= {
     input$selectionType
     input$colorType
@@ -1107,7 +1114,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Save ROIs selected when Next button pushed
+  # Save ROIs selected when Validate button pushed
   observeEvent(eventExpr={
     input$nextSel},
     handlerExpr={
@@ -1147,12 +1154,14 @@ server <- function(input, output, session) {
                })
   
   # Colors of the selections 
+  # Button to change colors of groups
   output$colorSelection <- renderUI ({
     if (input$selectionType=="Multiple selection" & length(multiSelect$total)!=0) {
       actionLink("colorSelection", "Change colors of groups") 
     }
   })
   
+  # Modal dialog to choose new color of groups
   observeEvent(input$colorSelection, {
     showModal(modalDialog(
       title = "Colors of the group",
@@ -1166,6 +1175,7 @@ server <- function(input, output, session) {
     )
   })
   
+  # Change the color of the groups if apply button pushed
   observeEvent(input$colorApply, {
     req(!is.null(global$colors))
     for (j in unique(global$colors$color)) {
@@ -1175,12 +1185,14 @@ server <- function(input, output, session) {
     removeModal(session = getDefaultReactiveDomain())
   })
   
+  # Vector containing the new colors of the groups
   colorSels <- reactive({
     nbGroups <- unique(global$colors$color)
     colorSels <- sapply(nbGroups, function(i) {
       input[[paste0("colorSel", i)]] })
   }) 
   
+  # Radiobuttons in modal dialog to choose colors of the groups
   output$colorButtons <- renderUI({
     req(!is.null(global$colors))
     nbGroups <- unique(global$colors$color)
@@ -1189,7 +1201,7 @@ server <- function(input, output, session) {
     })
   })
   
-  # ROI selected 
+  # ROI selectedon the plot
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
     input$specificFrame
@@ -1198,38 +1210,38 @@ server <- function(input, output, session) {
     {
       req(!is.null(global$data))
       req(!is.null(global$colors))
-      if (input$selectionType == "Free selection") {
+      if (input$selectionType == "Free selection") { # If free selection : use only the selection on the plot
         rois_plot1 <- selectionRois()
         rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
-      else if (input$selectionType=="Multiple selection") {
+      else if (input$selectionType=="Multiple selection") { # If multiple selection : use the registered selections (multiSelect$total vs multiSelect$indiv which are new selections)
         rois_plot1 <- unique(multiSelect$total)
         rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
-      else if (input$selectionType == "Select all") {
+      else if (input$selectionType == "Select all") { # If select all : all ROIs 
         rois_plot1 <- global$colors$ID
         rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
-      else if (input$selectionType == "Select all ROIs of a specific frame") {
-        if ((global$nFrame > 1) & (!is.null(input$specificFrame))) {
+      else if (input$selectionType == "Select all ROIs of a specific frame") { # If select all ROIs of a specific frame 
+        if ((global$nFrame > 1) & (!is.null(input$specificFrame))) { # If more than one frame : only ROIs which are on this specific frame
           rois_plot1 <- global$colors$ID[global$colors$ID %in% global$data$ID[global$data$Slice==input$specificFrame]]
         }
-        else if (global$nFrame == 1) {
+        else if (global$nFrame == 1) { # If only one frame : all ROIs 
           rois_plot1 <- global$colors$ID
         }
       }
       else {
-        rois_plot1 <- event_data("plotly_deselect", source="p")
+        rois_plot1 <- event_data("plotly_deselect", source="p") # If none : no selection
       }
     }, ignoreNULL=FALSE)
   
-  
+  # Update tabset panel : go to panel "Selected" instead of groups when there is a selection
   observeEvent(eventExpr={rois_plot1()}, 
                handlerExpr= {
                  updateTabsetPanel(session, "infosGroup", selected="Selected")
                })
   
-  # Reactive variable : infos on points selected on the plot 
+  # Reactive variable : infos on points selected on the plot (infos from global$data)
   rois_plot_table1 <- reactive ({
     req(!is.null(global$data))
     global$data[global$data$ID %in% rois_plot1(),]
@@ -1283,7 +1295,7 @@ server <- function(input, output, session) {
   # Overlay channels 
   observeEvent(eventExpr = input$overlay,
                handlerExpr = {
-                 if (input$overlay==TRUE) {
+                 if (input$overlay==TRUE) { # Show modal dialog when clicked on overlay checkbox
                    showModal(modalDialog(
                      title = "Channel to overlay",
                      uiOutput("channelOverlay"),
@@ -1404,31 +1416,35 @@ server <- function(input, output, session) {
                  }
                })
   
+  # If ROIs selected all on the same frame -> change the actual frame to this frame
   observeEvent(eventExpr= {
     rois_plot1()
   },
   handlerExpr={
-    if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) {
+    if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) { 
       newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
       global$imgFrame <- newFrame
       global$imgChan <- input$channel1
     }
   }, ignoreNULL=FALSE)
   
+  # When channel slider modified : change the actual channel of the image
   observeEvent(eventExpr=input$channel1,
                handlerExpr={global$imgChan = input$channel1})
   
   # Displaying ring of the ROI 
+  # Render UI for the size of the ring
   observeEvent(eventExpr={
     input$ring
   }, handlerExpr={
     output$ringSlider <- renderUI({
       if (input$ring==TRUE) {
-        sliderInput("ringSlider", label="Size of the ring (pixels)", min=1, max=10, step=0.5, value=2)
+        sliderInput("ringSlider", label="Size of the ring (pixels)", min=5, max=50, step=0.5, value=2)
       }
     })
   })
   
+  # Reactive values containing the coords of the ring for each selected ROI
   ring <- reactiveValues(ringCoords = list())
   
   observeEvent(eventExpr={
@@ -1439,19 +1455,23 @@ server <- function(input, output, session) {
   handlerExpr = {
     ring$ringCoords <- list()
     if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
-      for (i in 1:length(global$zip)) {ring$ringCoords <- append(ring$ringCoords, list(global$zip[[i]]$coords))}
+      for (i in 1:length(global$zip)) {ring$ringCoords <- append(ring$ringCoords, list(global$zip[[i]]$coords))} # Add coords of ALL ROIs on the ringCoords list 
       for (j in rois_plot1()) {  
-        for (i in 1:nrow(ring$ringCoords[[j]])) {
-          if (ring$ringCoords[[j]][i,1] >= mean(global$zip[[j]]$coords[,1])) { 
+        for (i in 1:nrow(ring$ringCoords[[j]])) { # Modify the ringCoords of each ROIs selected 
+          if (ring$ringCoords[[j]][i,1] >= mean(global$zip[[j]]$coords[,1])) { # If the x coordinate is superior to the mean x coordinate of the ROI -> means that this point is on the
+            # upper zone of the ROI -> substract the size of the ring -> ring point will be below the initial point
             ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] - as.numeric(input$ringSlider)
           } 
-          else { 
+          else { # If the x coordinate is inferior to the mean x coordinate of the ROI -> means that this point is on the
+            # lower zone of the ROI -> add the size of the ring -> ring point will be above the initial point
             ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] + as.numeric(input$ringSlider)
           } 
-          if (ring$ringCoords[[j]][i,2] >= mean(global$zip[[j]]$coords[,2])) {
+          if (ring$ringCoords[[j]][i,2] >= mean(global$zip[[j]]$coords[,2])) { # If the y coordinate is superior to the mean y coordinate of the ROI -> means that this point is on the
+            # right zone of the ROI -> substract the size of the ring -> ring point will be on the left of the initial point
             ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] - as.numeric(input$ringSlider)
           }
-          else {
+          else { # If the y coordinate is inferior to the mean y coordinate of the ROI -> means that this point is on the
+            # left zone of the ROI -> substract the size of the ring -> ring point will be on the right of the initial point
             ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] + as.numeric(input$ringSlider)
           }
         }
@@ -1467,8 +1487,6 @@ server <- function(input, output, session) {
     input$frame1
     x()
     y()
-    input$ids
-    input$size
     input$associated
     multiSelect$indiv
     ring$ringCoords
@@ -1476,6 +1494,8 @@ server <- function(input, output, session) {
     input$ringSlider
     overlays$imgOverlay
     input$overlay
+    input$ids
+    input$contrastImg
   },
   handlerExpr= {
     req(length(global$img)!=0)
@@ -1486,10 +1506,10 @@ server <- function(input, output, session) {
     else if (global$nFrame > 1) {
       png(out, height=dim(global$img[[global$imgFrame]])[1], width=dim(global$img[[global$imgFrame]])[2])
     }
-    if (input$overlay==TRUE & !is.null(overlays$imgOverlay)) {
+    if (input$overlay==TRUE & !is.null(overlays$imgOverlay)) { # If input overlay -> display overlayed image
       display(overlays$imgOverlay, method="raster")
     }
-    else {
+    else { # Else if no overlay -> display normal image
       if (global$nFrame == 1) {
         display(global$img[,,global$imgChan,1], method="raster")
       }
@@ -1497,43 +1517,33 @@ server <- function(input, output, session) {
         display(global$img[[global$imgFrame]][,,global$imgChan,], method="raster")
       }
     }
-    if (input$associated == TRUE) {
-      if (global$nFrame==1) {
-        if (length(rois_plot1())>0) {
-          for (i in rois_plot1()) {
-            col <- global$colors$color[global$colors$ID==i]
-            col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-            plot(global$zip[[i]], col=col, add=TRUE)
-            if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-              lines(ring$ringCoords[[i]], col=col)
+    if (input$associated == TRUE & global$nFrame > 1) { # If more than one frame and ROIs associated with their original frame
+      if (length(rois_plot1())>0) { # If ROIs selected on the plot
+        for (i in rois_plot1()) {
+          col <- global$colors$color[global$colors$ID==i] 
+          # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
+          col <- switch (col, "2"=2, "LLgroup"=2,"LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
+          if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
+            plot(global$zip[[i]], col=col, add=TRUE) # Plot this ROI 
+            if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
+              lines(ring$ringCoords[[i]], col=col) # If display ring, add the ring corresponding to its ringcoords
             }
           }
         }
-        if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
-          for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
-            if (input$colorType==TRUE) {
-              plot(global$zip[[i]], col="yellow", add=TRUE)
-              if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
+      }
+      if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) { 
+        # If multiple selection and not validated ROIs selected 
+        for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) { # multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total] represents ROIs selected which are not validated yet
+          if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If ROIs on the actual slice
+            if (input$colorType==TRUE) { # If color of the ROI determined with the different selections
+              plot(global$zip[[i]], col="yellow", add=TRUE) # Plot it in yellow
+              if (length(ring$ringCoords) > 0 & input$ring==TRUE) { # Plus their ring
                 lines(ring$ringCoords[[i]], col=col)
               }
             }
-            else {
+            else { # If color of the ROI not determined by the different selections but by the lines on the plot
               col <- global$colors$color[global$colors$ID==i]
-              col <- switch (col, "2"=2, "LLgroup"=2,"LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-              plot(global$zip[[i]], col=col, add=TRUE)
-              if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-                lines(ring$ringCoords[[i]], col=col)
-              }
-            }
-          }
-        } 
-      }
-      else if (global$nFrame > 1) {
-        if (length(rois_plot1())>0) {
-          for (i in rois_plot1()) {
-            col <- global$colors$color[global$colors$ID==i]
-            col <- switch (col, "2"=2, "LLgroup"=2,"LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-            if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+              col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
               plot(global$zip[[i]], col=col, add=TRUE)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                 lines(ring$ringCoords[[i]], col=col)
@@ -1541,29 +1551,10 @@ server <- function(input, output, session) {
             }
           }
         }
-        if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
-          for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
-            if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-              if (input$colorType==TRUE) {
-                plot(global$zip[[i]], col="yellow", add=TRUE)
-                if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-                  lines(ring$ringCoords[[i]], col=col)
-                }
-              }
-              else {
-                col <- global$colors$color[global$colors$ID==i]
-                col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-                plot(global$zip[[i]], col=col, add=TRUE)
-                if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-                  lines(ring$ringCoords[[i]], col=col)
-                }
-              }
-            }
-          }
-        } 
-      }
+      } 
     }
-    else if (input$associated == FALSE) {
+    else if ((input$associated == FALSE & global$nFrame >1) | (input$associated==TRUE & global$nFrame==1) | (input$associated==FALSE & global$nFrame==1) ) {
+      # If only one slice or if more than one slice and ROI not associated with their original slice -> Same procedure but without slice association 
       if (length(rois_plot1())>0) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$colors$ID==i]
@@ -1596,8 +1587,42 @@ server <- function(input, output, session) {
     dev.off()
     out <- normalizePath(out, "/")
     global$imgPNG <- EBImage::readImage(out)
+    
+    if (input$ids==TRUE) {
+      if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
+        for (i in rois_plot1()) {
+          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+          coord <- paste("+", xID, "+", yID, sep="")
+          global$imgPNG <- magick::image_read(global$imgPNG)
+          global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+          global$imgPNG <- magick::as_EBImage(global$imgPNG)
+        }
+      }
+      if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
+        for (i in rois_plot1()) {
+          if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
+            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
+            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+            coord <- paste("+", xID, "+", yID, sep="")
+            global$imgPNG <- magick::image_read(global$imgPNG)
+            global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+            global$imgPNG <- magick::as_EBImage(global$imgPNG)
+          }
+        }
+      }
+    }
+    if (input$contrastImg==TRUE) {
+      global$imgPNG <- magick::image_read(global$imgPNG)
+      global$imgPNG <- magick::image_normalize(global$imgPNG)
+      global$imgPNG <- magick::as_EBImage(global$imgPNG)
+    }
+    
   }, ignoreNULL=FALSE)
+  
+  
   # Crop ROIs
+  # Slider with size of the ROI in microns 
   output$size <- renderUI ({
     req(length(global$img) != 0)
     req(length(global$zip) != 0)
@@ -1606,16 +1631,19 @@ server <- function(input, output, session) {
       if (max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1]) > val) {
         val <- max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1])
       }
-    }
+    } # Take the maximum range of x coords or y coords from all the ROIs 
     if (global$nFrame == 1) {
-      max <- min(dim(global$img)[1], dim(global$img)[2])
+      val <- val*attr(global$img,"x_resolution")
+      max <- min(dim(global$img)[1], dim(global$img)[2])*attr(global$img,"x_resolution") # Dimension of the image if only one slice 
     }
     else if (global$nFrame > 1) {
-      max <- min(dim(global$img[[global$imgFrame]])[1], dim(global$img[[global$imgFrame]])[2])
+      max <- min(dim(global$img[[global$imgFrame]])[1], dim(global$img[[global$imgFrame]])[2])/(1/attr(global$img[[global$imgFrame]],"x_resolution")) # Dimension of the image if more than one slice
+      val <- val*attr(global$img[[global$imgFrame]],"x_resolution")
     }
-    sliderInput("size", label = "Size of the ROI crop (pixels)", min = 0, max = max, value = val)
+    sliderInput("size", label = "Size of the ROI crop (microns)", min = 0, max = max, value = val) # Slider
   })
   
+  # Displayer cropped ROIs 
   observeEvent(eventExpr= {
     rois_plot1()
     input$channel1
@@ -1625,14 +1653,17 @@ server <- function(input, output, session) {
   handlerExpr= {
     output$list <- EBImage::renderDisplay({
       req(length(rois_plot1()) != 0)
+      req(global$img)
+      # Case one : one slice or no association with slice 
       if (global$nFrame==1 | input$associated==FALSE) {
-        d <- (input$size-1)/2
-        dim <- 2*d+1
-        prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-        for (i in rois_plot1()) {
+        d <- ((input$size/attr(global$img,"x_resolution"))-1)/2 # Half of the image dimension 
+        dim <- input$size/attr(global$img,"x_resolution") # Dimension of the image
+        prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG)) # Initial image with dimension depending on slider input
+        for (i in rois_plot1()) { # For each ROI, determine its center 
           xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
           ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-          xmin = xcenter-d
+          # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
+          xmin = xcenter-d 
           xmax= xcenter+d
           ymin = ycenter-d
           ymax = ycenter+d
@@ -1648,22 +1679,22 @@ server <- function(input, output, session) {
           if (xmax > dim(global$imgPNG)[1]) { 
             xmax <- dim(global$imgPNG)[1]
             xmin <- dim(global$imgPNG)[1] - dim +1}
-          cross <- global$imgPNG
-          cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
-          cross <- cross[xmin:xmax,ymin:ymax,]
-          if (input$ids == FALSE) {
+          cross <- global$imgPNG 
+          cross <- EBImage::drawCircle(img=cross, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1) # Draw a circle on the center of each ROI
+          cross <- cross[xmin:xmax,ymin:ymax,] # Cropped image for one ROI 
+          if (input$ids == FALSE) { # If ID not on imagePNG -> added on crops 
             cross <- magick::image_read(cross)
             cross <- magick::image_annotate(cross, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
             cross <- magick::as_EBImage(cross)
           }
-          prem <- EBImage::combine(prem, cross)
+          prem <- EBImage::combine(prem, cross) # Combine all the cropped images -> the first will be a black image 
         }
         nbCell <- nrow(rois_plot_table1())
-        EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
+        EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser') # Display all the images representing a ROI (all but the first)
       }
-      else if (global$nFrame >1) {
-        d <- (input$size-1)/2
-        dim <- 2*d+1
+      else if (global$nFrame >1) { # Same but association with slice
+        d <- ((input$size/attr(global$img[[global$imgFrame]],"x_resolution"))-1)/2 # Half of the image dimension 
+        dim <- input$size/attr(global$img[[global$imgFrame]],"x_resolution") # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
         if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
           for (i in rois_plot1()) {
@@ -1705,53 +1736,11 @@ server <- function(input, output, session) {
     })
   })
   
-  # Zoom displayer
-  observeEvent(eventExpr= {
-    rois_plot1()
-    input$channel1
-    input$frame1 
-    input$ids
-    ring$ringCoords
-    input$ring
-    input$ringSlider
-    input$associated
-    input$contrastImg
-  },
-  handlerExpr= {
+  # Zoom displayer -> Image PNG in a displayer
+  output$zoomImg <- EBImage::renderDisplay({
     req(global$imgPNG)
-    if (input$ids==TRUE) {
-      if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
-        for (i in rois_plot1()) {
-          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-          coord <- paste("+", xID, "+", yID, sep="")
-          global$imgPNG <- magick::image_read(global$imgPNG)
-          global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
-          global$imgPNG <- magick::as_EBImage(global$imgPNG)
-        }
-      }
-      if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
-        for (i in rois_plot1()) {
-          if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-            coord <- paste("+", xID, "+", yID, sep="")
-            global$imgPNG <- magick::image_read(global$imgPNG)
-            global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
-            global$imgPNG <- magick::as_EBImage(global$imgPNG)
-          }
-        }
-      }
-    }
-    if (input$contrastImg==TRUE) {
-      global$imgPNG <- magick::image_read(global$imgPNG)
-      global$imgPNG <- magick::image_normalize(global$imgPNG)
-      global$imgPNG <- magick::as_EBImage(global$imgPNG)
-    }
-    output$zoomImg <- EBImage::renderDisplay({
-      EBImage::display(global$imgPNG, method = 'browser')
-    })
-  }, ignoreNULL=FALSE)
+    EBImage::display(global$imgPNG, method = 'browser')
+  })
   
   ## MENU IMAGE TO PLOT
   # UI to choose channel to display for the image
@@ -1961,6 +1950,18 @@ server <- function(input, output, session) {
     })
   })
   
+  # If user wants to annotate an other column than the one plotted
+  output$choiceColumnToAnnot <- renderUI ({
+    if (input$columnToAnnot == FALSE) {
+      selectizeInput(inputId = "variableAnnot",
+                     label = "Variable to annotate",
+                     multiple = TRUE,
+                     choices = names(global$data),
+                     options = list(maxItems = 1))
+    }
+  })
+
+  
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectRoisAnnot <- renderPlotly({
     req(!is.null(global$data))
@@ -1990,9 +1991,10 @@ server <- function(input, output, session) {
   })
   
   # Choice of ROIs ID 
-  observeEvent(eventExpr = input$filterTypeAnnot,
+  observeEvent(eventExpr = {input$filterTypeAnnot
+    input$modifySelectID},
                handlerExpr = {
-                 if (input$filterTypeAnnot == "Select ROI(s) with their ID") {
+                 if (input$filterTypeAnnot == "Select ROI(s) with their ID" & (!is.null(input$variablesHistoAnnot) | !is.null(input$variableAnnot))) {
                    showModal(modalDialog(
                      title = "ROIs to annotate",
                      radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one ID", "Select ID 1 -> n", "Select ID n -> m", "Select IDs")),
@@ -2002,7 +2004,13 @@ server <- function(input, output, session) {
                        actionButton("annotValidateID", "Ok"))
                    ))
                  }
-               })
+               }, ignoreNULL=FALSE)
+  
+  output$annotModifySelectID <- renderUI ({
+    if (input$filterTypeAnnot == "Select ROI(s) with their ID" & !is.null(input$variablesHistoAnnot)) {
+      actionLink("modifySelectID", "Modify selected IDs") 
+    }
+  })
   
   observeEvent(eventExpr = input$annotTypeSelID,
                handlerExpr = {
@@ -2047,9 +2055,9 @@ server <- function(input, output, session) {
   # ROIs to annotate depending on selection 
   rois_toAnnotate <- reactive({
     req(!is.null(global$data))
-    req(!is.null(input$variablesHistoAnnot))
     # If histogram : select ROIs having values selected
     if (input$filterTypeAnnot == "Free selection") {
+      req(!is.null(input$variablesHistoAnnot))
       if (input$plotTypeAnnot == "Histogram") {
         d <- (max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20 # Size of the histogram bar : values corresponding to this bars
         if (!is.null(event_data("plotly_selected", source="a")$x)) {
@@ -2086,7 +2094,7 @@ server <- function(input, output, session) {
       global$data
     }
     else if (input$filterTypeAnnot == "Select ROI(s) with their ID") {
-      if (!is.null(global$data[global$data$ID %in% annote$rois,])) {
+      if (!is.null(global$data[global$data$ID %in% annote$ID,])) {
         global$data[global$data$ID %in% annote$ID,]
       }
     }
@@ -2112,12 +2120,17 @@ server <- function(input, output, session) {
                    annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
                    annote$data <- data.frame(annote$rois)
                    colnames(annote$data) <- c("ID")
-                   if (!is.null(global$data[input$variablesHistoAnnot])) {
+                   if (!is.null(global$data[input$variablesHistoAnnot]) & input$columnToAnnot == TRUE) {
                      annote$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,]
+                     if (input$plotTypeAnnot=="Scatterplot") {
+                       if (!is.null(global$data[input$variablesScatterAnnot])) {
+                         annote$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,]
+                       }
+                     }
                    }
-                   if (input$plotTypeAnnot=="Scatterplot") {
-                     if (!is.null(global$data[input$variablesScatterAnnot])) {
-                       annote$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,]
+                   else if (input$columnToAnnot==FALSE) {
+                     if (!is.null(global$data[input$variableAnnot])) {
+                       annote$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot][global$data$ID %in% annote$rois,]
                      }
                    }
                    output$validateModifAnnot <- renderUI ({
@@ -2280,14 +2293,18 @@ server <- function(input, output, session) {
                handlerExpr={annote$imgChan = input$annotChan})
   
   output$annotValue <- renderText ({
-    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-    if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
+    if ((input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") & input$columnToAnnot==TRUE) {
+      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
       value = global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]
       paste0("Actual value of ", input$variablesHistoAnnot, " for ROI ", annote$actual, " : ", "\n", value)
     }
-    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])) {
+    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & input$columnToAnnot==TRUE) {
       value = c(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,], global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])
       paste0("Actual value for ROI ", annote$actual, " of ", input$variablesHistoAnnot, " : ", value[1], "\n", "and  ", input$variablesScatterAnnot," : ", value[2])
+    }
+    else if (input$columnToAnnot==FALSE & length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0) {
+      value = global$data[input$variableAnnot][global$data$ID==annote$actual,]
+      paste0("Actual value of ", input$variableAnnot, " for ROI ", annote$actual, " : ", "\n", value)
     }
   })
   
@@ -2366,14 +2383,17 @@ server <- function(input, output, session) {
                })
   
   output$modifyAnnot <- renderUI ({
-    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-    if (input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") {
+    if ((input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") & input$columnToAnnot==TRUE) {
+      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
       radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
     }
-    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])) {
+    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & input$columnToAnnot==TRUE) {
       tagList(
       radioButtons("modifyAnnot", "Modify the first value", choices=c("Yes", "No"), selected="No"),
       radioButtons("modifySecondAnnot", "Modify the second value", choices=c("Yes", "No"), selected="No"))
+    }
+    else if (input$columnToAnnot==FALSE & length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0) {
+      radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
     }
   })
   
@@ -2383,21 +2403,23 @@ server <- function(input, output, session) {
                     input$modifySecondAnnot},
                 handlerExpr = {
                     req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-                    if (input$modifyAnnot=="Yes") {
+                    if (input$modifyAnnot=="Yes" & input$columnToAnnot == TRUE) {
                       output$numModifyAnnot <- renderUI ({
-                        if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
-                          tagList(
-                          numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
-                          actionButton("validateNumModifyAnnot", "Ok"))
-                        }
-                        else if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Barplot (non numerical datas)") {
-                          tagList(
-                            textInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), ""),
-                            actionButton("validateNumModifyAnnot", "Ok"))
+                        if (input$columnToAnnot == TRUE) {
+                          if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
+                            tagList(
+                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
+                              actionButton("validateNumModifyAnnot", "Ok"))
+                          }
+                          else if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Barplot (non numerical datas)") {
+                            tagList(
+                              textInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), ""),
+                              actionButton("validateNumModifyAnnot", "Ok"))
+                          }
                         }
                       })
                     }
-                    if (input$plotTypeAnnot=="Scatterplot") {
+                    if (input$plotTypeAnnot=="Scatterplot" & input$columnToAnnot==TRUE) {
                       if (length(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,] != 0) & (input$modifySecondAnnot=="Yes")) {
                         output$numModifyAnnot <- renderUI ({
                           if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
@@ -2410,17 +2432,36 @@ server <- function(input, output, session) {
                         })
                       }
                     }
+                    if (input$columnToAnnot == FALSE) {
+                      output$numModifyAnnot <- renderUI ({
+                        if (input$columnToAnnot == FALSE) {
+                          if (input$modifyAnnot=="Yes" & !is.null(input$variableAnnot)) {
+                            tagList(
+                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variableAnnot), 0),
+                              actionButton("validateNumModifyAnnot", "Ok"))
+                          }
+                        }
+                      })
+                    }
+                  
                 }, ignoreNULL=FALSE)
   
   
   observeEvent (eventExpr = input$validateNumModifyAnnot,
                 handlerExpr = {
-                  annote$data[paste0("corrected_", input$variablesHistoAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
+                  if (input$columnToAnnot == TRUE) {
+                    annote$data[paste0("corrected_", input$variablesHistoAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
+                  }
+                  else if (input$columnToAnnot == FALSE) {
+                    annote$data[paste0("corrected_", input$variableAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
+                  }
                 })
   
   observeEvent (eventExpr = input$validateNumModifySecondAnnot,
                 handlerExpr = {
-                  annote$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID==annote$actual,] <- input$numModifySecondAnnot
+                  if (input$columnToAnnot == TRUE) {
+                    annote$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID==annote$actual,] <- input$numModifySecondAnnot
+                  }
                 })
   
   output$annoteData <- renderPrint ({
@@ -2430,14 +2471,22 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr = input$validateModifAnnot, 
                handlerExpr = {
-                 if (any(global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesHistoAnnot)])) {
-                   global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
-                   global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
+                 if (input$columnToAnnot==TRUE) {
+                   if (any(global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesHistoAnnot)])) {
+                     global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
+                     global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
+                   }
+                   if (input$plotTypeAnnot=="Scatterplot") {
+                     if (any(global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesScatterAnnot)])) {
+                       global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot]
+                       global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
+                     }
+                   }
                  }
-                 if (input$plotTypeAnnot=="Scatterplot") {
-                   if (any(global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesScatterAnnot)])) {
-                     global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot]
-                     global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
+                 else if (input$columnToAnnot==FALSE) {
+                   if (any(global$data[input$variableAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variableAnnot)])) {
+                     global$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot]
+                     global$data[paste0("corrected_", input$variableAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variableAnnot)]
                    }
                  }
                  annote$imgPNG <- NULL
