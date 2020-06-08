@@ -1204,7 +1204,7 @@ server <- function(input, output, session) {
     })
   })
   
-  # ROI selectedon the plot
+  # ROI selected on the plot
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
     selectionRois()
     input$specificFrame
@@ -1442,7 +1442,7 @@ server <- function(input, output, session) {
   }, handlerExpr={
     output$ringSlider <- renderUI({
       if (input$ring==TRUE) {
-        sliderInput("ringSlider", label="Size of the ring (pixels)", min=5, max=50, step=0.5, value=2)
+        sliderInput("ringSlider", label="Size of the ring (microns)", min=5, max=50, step=0.5, value=2)
       }
     })
   })
@@ -1463,19 +1463,19 @@ server <- function(input, output, session) {
         for (i in 1:nrow(ring$ringCoords[[j]])) { # Modify the ringCoords of each ROIs selected 
           if (ring$ringCoords[[j]][i,1] >= mean(global$zip[[j]]$coords[,1])) { # If the x coordinate is superior to the mean x coordinate of the ROI -> means that this point is on the
             # upper zone of the ROI -> substract the size of the ring -> ring point will be below the initial point
-            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] - as.numeric(input$ringSlider)
-          } 
+            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] - as.numeric(input$ringSlider)/global$resolution
+          }  
           else { # If the x coordinate is inferior to the mean x coordinate of the ROI -> means that this point is on the
             # lower zone of the ROI -> add the size of the ring -> ring point will be above the initial point
-            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] + as.numeric(input$ringSlider)
+            ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] + as.numeric(input$ringSlider)/global$resolution
           } 
           if (ring$ringCoords[[j]][i,2] >= mean(global$zip[[j]]$coords[,2])) { # If the y coordinate is superior to the mean y coordinate of the ROI -> means that this point is on the
             # right zone of the ROI -> substract the size of the ring -> ring point will be on the left of the initial point
-            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] - as.numeric(input$ringSlider)
+            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] - as.numeric(input$ringSlider)/global$resolution
           }
           else { # If the y coordinate is inferior to the mean y coordinate of the ROI -> means that this point is on the
             # left zone of the ROI -> substract the size of the ring -> ring point will be on the right of the initial point
-            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] + as.numeric(input$ringSlider)
+            ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] + as.numeric(input$ringSlider)/global$resolution
           }
         }
       }
@@ -1636,12 +1636,12 @@ server <- function(input, output, session) {
       }
     } # Take the maximum range of x coords or y coords from all the ROIs 
     if (global$nFrame == 1) {
-      val <- val*attr(global$img,"x_resolution")
-      max <- min(dim(global$img)[1], dim(global$img)[2])*attr(global$img,"x_resolution") # Dimension of the image if only one slice 
+      val <- val*global$resolution
+      max <- min(dim(global$img)[1], dim(global$img)[2])*global$resolution # Dimension of the image if only one slice 
     }
     else if (global$nFrame > 1) {
-      max <- min(dim(global$img[[global$imgFrame]])[1], dim(global$img[[global$imgFrame]])[2])/(1/attr(global$img[[global$imgFrame]],"x_resolution")) # Dimension of the image if more than one slice
-      val <- val*attr(global$img[[global$imgFrame]],"x_resolution")
+      max <- min(dim(global$img[[global$imgFrame]])[1], dim(global$img[[global$imgFrame]])[2])*global$resolution # Dimension of the image if more than one slice
+      val <- val*global$resolution
     }
     sliderInput("size", label = "Size of the ROI crop (microns)", min = 0, max = max, value = val) # Slider
   })
