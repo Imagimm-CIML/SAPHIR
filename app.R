@@ -284,7 +284,7 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL)
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -526,6 +526,7 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
         global$nChan <- dim(global$img)[3] # Number of channel on the image
+        global$resolution <- attr(global$img, "x_resolution")
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
@@ -533,12 +534,14 @@ server <- function(input, output, session) {
           global$img[[i]] <- read_tif(global$imgPath, frame=i)
         }
         global$nChan <- dim(global$img[[1]])[3] 
+        global$resolution <- attr(global$img[[1]], "x_resolution")
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$resolution <- attr(global$img, "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -1656,8 +1659,8 @@ server <- function(input, output, session) {
       req(global$img)
       # Case one : one slice or no association with slice 
       if (global$nFrame==1 | input$associated==FALSE) {
-        d <- ((input$size/attr(global$img,"x_resolution"))-1)/2 # Half of the image dimension 
-        dim <- input$size/attr(global$img,"x_resolution") # Dimension of the image
+        d <- ((input$size/global$resolution)-1)/2 # Half of the image dimension 
+        dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG)) # Initial image with dimension depending on slider input
         for (i in rois_plot1()) { # For each ROI, determine its center 
           xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
@@ -1693,8 +1696,8 @@ server <- function(input, output, session) {
         EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser') # Display all the images representing a ROI (all but the first)
       }
       else if (global$nFrame >1) { # Same but association with slice
-        d <- ((input$size/attr(global$img[[global$imgFrame]],"x_resolution"))-1)/2 # Half of the image dimension 
-        dim <- input$size/attr(global$img[[global$imgFrame]],"x_resolution") # Dimension of the image
+        d <- ((input$size/global$resolution)-1)/2 # Half of the image dimension 
+        dim <- input$size/global$resolution# Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
         if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
           for (i in rois_plot1()) {
@@ -2100,12 +2103,28 @@ server <- function(input, output, session) {
     }
   })
   
+  colToAnnotate <- reactive ({
+    req(!is.null(global$data))
+    if (input$columnToAnnot==TRUE) {
+      if (input$plotTypeAnnot == "Histogram" | input$plotTypeAnnot == "Barplot (non numerical datas)") {
+        input$variablesHistoAnnot
+      }
+      else if (input$plotTypeAnnot == "Scatterplot") {
+        c(input$variablesHistoAnnot, input$variablesScatterAnnot)
+      }
+    }
+    else {
+      input$variableAnnot
+    }
+  })
+  
   output$roisAnnot <- renderPrint({
     rois_toAnnotate()
   })
   
   output$annotate <- renderUI ({
     req(length(rois_toAnnotate()) > 0)
+    req(length(colToAnnotate()) > 0)
     actionButton("annotate", "Validate and annotate")
   })
   
