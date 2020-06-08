@@ -2402,8 +2402,9 @@ server <- function(input, output, session) {
                   {input$modifyAnnot
                     input$modifySecondAnnot},
                 handlerExpr = {
-                    req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
+                  req(input$modifyAnnot)
                     if (input$modifyAnnot=="Yes" & input$columnToAnnot == TRUE) {
+                      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
                       output$numModifyAnnot <- renderUI ({
                         if (input$columnToAnnot == TRUE) {
                           if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
@@ -2433,11 +2434,12 @@ server <- function(input, output, session) {
                       }
                     }
                     if (input$columnToAnnot == FALSE) {
+                      req(length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0)
                       output$numModifyAnnot <- renderUI ({
                         if (input$columnToAnnot == FALSE) {
                           if (input$modifyAnnot=="Yes" & !is.null(input$variableAnnot)) {
                             tagList(
-                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variableAnnot), 0),
+                              textInput("numModifyAnnot", paste0("Input new value for ", input$variableAnnot), ""),
                               actionButton("validateNumModifyAnnot", "Ok"))
                           }
                         }
