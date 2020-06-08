@@ -284,7 +284,7 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL)
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, zipcoords=list())
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -526,22 +526,28 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
         global$nChan <- dim(global$img)[3] # Number of channel on the image
-        global$resolution <- attr(global$img, "x_resolution")
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+        global$img <- as_EBImage(global$img)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
-          global$img[[i]] <- read_tif(global$imgPath, frame=i)
+          global$img[[i]] <- read_tif(global$imgPath, frames=i)
+          global$img[[i]] <- as_EBImage(global$img[[i]])
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[1]/2)
         }
         global$nChan <- dim(global$img[[1]])[3] 
-        global$resolution <- attr(global$img[[1]], "x_resolution")
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
-        global$resolution <- attr(global$img, "x_resolution")
+        global$img <- as_EBImage(global$img)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -551,6 +557,13 @@ server <- function(input, output, session) {
     }
     global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
     global$zip <- read.ijzip("www/roiset.zip")
+    for (i in c(1:length(global$zip))) {
+      global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
+    }
+    for (i in c(1:length(global$zipcoords))) {
+      global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
+      global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
+    } 
     global$legend <- read.table("www/legend.csv", header=TRUE, sep="\t", dec=".")
   })
   
@@ -561,19 +574,28 @@ server <- function(input, output, session) {
       if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image menu plot to image
         global$nChan <- dim(global$img)[3] # Number of channel on the image
+        global$img <- as_EBImage(global$img)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
-          global$img[[i]] <- read_tif(global$imgPath, frame=i)
+          global$img[[i]] <- read_tif(global$imgPath, frames=i)
+          global$img[[i]] <- as_EBImage(global$img[[i]])
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[1]/2)
         }
         global$nChan <- dim(global$img[[1]])[3] 
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$img <- as_EBImage(global$img)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -602,6 +624,13 @@ server <- function(input, output, session) {
   observeEvent(eventExpr= input$zipFile, handlerExpr = {
     #ROIzip file
     global$zip <- read.ijzip(input$zipFile$datapath)
+    for (i in c(1:length(global$zip))) {
+      global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
+    }
+    for (i in c(1:length(global$zipcoords))) {
+      global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
+      global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
+    } 
   }, label = "files")
   
   ## MENU PLOT TO IMAGE
@@ -1458,10 +1487,10 @@ server <- function(input, output, session) {
   handlerExpr = {
     ring$ringCoords <- list()
     if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
-      for (i in 1:length(global$zip)) {ring$ringCoords <- append(ring$ringCoords, list(global$zip[[i]]$coords))} # Add coords of ALL ROIs on the ringCoords list 
+      ring$ringCoords <- global$zipcoords # Add coords of ALL ROIs on the ringCoords list 
       for (j in rois_plot1()) {  
         for (i in 1:nrow(ring$ringCoords[[j]])) { # Modify the ringCoords of each ROIs selected 
-          if (ring$ringCoords[[j]][i,1] >= mean(global$zip[[j]]$coords[,1])) { # If the x coordinate is superior to the mean x coordinate of the ROI -> means that this point is on the
+          if (ring$ringCoords[[j]][i,1] >= mean(global$zipcoords[[j]][,1])) { # If the x coordinate is superior to the mean x coordinate of the ROI -> means that this point is on the
             # upper zone of the ROI -> substract the size of the ring -> ring point will be below the initial point
             ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] - as.numeric(input$ringSlider)/global$resolution
           }  
@@ -1469,7 +1498,7 @@ server <- function(input, output, session) {
             # lower zone of the ROI -> add the size of the ring -> ring point will be above the initial point
             ring$ringCoords[[j]][i,1] <- ring$ringCoords[[j]][i,1] + as.numeric(input$ringSlider)/global$resolution
           } 
-          if (ring$ringCoords[[j]][i,2] >= mean(global$zip[[j]]$coords[,2])) { # If the y coordinate is superior to the mean y coordinate of the ROI -> means that this point is on the
+          if (ring$ringCoords[[j]][i,2] >= mean(global$zipcoords[[j]][,2])) { # If the y coordinate is superior to the mean y coordinate of the ROI -> means that this point is on the
             # right zone of the ROI -> substract the size of the ring -> ring point will be on the left of the initial point
             ring$ringCoords[[j]][i,2] <- ring$ringCoords[[j]][i,2] - as.numeric(input$ringSlider)/global$resolution
           }
@@ -1527,7 +1556,7 @@ server <- function(input, output, session) {
           # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
           col <- switch (col, "2"=2, "LLgroup"=2,"LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
-            plot(global$zip[[i]], col=col, add=TRUE) # Plot this ROI 
+            lines(global$zipcoords[[i]], col=col) # Plot this ROI 
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
               lines(ring$ringCoords[[i]], col=col) # If display ring, add the ring corresponding to its ringcoords
             }
@@ -1539,7 +1568,7 @@ server <- function(input, output, session) {
         for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) { # multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total] represents ROIs selected which are not validated yet
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If ROIs on the actual slice
             if (input$colorType==TRUE) { # If color of the ROI determined with the different selections
-              plot(global$zip[[i]], col="yellow", add=TRUE) # Plot it in yellow
+              lines(global$zipcoords[[i]], col="yellow") # Plot it in yellow
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) { # Plus their ring
                 lines(ring$ringCoords[[i]], col=col)
               }
@@ -1547,7 +1576,7 @@ server <- function(input, output, session) {
             else { # If color of the ROI not determined by the different selections but by the lines on the plot
               col <- global$colors$color[global$colors$ID==i]
               col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-              plot(global$zip[[i]], col=col, add=TRUE)
+              lines(global$zipcoords[[i]], col=col)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                 lines(ring$ringCoords[[i]], col=col)
               }
@@ -1562,7 +1591,7 @@ server <- function(input, output, session) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$colors$ID==i]
           col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-          plot(global$zip[[i]], col=col, add=TRUE)
+          lines(global$zipcoords[[i]], col=col)
           if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
             lines(ring$ringCoords[[i]], col=col)
           }
@@ -1571,7 +1600,7 @@ server <- function(input, output, session) {
       if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
         for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) {
           if (input$colorType==TRUE) {
-            plot(global$zip[[i]], col="yellow", add=TRUE)
+            lines(global$zipcoords[[i]], col="yellow")
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
             }
@@ -1579,7 +1608,7 @@ server <- function(input, output, session) {
           else {
             col <- global$colors$color[global$colors$ID==i]
             col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
-            plot(global$zip[[i]], col=col, add=TRUE)
+            lines(global$zipcoords[[i]], col=col)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
             }
@@ -1594,8 +1623,8 @@ server <- function(input, output, session) {
     if (input$ids==TRUE) {
       if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
         for (i in rois_plot1()) {
-          xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-          yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+          xID <- round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
+          yID <- round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
           coord <- paste("+", xID, "+", yID, sep="")
           global$imgPNG <- magick::image_read(global$imgPNG)
           global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
@@ -1605,8 +1634,8 @@ server <- function(input, output, session) {
       if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
         for (i in rois_plot1()) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-            xID <- round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-            yID <- round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+            xID <- round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
+            yID <- round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
             coord <- paste("+", xID, "+", yID, sep="")
             global$imgPNG <- magick::image_read(global$imgPNG)
             global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
@@ -1628,11 +1657,11 @@ server <- function(input, output, session) {
   # Slider with size of the ROI in microns 
   output$size <- renderUI ({
     req(length(global$img) != 0)
-    req(length(global$zip) != 0)
+    req(length(global$zipcoords) != 0)
     val <- 0
-    for (i in length(global$zip)) {
-      if (max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1]) > val) {
-        val <- max(global$zip[[i]]$yrange[2]-global$zip[[i]]$yrange[1], global$zip[[i]]$xrange[2]-global$zip[[i]]$xrange[1])
+    for (i in length(global$zipcoords)) {
+      if (max(max(global$zipcoords[[i]][,2])-min(global$zipcoords[[i]][,2]), max(global$zipcoords[[i]][,1])-min(global$zipcoords[[i]][,1])) > val) {
+        val <- max(max(global$zipcoords[[i]][,2])-min(global$zipcoords[[i]][,2]), max(global$zipcoords[[i]][,1])-min(global$zipcoords[[i]][,1]))
       }
     } # Take the maximum range of x coords or y coords from all the ROIs 
     if (global$nFrame == 1) {
@@ -1663,8 +1692,8 @@ server <- function(input, output, session) {
         dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG)) # Initial image with dimension depending on slider input
         for (i in rois_plot1()) { # For each ROI, determine its center 
-          xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-          ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+          xcenter = round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
+          ycenter = round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
           # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
           xmin = xcenter-d 
           xmax= xcenter+d
@@ -1702,8 +1731,8 @@ server <- function(input, output, session) {
         if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
           for (i in rois_plot1()) {
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-              xcenter = round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-              ycenter = round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
+              xcenter = round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
+              ycenter = round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
               xmin = xcenter-d
               xmax= xcenter+d
               ymin = ycenter-d
@@ -1778,7 +1807,7 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr= {
     global$img
-    global$zip
+    global$zipcoords
     input$channel2
     input$frame2 
     global$imgFrame2
@@ -1786,13 +1815,13 @@ server <- function(input, output, session) {
     input$color2
   },
   handlerExpr= {
-    if ((length(global$img) != 0) & (!is.null(global$zip))) {
+    if ((length(global$img) != 0) & (length(global$zipcoords)>0)) {
       out2 <- tempfile(fileext='.png')
       if (global$nFrame == 1) {
         png(out2, height=dim(global$img)[1], width=dim(global$img)[2])
         display(global$img[,,global$imgChan2,1], method="raster")
-        for (i in c(1:length(global$zip))) {
-          plot(global$zip[[i]], col=input$color2, add=TRUE) 
+        for (i in c(1:length(global$zipcoords))) {
+          lines(global$zipcoords[[i]], col=input$color2)
         }
       }
       else if (global$nFrame > 1) {
@@ -1800,7 +1829,7 @@ server <- function(input, output, session) {
         display(global$img[[global$imgFrame2]][,,global$imgChan2,1], method="raster")
         for (i in global$data$ID) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
-            plot(global$zip[[i]], col=input$color2, add=TRUE)
+            lines(global$zipcoords[[i]], col=input$color2)
           }
         } 
       }
@@ -1814,7 +1843,7 @@ server <- function(input, output, session) {
   output$img_rois2 <- renderPlotly({
     req(!is.null(global$imgPNG2))
     req(!is.null(global$data))
-    req(!is.null(global$zip))
+    req(length(global$zipcoords)>0)
     axX <- list(
       title = "",
       zeroline = FALSE,
@@ -1837,8 +1866,8 @@ server <- function(input, output, session) {
     ycenter = c()
     if (global$nFrame > 1 ) {
       for (i in global$data$ID[global$data$Slice==global$imgFrame2]) {
-        xcenter = c(xcenter,round((global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2))
-        ycenter = c(ycenter, dim(global$imgPNG2)[1]-round((global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2))
+        xcenter = c(xcenter,round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2))
+        ycenter = c(ycenter, dim(global$imgPNG2)[1]-round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2))
       }
       i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID[global$data$Slice==global$imgFrame2], mode="markers", type="scatter", source="i") 
       i %>%
@@ -1860,9 +1889,9 @@ server <- function(input, output, session) {
     }
     else if (global$nFrame == 1) {
       for (i in global$data$ID) {
-        xcenter = c(xcenter,(global$zip[[i]]$xrange[1]+global$zip[[i]]$xrange[2])/2)
-        ycenter = c(ycenter, dim(global$imgPNG2)[1]-(global$zip[[i]]$yrange[1]+global$zip[[i]]$yrange[2])/2)
-      }
+        xcenter = c(xcenter,round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2))
+        ycenter = c(ycenter, dim(global$imgPNG2)[1]-round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2))
+      } 
       i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID, mode="markers", type="scatter", source="i") 
       i %>%
         layout(
@@ -1889,7 +1918,7 @@ server <- function(input, output, session) {
   output$rois_img2 <- renderPrint({
     req(length(global$img) != 0)
     req(!is.null(global$data))
-    req(!is.null(global$zip))
+    req(length(global$zipcoords)>0)
     if (!is.null(event_data("plotly_click", source="i")$customdata)) {
       global$IDs <- event_data("plotly_click", source="i")$customdata
     }
@@ -1904,7 +1933,7 @@ server <- function(input, output, session) {
     req(!is.null(global$IDs))
     req(length(global$img) != 0)
     req(!is.null(global$data))
-    req(!is.null(global$zip))
+    req(length(global$zipcoords)>0)
     ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2)) + labs(x=input$colsX2, y=input$colsY2) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
   })
   
@@ -2335,7 +2364,7 @@ server <- function(input, output, session) {
                     annotOverlays$imgOverlay
                     input$annotOverlay}, 
                 handlerExpr = 
-                  { if ((length(global$img) != 0) & (!is.null(global$zip))) {
+                  { if ((length(global$img) != 0) & (length(global$zipcoords)>0)) {
                       out3 <- tempfile(fileext='.png')
                       if (global$nFrame == 1) {
                         png(out3, height=dim(global$img)[1], width=dim(global$img)[2])
@@ -2346,7 +2375,7 @@ server <- function(input, output, session) {
                           display(annotOverlays$imgOverlay, method="raster")
                         }
                         if (!is.null(annote$actual)) {
-                          plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                          lines(global$zipcoords[[annote$actual]], col="yellow") 
                         }
                       }
                       else if (global$nFrame > 1) {
@@ -2360,7 +2389,7 @@ server <- function(input, output, session) {
                           }
                           if (!is.null(annote$actual)) {
                             if (global$data$Slice[global$data$ID==annote$actual]==annote$imgFrame) {
-                              plot(global$zip[[annote$actual]], col="yellow", add=TRUE)
+                              lines(global$zipcoords[[annote$actual]], col="yellow") 
                             }
                           }
                         }
@@ -2373,7 +2402,7 @@ server <- function(input, output, session) {
                             display(annotOverlays$imgOverlay, method="raster")
                           }
                           if (!is.null(annote$actual)) {
-                            plot(global$zip[[annote$actual]], col="yellow", add=TRUE) 
+                            lines(global$zipcoords[[annote$actual]], col="yellow")  
                           }
                         }
                       }
