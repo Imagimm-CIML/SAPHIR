@@ -127,8 +127,8 @@ ui <- dashboardPage(
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
-                             checkboxInput("localContrast", "Use an other variable for the shape of the points"),
-                             uiOutput("changeShape")
+                             uiOutput("colsContrast"),
+                             uiOutput("contrastThreshold")
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
@@ -180,6 +180,7 @@ ui <- dashboardPage(
               ),
               fluidRow( 
                 box ( width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
+                      title="Statistics",
                   tabsetPanel (id="infosGroup", selected="Global",
                                tabPanel("Global",
                                         tags$br(),
@@ -558,7 +559,7 @@ server <- function(input, output, session) {
         })
       }
     }
-    global$data <- read.table("www/intensity.csv",header=TRUE, sep="\t", dec=".")
+    global$data <- read.table("www/intensity.csv",header=TRUE, sep=";", dec=".")
     global$zip <- read.ijzip("www/roiset.zip")
     for (i in c(1:length(global$zip))) {
       global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
@@ -748,34 +749,6 @@ server <- function(input, output, session) {
   })
   
   ## Local contrast or other variables to change shape of the points 
-  # Modal dialog window with columns to use and threshold
-  observeEvent(
-    eventExpr={
-      input$localContrast
-      input$changeShape},
-    handlerExpr={
-      if (input$localContrast==TRUE) {
-        global$colors$shape <- "Neg"
-        showModal(modalDialog(
-          title = "Select threshold and columns to use",
-          uiOutput("colsContrast"),
-          uiOutput("contrastThreshold"),
-          footer=tagList(
-            modalButton("Cancel"),
-            actionButton("apply", "Apply")),
-          easyClose = TRUE
-        ))
-      }
-    }, ignoreNULL=FALSE
-  )
-  
-  # Action button to change shape variable or threshold
-  output$changeShape <- renderUI ({
-    if (input$localContrast==TRUE & !is.null(global$colors$shape)) {
-      actionLink("changeShape", "Modify the variable or the threshold")
-    }
-  })
-  
   # Modification of the "shape" column depending on the thresholds
   observeEvent(
     eventExpr = {
@@ -803,29 +776,43 @@ server <- function(input, output, session) {
     selectizeInput(inputId = "colsContrast", 
                    label = "Columns to use",
                    multiple = FALSE,
-                   choices = names(global$data),
-                   selected = names(global$data)[1],
-                   options = list(maxItems = 3))
-  })
-  
-  # Sliders input for threshold
-  output$contrastThreshold <- renderUI({
-    req(!is.null(global$data))
-    req(!is.null(input$colsContrast))
-    nbCols <- length(input$colsContrast)
-    lapply(1:nbCols, function(i) {
-      sliderInput(inputId = paste0("threshold", i), label = paste("Threshold for column ", input$colsContrast[[i]]),
-                  min = min(global$data[input$colsContrast[[i]]]), max = max(global$data[input$colsContrast[[i]]]), value = mean(global$data[input$colsContrast[[i]]]))
-    })
+                   choices = c("None", names(global$data)),
+                   selected = "None",
+                   options = list(maxItems = 1))
   })
   
   # Reactive values with thresholds
   thresholds <- reactive({
-    nbCols <- length(input$colsContrast)
-    thresholds <- sapply(1:nbCols, function(i) {
-      as.numeric(input[[paste0("threshold", i)]]) })
+    as.numeric(input[[paste0("threshold", input$colsContrast)]]) 
   }) 
   
+
+# Sliders input for threshold
+  output$contrastThreshold <- renderUI({
+    req(!is.null(global$data))
+    req(!is.null(input$colsContrast))
+    if (input$colsContrast != "None") {
+      tagList(
+      sliderInput(inputId = paste0("threshold", input$colsContrast), label = paste("Threshold for column ", input$colsContrast),
+                  min = min(global$data[input$colsContrast]), max = max(global$data[input$colsContrast]), value = mean(global$data[input$colsContrast])),
+      actionLink("validateThreshold", "Validate threshold"))
+    }
+  })
+  
+  observeEvent ( eventExpr = {
+    input$validateThreshold
+  }, handlerExpr = {
+    req(length(input$colsContrast) == 1)
+    req(length(thresholds())==1)
+    for (i in global$colors$ID) {
+      if (global$data[input$colsContrast][global$data$ID==i,] >= thresholds()) {
+        global$colors$shape[global$colors$ID==i] <- "Superior or equal"
+      }
+      else {
+        global$colors$shape[global$colors$ID==i] <- "Inferior"
+      }
+    }
+  })
   ## Global colors
   # Datas to plot if no Filtering 
   observeEvent(
@@ -981,7 +968,6 @@ server <- function(input, output, session) {
   ## Scatter plot
   observeEvent(eventExpr= {global$colors
     input$colorType
-    input$localContrast
     input$colsContrast
     input$contrastThreshold
   },
@@ -989,15 +975,15 @@ server <- function(input, output, session) {
     output$plot_rois1 <- renderPlotly({
       req(!is.null(global$data))
       req(!is.null(global$colors))
-      if (input$localContrast==FALSE) { # No shape attribute
+      if (input$colsContrast=="None") { # No shape attribute
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
           layout(dragmode = "select") %>%
           event_register("plotly_selected") %>%
           layout(
-            xaxis = list(range = c(0, 300)),
-            yaxis = list(range = c(0, 300)),
+            xaxis = list(title= colsX1(),range = c(0, 300)),
+            yaxis = list(title= colsY1(),range = c(0, 300)),
             shapes = list(list(
               type = "line", 
               line = list(color = "black",dash = "dash"),
@@ -1014,7 +1000,7 @@ server <- function(input, output, session) {
           ) %>%
           config(edits = list(shapePosition = TRUE))
       }
-      else if (input$localContrast==TRUE & "shape" %in% names(global$colors)) { # Modification of the shape of the points
+      else if (input$colsContrast != "None" & "shape" %in% names(global$colors)) { # Modification of the shape of the points
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
