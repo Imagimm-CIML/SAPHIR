@@ -113,18 +113,15 @@ ui <- dashboardPage(
                 column( width =6,
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                             title = "Parameters - Filtering ROIs",
+                             title = "Parameters - Filtering",
                              helpText("Select the variables you want to plot."),
-                             radioButtons("plotType", "Type of plot", choices=c("Histogram", "Scatterplot"), selected="Histogram", inline=TRUE),
+                             radioButtons("plotType", "Number of parameters to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
                              uiOutput("variablesHisto"),
-                             uiOutput("variablesScatter")
-                        ),
-                        box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
-                             title="Filtering ROIs",
+                             uiOutput("variablesScatter"),
                              radioButtons("filterType", "Type of selection", choices=c("Free selection", "Select all"), selected="Free selection"),
                              helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
                              plotlyOutput("selectVar")
-                        ), 
+                        ),
                         box( width = NULL,
                              title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
                              helpText("Select the columns to use for the scatter plot."),
@@ -149,36 +146,18 @@ ui <- dashboardPage(
                              radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Multiple selection","Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection"),
                              uiOutput("changeSpecificFrame")
                         ),
-                        tabsetPanel (id="infosGroup", selected="Subgroups",
-                                     tabPanel("Subgroups",
-                                              tags$br(),
-                                              downloadLink("downloadData", "Download Groups subtables"),
-                                              tags$br(),
-                                              downloadLink("downloadSummaryData", "Download summary of groups subtables"),
-                                              tags$br(),
-                                              tags$br(),
-                                              verbatimTextOutput("groups")
-                                     ),
-                                     tabPanel("Selected", 
-                                              tags$br(),
-                                              verbatimTextOutput("rois_plot1"),
-                                              downloadLink("downloadSubdata", "Download selected ROIs subtable"),
-                                              tags$br(),
-                                              downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
-                                              tableOutput("rois_plot_table1")
-                                     )
-                                     
-                        ) 
                 ),
                 # Second box : Image displayer
                 column (width=6,
                         box( width=NULL, 
-                             title = "Image display", solidHeader= TRUE, status = "primary",
+                             title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
                              helpText("Legends of the channels : "),
                              tableOutput("legend1"),
                              helpText("Legends of the colors : "), 
-                             tableOutput("colorLegend"),
-                             tags$hr(),
+                             tableOutput("colorLegend")
+                        ),
+                        box( width=NULL, 
+                             title = "Image display", solidHeader= TRUE, status = "primary",
                              checkboxInput("ids", "Display IDs"),
                              checkboxInput("ring", "Display ring ROI"),
                              uiOutput("ringSlider"),
@@ -198,7 +177,31 @@ ui <- dashboardPage(
                              )
                         )
                 )
+              ),
+              fluidRow( 
+                box ( width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
+                  tabsetPanel (id="infosGroup", selected="Global",
+                               tabPanel("Global",
+                                        tags$br(),
+                                        downloadLink("downloadData", "Download Groups subtables"),
+                                        tags$br(),
+                                        downloadLink("downloadSummaryData", "Download summary of groups subtables"),
+                                        tags$br(),
+                                        tags$br(),
+                                        verbatimTextOutput("groups")
+                               ),
+                               tabPanel("Selected", 
+                                        tags$br(),
+                                        verbatimTextOutput("rois_plot1"),
+                                        downloadLink("downloadSubdata", "Download selected ROIs subtable"),
+                                        tags$br(),
+                                        downloadLink("downloadSummarySubdata", "Download summary of selected ROIs subtable"),
+                                        tableOutput("rois_plot_table1")
+                               )
+                               
+                  )
               )
+            )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -528,14 +531,14 @@ server <- function(input, output, session) {
         global$nChan <- dim(global$img)[3] # Number of channel on the image
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
           global$img[[i]] <- as_EBImage(global$img[[i]])
-          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[1]/2)
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
         }
         global$nChan <- dim(global$img[[1]])[3] 
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
@@ -546,7 +549,7 @@ server <- function(input, output, session) {
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
         global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else {
@@ -575,7 +578,7 @@ server <- function(input, output, session) {
         global$img <- read_tif(global$imgPath) # Image menu plot to image
         global$nChan <- dim(global$img)[3] # Number of channel on the image
         global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
@@ -583,7 +586,7 @@ server <- function(input, output, session) {
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
           global$img[[i]] <- as_EBImage(global$img[[i]])
-          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[1]/2)
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
         }
         global$nChan <- dim(global$img[[1]])[3] 
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
@@ -594,7 +597,7 @@ server <- function(input, output, session) {
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
         global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[1]/2)
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
       else {
@@ -650,7 +653,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$plotType, handlerExpr= {
     output$variablesScatter <- renderUI({
       req(!is.null(global$data))
-      if (input$plotType=="Scatterplot") {
+      if (input$plotType=="Two") {
         selectizeInput(inputId = "variablesScatter",
                        label = "Column to plot in Y",
                        multiple = TRUE,
@@ -664,14 +667,14 @@ server <- function(input, output, session) {
   output$selectVar <- renderPlotly({
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
-    if (input$plotType == "Histogram") {
+    if (input$plotType == "One") {
       gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
         event_register("plotly_selected")
     }
-    else if (input$plotType == "Scatterplot") {
+    else if (input$plotType == "Two") {
       req(!is.null(input$variablesScatter))
       gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto, y=input$variablesScatter, customdata="ID"))
       v <- ggplotly(gg, source="v")
@@ -687,7 +690,7 @@ server <- function(input, output, session) {
     req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
     if (input$filterType == "Free selection") {
-      if (input$plotType == "Histogram") {
+      if (input$plotType == "One") {
         d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
         if (!is.null(event_data("plotly_selected", source="v")$x)) {
           min <- event_data("plotly_selected", source="v")$x[1]-d/2 
@@ -1270,7 +1273,9 @@ server <- function(input, output, session) {
   # Update tabset panel : go to panel "Selected" instead of groups when there is a selection
   observeEvent(eventExpr={rois_plot1()}, 
                handlerExpr= {
-                 updateTabsetPanel(session, "infosGroup", selected="Selected")
+                 if (length(rois_plot1())>0) {
+                   updateTabsetPanel(session, "infosGroup", selected="Selected")
+                 }
                })
   
   # Reactive variable : infos on points selected on the plot (infos from global$data)
