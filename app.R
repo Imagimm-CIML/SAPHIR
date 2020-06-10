@@ -242,15 +242,14 @@ ui <- dashboardPage(
                         ),
                         box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Select ROIs",
-                             radioButtons("filterTypeAnnot", "Type of selection", choices=c("Select ROI(s) within a plot", "Select ROI(s) with their ID" ,"Select all"), selected="Select all"),
+                             uiOutput("filterTypeAnnot"),
                              uiOutput("annotTypeSelID"),
                              uiOutput("annotSelID"),
                              uiOutput("useVariableAnnot"), 
                              uiOutput("plotTypeAnnot"),
                              uiOutput("variablesHistoAnnot"),
                              uiOutput("variablesScatterAnnot"),
-                             helpText("Select the ROIs (click or brush) to annotate."),
-                             plotlyOutput("selectRoisAnnot"),
+                             uiOutput("selectRoisAnnotUI"),
                              uiOutput("annotate"),
                              tags$br(),
                              verbatimTextOutput("roisAnnot")
@@ -1862,14 +1861,20 @@ server <- function(input, output, session) {
                    choices = names(global$data),
                    options = list(maxItems = 1))
   })
+  output$filterTypeAnnot <- renderUI({
+    req(!is.null(input$variableAnnot))
+    radioButtons("filterTypeAnnot", "Type of selection", choices=c("Select ROI(s) within a plot", "Select ROI(s) with their ID" ,"Select all"))
+  })
   
   output$useVariableAnnot <- renderUI ({
+    req(!is.null(input$filterTypeAnnot))
     if (input$filterTypeAnnot == "Select ROI(s) within a plot") {
       checkboxInput("useVariableAnnot", "Use the variable to annotate for the plot", TRUE)
     }
   })
   
   output$plotTypeAnnot <- renderUI ({
+    req(!is.null(input$filterTypeAnnot))
     req(!is.null(input$useVariableAnnot))
     if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE) {
       radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE)
@@ -1881,6 +1886,7 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$plotTypeAnnot))
     req(!is.null(input$useVariableAnnot))
+    req(!is.null(input$filterTypeAnnot))
     if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE) {
       selectizeInput(inputId = "variablesHistoAnnot",
                      label = "Column to plot in X",
@@ -1895,6 +1901,7 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$plotTypeAnnot))
     req(!is.null(input$useVariableAnnot))
+    req(!is.null(input$filterTypeAnnot))
     if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE & input$plotTypeAnnot=="Scatterplot") {
       selectizeInput(inputId = "variablesScatterAnnot",
                      label = "Column to plot in Y",
@@ -1904,11 +1911,16 @@ server <- function(input, output, session) {
     }
   })
 
+  output$selectRoisAnnotUI <- renderUI ({
+    req(!is.null(input$filterTypeAnnot))
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot") {
+      plotlyOutput("selectRoisAnnot")
+    }
+  })
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectRoisAnnot <- renderPlotly({
     req(!is.null(global$data))
-    req(input$filterTypeAnnot == "Select ROI(s) within a plot")
     req(!is.null(input$useVariableAnnot))
     if (input$useVariableAnnot == "TRUE") {
       req(!is.null(input$variableAnnot))
@@ -1959,14 +1971,16 @@ server <- function(input, output, session) {
   
   # Choice of ROIs ID 
   output$annotTypeSelID <- renderUI ({
+    req(!is.null(input$filterTypeAnnot))
     if (input$filterTypeAnnot == "Select ROI(s) with their ID" & (!is.null(input$variablesHistoAnnot) | !is.null(input$variableAnnot))) {
       radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one or more ID(s)", "Select ID n -> m"))
     }
   })
 
    output$annotSelID <- renderUI({
+     req(!is.null(input$filterTypeAnnot))
+     req(!is.null(input$annotTypeSelID))
      req(input$filterTypeAnnot == "Select ROI(s) with their ID")
-     req(input$annotTypeSelID)
      if (input$annotTypeSelID == "Select one or more ID(s)") {
        tagList(selectizeInput("annotSelectIDs", "Select the ID to use", choices=global$data$ID, multiple=TRUE),
                actionLink("annotValidateID", "Validate IDs"))
@@ -1994,6 +2008,7 @@ server <- function(input, output, session) {
   rois_toAnnotate <- reactive({
     req(!is.null(global$data))
     req(!is.null(input$useVariableAnnot))
+    req(!is.null(input$filterTypeAnnot))
     # If histogram : select ROIs having values selected
     if (input$filterTypeAnnot == "Select ROI(s) within a plot") {
       if (input$useVariableAnnot == TRUE ) {
