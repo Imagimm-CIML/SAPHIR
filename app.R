@@ -127,24 +127,25 @@ ui <- dashboardPage(
                              helpText("Select the columns to use for the scatter plot."),
                              uiOutput("colsX1"),
                              uiOutput("colsY1"),
-                             uiOutput("colsContrast"),
-                             uiOutput("contrastThreshold")
+                             uiOutput("colShape"),
+                             uiOutput("shapeThreshold")
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
                              withSpinner(
                                plotlyOutput("plot_rois1")),
-                             uiOutput("nextSelReset"),
+                             uiOutput("nextSel"),
                              uiOutput("resetAllSel"),
                              helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
                              checkboxInput("associated", "Associate with slice", value=TRUE),
                              uiOutput("colorType"),
-                             uiOutput("colorSelection"),
                              useShinyjs(),
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
-                             radioButtons("selectionType", "Type of selection", choices=c("Free selection", "Multiple selection","Select all", "Select all ROIs of a specific frame", "Select none"), selected="Free selection"),
-                             uiOutput("changeSpecificFrame")
+                             radioButtons("selectionType", "Type of selection",
+                                          choices=c("Select none","Free selection", "Multiple selection", "Select all ROIs of a specific frame","Select all"),
+                                          selected="Free selection"),
+                             uiOutput("specificFrame")
                         ),
                 ),
                 # Second box : Image displayer
@@ -165,6 +166,7 @@ ui <- dashboardPage(
                                EBImage::displayOutput("zoomImg")
                              ),
                              checkboxInput("overlay", "Overlay channels (up to 3)"),
+                             uiOutput("channelOverlay"),
                              uiOutput("channel1"),
                              uiOutput("frame1"),
                              checkboxInput("contrastImg", "Enhance contrast in image")
@@ -749,31 +751,10 @@ server <- function(input, output, session) {
   })
   
   ## Local contrast or other variables to change shape of the points 
-  # Modification of the "shape" column depending on the thresholds
-  observeEvent(
-    eventExpr = {
-      input$apply
-    },
-    handlerExpr = {
-      req(length(input$colsContrast) >= 1)
-      req(length(thresholds())==length(input$colsContrast))
-      for (i in global$colors$ID) {
-        comparisons <- c()
-        for (j in 1:length(input$colsContrast)) {
-          comparisons <- c(comparisons, (global$data[input$colsContrast[[j]]][global$data$ID==i,] >= thresholds()[j]))
-        }
-        if (sum(comparisons) == 1) {
-          trueCol <- which(comparisons==TRUE)
-          global$colors$shape[global$colors$ID==i] <- paste("Cell type ", trueCol)
-        }
-      }
-      removeModal(session = getDefaultReactiveDomain())
-    })
-  
   # UI Output for the names of the columns used for local contrast
-  output$colsContrast <- renderUI({
+  output$colShape <- renderUI({
     req(!is.null(global$data))
-    selectizeInput(inputId = "colsContrast", 
+    selectizeInput(inputId = "colShape", 
                    label = "Columns to use",
                    multiple = FALSE,
                    choices = c("None", names(global$data)),
@@ -783,18 +764,18 @@ server <- function(input, output, session) {
   
   # Reactive values with thresholds
   thresholds <- reactive({
-    as.numeric(input[[paste0("threshold", input$colsContrast)]]) 
+    as.numeric(input[[paste0("threshold", input$colShape)]]) 
   }) 
   
 
 # Sliders input for threshold
-  output$contrastThreshold <- renderUI({
+  output$shapeThreshold <- renderUI({
     req(!is.null(global$data))
-    req(!is.null(input$colsContrast))
-    if (input$colsContrast != "None") {
+    req(!is.null(input$colShape))
+    if (input$colShape != "None") {
       tagList(
-      sliderInput(inputId = paste0("threshold", input$colsContrast), label = paste("Threshold for column ", input$colsContrast),
-                  min = min(global$data[input$colsContrast]), max = max(global$data[input$colsContrast]), value = mean(global$data[input$colsContrast])),
+      sliderInput(inputId = paste0("threshold", input$colShape), label = paste("Threshold for column ", input$colShape),
+                  min = min(global$data[input$colShape]), max = max(global$data[input$colShape]), value = mean(global$data[input$colShape])),
       actionLink("validateThreshold", "Validate threshold"))
     }
   })
@@ -802,10 +783,10 @@ server <- function(input, output, session) {
   observeEvent ( eventExpr = {
     input$validateThreshold
   }, handlerExpr = {
-    req(length(input$colsContrast) == 1)
+    req(length(input$colShape) == 1)
     req(length(thresholds())==1)
     for (i in global$colors$ID) {
-      if (global$data[input$colsContrast][global$data$ID==i,] >= thresholds()) {
+      if (global$data[input$colShape][global$data$ID==i,] >= thresholds()) {
         global$colors$shape[global$colors$ID==i] <- "Superior or equal"
       }
       else {
@@ -825,7 +806,7 @@ server <- function(input, output, session) {
       if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1()))) {
         # Dataframe which will contain datas to plot depending on cols selected 
         global$colors <- data.frame(global$data$ID)
-        global$colors$color <- 1
+        global$colors$color <- "R0"
         colnames(global$colors) <- c("ID","color")
         global$colors$shape <- "Neg"
         global$colors[colsX1()] <- global$data[colsX1()]
@@ -847,7 +828,7 @@ server <- function(input, output, session) {
         if ((!is.null(global$data)) & (!is.null(colsX1())) & (!is.null(colsY1())) & (!is.null(rois_toPlot()$ID))) {
           # Dataframe which will contain datas to plot depending on cols selected 
           global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
-          global$colors$color <- 1
+          global$colors$color <- "R0"
           colnames(global$colors) <- c("ID","color")
           global$colors$shape <- "Neg"
           global$colors[colsX1()] <- global$data[colsX1()][global$data$ID %in% rois_toPlot()$ID,]
@@ -872,39 +853,39 @@ server <- function(input, output, session) {
     if (is.null(input$colorType) | input$selectionType!="Multiple selection") {
       for (i in c(1:nrow(global$colors))) {
         if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-          global$colors$color[i] <- "LLgroup"
+          global$colors$color[i] <- "R1"
         }
         else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-          global$colors$color[i] <- "URgroup"
+          global$colors$color[i] <- "R4"
         }
         else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-          global$colors$color[i] <- "ULgroup"
+          global$colors$color[i] <- "R2"
         }
         else {
-          global$colors$color[i] <- "LRgroup"
+          global$colors$color[i] <- "R3"
         }
       }
     }
-    else {
+    else if (!is.null(input$colorType) & input$selectionType=="Multiple selection") {
       if (input$colorType==FALSE) {
         for (i in c(1:nrow(global$colors))) {
           if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-            global$colors$color[i] <- "LLgroup"
+            global$colors$color[i] <- "R1"
           }
           else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-            global$colors$color[i] <- "URgroup"
+            global$colors$color[i] <- "R4"
           }
           else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-            global$colors$color[i] <- "ULgroup"
+            global$colors$color[i] <- "R2"
           }
           else {
-            global$colors$color[i] <- "LRgroup"
+            global$colors$color[i] <- "R3"
           }
         }
       }
       else {
-        if (!2 %in% unique(global$colors$color) & !any(c("Red","Blue","Green","Orange","Pink") %in% (global$colors$color))) {
-          global$colors$color <- 1
+        if (!"R1_multiselect" %in% unique(global$colors$color)) {
+          global$colors$color <- "R0"
         }
       }
     }
@@ -919,11 +900,11 @@ server <- function(input, output, session) {
     content = function(file){
       tmpdir <- tempdir()
       setwd(tempdir())
-      fls <- c("ULGroup.csv", "URGroup.csv", "LLGroup.csv", "LRGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="ULgroup"],], "ULGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="URgroup"],], "URGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LLgroup"],], "LLGroup.csv")
-      write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LRgroup"],], "LRGroup.csv")
+      groups <- unique(global$colors$color)
+      fls <- paste0("group",groups, ".csv")
+      for (i in groups) {
+        write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],], paste0("group",i, ".csv"))
+      }
       zip::zipr(zipfile = file,fls)
       if (file.exists (paste0 (file," .zip "))) {file.rename (paste0 (file," .zip "), file)}
     }, contentType = "application/zip"
@@ -936,11 +917,11 @@ server <- function(input, output, session) {
     content = function(file) {
       tmpdir <- tempdir()
       setwd(tempdir())
-      fls <- c("ULGroup_summary.csv", "URGroup_summary.csv", "LLGroup_summary.csv", "LRGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="ULgroup"],]), "ULGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="URgroup"],]), "URGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LLgroup"],]), "LLGroup_summary.csv")
-      write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color=="LRgroup"],]), "LRGroup_summary.csv")
+      groups <- unique(global$colors$color)
+      fls <- paste0("summary_group",groups, ".csv")
+      lapply(groups, function(i) {
+        write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],]), paste0("summary_group",i, ".csv"))
+      })
       zip::zipr(zipfile = file,fls)
       if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
     }, contentType = "application/zip")
@@ -951,10 +932,10 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     groups <- c()
     for (i in unique(global$colors$color)) {
-      nCell <- str_c(i, length(global$colors$ID[global$colors$color==i]), sep=" : ")
+      nCell <- paste("Number of ROIs in ",i, " : ",length(global$colors$ID[global$colors$color==i]), ", ", round(100*(length(global$colors$ID[global$colors$color==i])/nrow(global$data)), 2), " percent of the cells")
       groups <- c(nCell, groups)
     }
-    paste("Number of ROIs in ", groups, "\n")
+    paste(groups, "\n", sep="")
   })
   
   output$summary <- renderPrint ({
@@ -968,14 +949,14 @@ server <- function(input, output, session) {
   ## Scatter plot
   observeEvent(eventExpr= {global$colors
     input$colorType
-    input$colsContrast
-    input$contrastThreshold
+    input$colShape
+    input$shapeThreshold
   },
   handlerExpr= {
     output$plot_rois1 <- renderPlotly({
       req(!is.null(global$data))
       req(!is.null(global$colors))
-      if (input$colsContrast=="None") { # No shape attribute
+      if (input$colShape=="None") { # No shape attribute
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
@@ -1000,7 +981,7 @@ server <- function(input, output, session) {
           ) %>%
           config(edits = list(shapePosition = TRUE))
       }
-      else if (input$colsContrast != "None" & "shape" %in% names(global$colors)) { # Modification of the shape of the points
+      else if (input$colShape != "None" & "shape" %in% names(global$colors)) { # Modification of the shape of the points
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
@@ -1063,41 +1044,12 @@ server <- function(input, output, session) {
     }
   })
   
-  # Modal dialog to select specific frame if wanted
-  observeEvent(eventExpr={
-    input$selectionType
-  },
-  handlerExpr={
+  output$specificFrame <- renderUI ({
     if (input$selectionType=="Select all ROIs of a specific frame" & global$nFrame > 1) {
-      showModal(modalDialog(
-        title = "Specific frame",
-        numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1),
-        easyClose = TRUE
-      ))
+      numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1)
     }
   })
-  
-  # UI Output -> change specific frame if one chosen
-  output$changeSpecificFrame <- renderUI({
-    if (input$selectionType=="Select all ROIs of a specific frame" & !is.null(input$specificFrame)) {
-      actionLink("changeSpecificFrame", "Modify specific frame chosen")
-    }
-  })
-  
-  # Observe event -> if change specific frame clicked : modal dialog to change this frame
-  observeEvent(eventExpr={
-    input$changeSpecificFrame
-  },
-  handlerExpr={
-    if (input$selectionType=="Select all ROIs of a specific frame" & global$nFrame > 1) {
-      showModal(modalDialog(
-        title = "Specific frame",
-        numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1),
-        easyClose = TRUE
-      ))
-    }
-  })
-  
+
   # Render UI -> if multiple selection, choose to associate color with selection or with plot lines
   output$colorType <- renderUI({
     if (input$selectionType=="Multiple selection") {
@@ -1106,28 +1058,28 @@ server <- function(input, output, session) {
   })
 
   # Global values for multiple selection
-  multiSelect <- reactiveValues(indiv = c(), total=c(), indice=1)
+  multiSelect <- reactiveValues(indiv = c(), total=c(), indice=0)
   
   # Render UI Validate selection + reset all selections 
   observeEvent(eventExpr= {
     input$selectionType
-    input$colorType
     selectionRois()},
     handlerExpr={
       if (input$selectionType=="Multiple selection" & length(selectionRois())>0 & length(unique(global$colors$color))<5) {
         multiSelect$indiv <- selectionRois()
         multiSelect$indiv <- global$data$ID[global$data$ID %in% multiSelect$indiv]
-        output$nextSelReset <- renderUI ({
-          if (input$selectionType=="Multiple selection" & length(unique(global$colors$color))<5) {
-            tagList(
-              helpText("Select your gate and click on the button to select an other gate."),
-              actionButton("nextSel", "Validate selection"),
-              tags$br()
-            )
-          }
-        })
       }
     })
+  
+  output$nextSel <- renderUI ({
+    if (input$selectionType=="Multiple selection" & length(selectionRois())>0  & length(unique(global$colors$color))<5) {
+      tagList(
+        helpText("Select your gate and click on the button to select an other gate."),
+        actionButton("nextSel", "Validate selection"),
+        tags$br()
+      )
+    }
+  })
   
   output$resetAllSel <- renderUI({
     if (input$selectionType=="Multiple selection") {
@@ -1139,14 +1091,16 @@ server <- function(input, output, session) {
   observeEvent(eventExpr={
     input$nextSel},
     handlerExpr={
-      multiSelect$indice <- multiSelect$indice + 1
-      if (!is.null(input$colorType) & input$colorType==TRUE) {
-        for (i in unique(multiSelect$indiv)) {
-          global$colors$color[global$colors$ID == i] <- multiSelect$indice
+      if (multiSelect$indice < 4) {
+        multiSelect$indice <- multiSelect$indice + 1
+        if (!is.null(input$colorType) & input$colorType==TRUE) {
+          for (i in unique(multiSelect$indiv)) {
+            global$colors$color[global$colors$ID == i] <- paste0("R", multiSelect$indice,"_multiselect")
+          }
         }
+        multiSelect$total <- c(multiSelect$total, multiSelect$indiv)
+        multiSelect$indiv <- c()
       }
-      multiSelect$total <- c(multiSelect$total, multiSelect$indiv)
-      multiSelect$indiv <- c()
     })
   
   # Remove all selections 
@@ -1160,9 +1114,9 @@ server <- function(input, output, session) {
       if ((input$selectionType=="Multiple selection") & (!is.null(input$colorType))) {
         multiSelect$indiv <- c()
         multiSelect$total <- c()
-        multiSelect$indice <- 1
+        multiSelect$indice <- 0
         if (input$colorType == TRUE) {
-          global$colors$color <- 1
+          global$colors$color <- "R0"
         }
       }
     })
@@ -1173,54 +1127,6 @@ server <- function(input, output, session) {
                  js$resetSelect()
                  js$resetClick()
                })
-  
-  # Colors of the selections 
-  # Button to change colors of groups
-  output$colorSelection <- renderUI ({
-    if (input$selectionType=="Multiple selection" & length(multiSelect$total)!=0) {
-      actionLink("colorSelection", "Change colors of groups") 
-    }
-  })
-  
-  # Modal dialog to choose new color of groups
-  observeEvent(input$colorSelection, {
-    showModal(modalDialog(
-      title = "Colors of the group",
-      uiOutput("colorButtons"),
-      footer=tagList(
-        modalButton("Cancel"),
-        actionButton("colorApply", "Apply"))
-    ))
-    removeUI(
-      selector = "#nextSelReset"
-    )
-  })
-  
-  # Change the color of the groups if apply button pushed
-  observeEvent(input$colorApply, {
-    req(!is.null(global$colors))
-    for (j in unique(global$colors$color)) {
-      global$colors$newColor[global$colors$color==j] <- colorSels()[which(unique(global$colors$color)==j)]
-    }
-    global$colors$color <- global$colors$newColor
-    removeModal(session = getDefaultReactiveDomain())
-  })
-  
-  # Vector containing the new colors of the groups
-  colorSels <- reactive({
-    nbGroups <- unique(global$colors$color)
-    colorSels <- sapply(nbGroups, function(i) {
-      input[[paste0("colorSel", i)]] })
-  }) 
-  
-  # Radiobuttons in modal dialog to choose colors of the groups
-  output$colorButtons <- renderUI({
-    req(!is.null(global$colors))
-    nbGroups <- unique(global$colors$color)
-    lapply(nbGroups, function(i) {
-      radioButtons(inputId = paste0("colorSel", i), label = paste("Color for group ", i),choices=c("Red", "Blue", "Green", "Pink", "Orange"), inline=TRUE)
-    })
-  })
   
   # ROI selected on the plot
   rois_plot1 <- eventReactive(eventExpr = {input$selectionType
@@ -1310,32 +1216,22 @@ server <- function(input, output, session) {
   
   # Table with color legend channel 
   output$colorLegend <- renderTable({
-    tableColor <- data.frame("Lower left" = "Red", "Lower right"= "Green", "Upper left"="Dark blue", "Upper right"= "Pink")
-    colnames(tableColor) <- c("Lower left", "Lower right", "Upper left", "Upper right")
+    tableColor <- data.frame("R1" = "Red", "R2"="Dark blue", "R3"= "Green", "R4"= "Pink")
+    colnames(tableColor) <- c("R1", "R2", "R3", "R4")
     tableColor
   })
   
   # Overlay channels 
-  observeEvent(eventExpr = input$overlay,
-               handlerExpr = {
-                 if (input$overlay==TRUE) { # Show modal dialog when clicked on overlay checkbox
-                   showModal(modalDialog(
-                     title = "Channel to overlay",
-                     uiOutput("channelOverlay"),
-                     footer=tagList(
-                       modalButton("Cancel"),
-                       actionButton("overlayApply", "Apply"))
-                   ))
-                 }
-               })
-  
   output$channelOverlay <- renderUI ({
     req(global$nChan)
-    tagList(
-      radioButtons("redOverlay", "First channel to overlay (in RED)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
-      radioButtons("greenOverlay", "Second channel to overlay (in GREEN)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
-      radioButtons("blueOverlay", "Third channel to overlay (in BLUE)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
-    )
+    if (input$overlay==TRUE) {
+      tagList(
+        radioButtons("redOverlay", "First channel to overlay (in RED)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+        radioButtons("greenOverlay", "Second channel to overlay (in GREEN)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+        radioButtons("blueOverlay", "Third channel to overlay (in BLUE)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+        actionButton("overlayApply", "Apply")
+      )
+    }
   })
   
   overlays <- reactiveValues(red=NULL, green=NULL, blue=NULL, redChan=NULL, blueChan=NULL, greenChan=NULL, imgOverlay=NULL)
@@ -1399,11 +1295,6 @@ server <- function(input, output, session) {
         }
       }
     })
-  
-  observeEvent(eventExpr = input$overlayApply,
-               handlerExpr = {
-                 removeModal(session=getDefaultReactiveDomain())
-               })
   
   observeEvent(eventExpr = {
     input$overlay
@@ -1545,7 +1436,7 @@ server <- function(input, output, session) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$colors$ID==i] 
           # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
-          col <- switch (col, "2"=2, "LLgroup"=2,"LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
+          col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
             lines(global$zipcoords[[i]], col=col) # Plot this ROI 
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
@@ -1566,7 +1457,7 @@ server <- function(input, output, session) {
             }
             else { # If color of the ROI not determined by the different selections but by the lines on the plot
               col <- global$colors$color[global$colors$ID==i]
-              col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
+              col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
               lines(global$zipcoords[[i]], col=col)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                 lines(ring$ringCoords[[i]], col=col)
@@ -1581,7 +1472,7 @@ server <- function(input, output, session) {
       if (length(rois_plot1())>0) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$colors$ID==i]
-          col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
+          col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           lines(global$zipcoords[[i]], col=col)
           if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
             lines(ring$ringCoords[[i]], col=col)
@@ -1598,7 +1489,7 @@ server <- function(input, output, session) {
           }
           else {
             col <- global$colors$color[global$colors$ID==i]
-            col <- switch (col, "2"=2, "LLgroup"=2, "LRgroup"=3,"ULgroup"=4, "5"=5, "URgroup"=6, "7"=7, "8"=8, "9"=9, "3"=3, "4"=4, "6"=6, "Red"="Red", "Blue"="Blue", "Green"="Green", "Pink"="Pink", "Orange"="Orange")
+            col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             lines(global$zipcoords[[i]], col=col)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
