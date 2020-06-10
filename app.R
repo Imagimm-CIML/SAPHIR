@@ -1,5 +1,6 @@
 # Installation of the necessary packages
-pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png")
+pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png")
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) {
   install.packages(new.pkg)
@@ -79,7 +80,8 @@ ui <- dashboardPage(
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Use files stored in the www directory",
-                     helpText("To use this button, you will need 3 files with predetermined names stored in a repertory \"www\" in your working directory. For prerequisites, click on the \"Prerequisites\" link."),
+                     helpText("To use this button, you will need 3 files with predetermined names stored in a repertory \"www\" in your working directory.
+                              For prerequisites, click on the \"Prerequisites\" link."),
                      actionLink("help", "Prerequisites"),
                      tags$br(),
                      actionButton("default", "Use default files")),
@@ -245,7 +247,8 @@ ui <- dashboardPage(
                         box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Select ROIs",
                              radioButtons("filterTypeAnnot", "Type of selection", choices=c("Free selection", "Select ROI(s) with their ID" ,"Select all"), selected="Free selection"),
-                             uiOutput("annotModifySelectID"),
+                             uiOutput("annotTypeSelID"),
+                             uiOutput("annotSelID"),
                              helpText("Select the ROIs (click or brush) to annotate."),
                              plotlyOutput("selectRoisAnnot"),
                              uiOutput("annotate"),
@@ -260,6 +263,7 @@ ui <- dashboardPage(
                              uiOutput("annotFrame"),
                              checkboxInput("annotAssociate", "Associate with slice", value=TRUE),
                              checkboxInput("annotOverlay", "Overlay channels (up to 3)"),
+                             uiOutput("annotChannelOverlay"),
                              withSpinner(EBImage::displayOutput("annotRoi")),
                              verbatimTextOutput("annotValue"),
                              tags$br(),
@@ -290,7 +294,8 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, zipcoords=list())
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, 
+                           imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, zipcoords=list())
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -521,7 +526,8 @@ server <- function(input, output, session) {
       "- legend.csv containing your legends result in csv format, with a TAB separator and a HEADER", tags$br(), 
       "- roiset.zip containing your ImageJ ROIs. ", tags$br(),
       "WARNING : If the names does not match, they are not going to be read.", tags$br(), 
-      "Store these files in a repository named www in your working directory and click on the button, you won't have to choose your files after, the files in the directory will be used.",
+      "Store these files in a repository named www in your working directory and click on the button, you won't have to choose your files after, 
+      the files in the directory will be used.",
       easyClose = TRUE
     ))
   })
@@ -671,7 +677,8 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
     if (input$plotType == "One") {
-      gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
+      gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + 
+        geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
@@ -750,7 +757,7 @@ server <- function(input, output, session) {
     input$colsY1
   })
   
-  ## Local contrast or other variables to change shape of the points 
+  ## Variables to change shape of the points 
   # UI Output for the names of the columns used for local contrast
   output$colShape <- renderUI({
     req(!is.null(global$data))
@@ -932,7 +939,8 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     groups <- c()
     for (i in unique(global$colors$color)) {
-      nCell <- paste("Number of ROIs in ",i, " : ",length(global$colors$ID[global$colors$color==i]), ", ", round(100*(length(global$colors$ID[global$colors$color==i])/nrow(global$data)), 2), " percent of the cells")
+      nCell <- paste("Number of ROIs in ",i, " : ",length(global$colors$ID[global$colors$color==i]), ", ", 
+                     round(100*(length(global$colors$ID[global$colors$color==i])/nrow(global$data)), 2), " percent of the cells")
       groups <- c(nCell, groups)
     }
     paste(groups, "\n", sep="")
@@ -957,7 +965,8 @@ server <- function(input, output, session) {
       req(!is.null(global$data))
       req(!is.null(global$colors))
       if (input$colShape=="None") { # No shape attribute
-        p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
+        p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], 
+                     text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
           layout(dragmode = "select") %>%
@@ -982,7 +991,8 @@ server <- function(input, output, session) {
           config(edits = list(shapePosition = TRUE))
       }
       else if (input$colShape != "None" & "shape" %in% names(global$colors)) { # Modification of the shape of the points
-        p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape, customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
+        p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape,
+                     customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
           layout(dragmode = "select") %>%
@@ -1229,7 +1239,8 @@ server <- function(input, output, session) {
         radioButtons("redOverlay", "First channel to overlay (in RED)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
         radioButtons("greenOverlay", "Second channel to overlay (in GREEN)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
         radioButtons("blueOverlay", "Third channel to overlay (in BLUE)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
-        actionButton("overlayApply", "Apply")
+        actionLink("overlayApply", "Apply"),
+        tags$br()
       )
     }
   })
@@ -1447,7 +1458,8 @@ server <- function(input, output, session) {
       }
       if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) { 
         # If multiple selection and not validated ROIs selected 
-        for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) { # multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total] represents ROIs selected which are not validated yet
+        for (i in multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total]) { # multiSelect$indiv[!multiSelect$indiv %in% multiSelect$total] 
+          # represents ROIs selected which are not validated yet
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If ROIs on the actual slice
             if (input$colorType==TRUE) { # If color of the ROI determined with the different selections
               lines(global$zipcoords[[i]], col="yellow") # Plot it in yellow
@@ -1816,7 +1828,9 @@ server <- function(input, output, session) {
     req(length(global$img) != 0)
     req(!is.null(global$data))
     req(length(global$zipcoords)>0)
-    ggplot(data=global$data[global$IDs,]) + geom_point(aes_string(x=input$colsX2, y=input$colsY2)) + labs(x=input$colsX2, y=input$colsY2) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
+    ggplot(data=global$data[global$IDs,]) + 
+      geom_point(aes_string(x=input$colsX2, y=input$colsY2)) + 
+      labs(x=input$colsX2, y=input$colsY2) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
   })
   
   # UI for choosing variables to display 
@@ -1881,7 +1895,8 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$variablesHistoAnnot))
     if (input$plotTypeAnnot == "Histogram") {
-      gg <- ggplot(data=global$data, aes_string(x=input$variablesHistoAnnot, customdata="ID")) + geom_histogram(binwidth=(max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20)
+      gg <- ggplot(data=global$data, aes_string(x=input$variablesHistoAnnot, customdata="ID")) + 
+        geom_histogram(binwidth=(max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20)
       v <- ggplotly(gg, source="a")
       v %>% 
         layout(dragmode = "select") %>%
@@ -1905,65 +1920,38 @@ server <- function(input, output, session) {
   })
   
   # Choice of ROIs ID 
-  observeEvent(eventExpr = {input$filterTypeAnnot
-    input$modifySelectID},
-               handlerExpr = {
-                 if (input$filterTypeAnnot == "Select ROI(s) with their ID" & (!is.null(input$variablesHistoAnnot) | !is.null(input$variableAnnot))) {
-                   showModal(modalDialog(
-                     title = "ROIs to annotate",
-                     radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one ID", "Select ID 1 -> n", "Select ID n -> m", "Select IDs")),
-                     uiOutput("annotSelID"),
-                     footer=tagList(
-                       modalButton("Cancel"),
-                       actionButton("annotValidateID", "Ok"))
-                   ))
-                 }
-               }, ignoreNULL=FALSE)
-  
-  output$annotModifySelectID <- renderUI ({
-    if (input$filterTypeAnnot == "Select ROI(s) with their ID" & !is.null(input$variablesHistoAnnot)) {
-      actionLink("modifySelectID", "Modify selected IDs") 
+  output$annotTypeSelID <- renderUI ({
+    if (input$filterTypeAnnot == "Select ROI(s) with their ID" & (!is.null(input$variablesHistoAnnot) | !is.null(input$variableAnnot))) {
+      radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one or more ID(s)", "Select ID n -> m"))
     }
   })
-  
-  observeEvent(eventExpr = input$annotTypeSelID,
-               handlerExpr = {
-                 if (!is.null(input$annotTypeSelID)) {
-                   output$annotSelID <- renderUI({
-                     if (input$annotTypeSelID == "Select one ID") {
-                       selectizeInput("annotSelectOneID", "Select the ID to use", choices=global$data$ID, multiple=FALSE)
-                     }
-                     else if (input$annotTypeSelID == "Select ID 1 -> n") {
-                       numericInput("annotSelect1nID", "Select the number of the last ID to use (1 -> n)", value=1, min=1, max=length(global$data$ID), step=1)
-                     }
-                     else if (input$annotTypeSelID == "Select ID n -> m") {
-                       tagList(
-                         numericInput("annotSelectnID", "Select the number of the first ID to use (n in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
-                         numericInput("annotSelectmID", "Select the number of the last ID to use (m in n -> m)", value=1, min=1, max=length(global$data$ID), step=1)
-                       )
-                     }
-                     else if (input$annotTypeSelID == "Select IDs") {
-                       selectizeInput("annotSelectIDs", "Select IDs to use", choices=global$data$ID, multiple=TRUE)
-                     }
-                   })
-                 }
-               })
+
+
+   output$annotSelID <- renderUI({
+     req(input$filterTypeAnnot == "Select ROI(s) with their ID")
+     req(input$annotTypeSelID)
+     if (input$annotTypeSelID == "Select one or more ID(s)") {
+       tagList(selectizeInput("annotSelectIDs", "Select the ID to use", choices=global$data$ID, multiple=TRUE),
+               actionLink("annotValidateID", "Validate IDs"))
+     }
+     else if (input$annotTypeSelID == "Select ID n -> m") {
+       tagList(
+         numericInput("annotSelectnID", "Select the number of the first ID to use (n in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
+         numericInput("annotSelectmID", "Select the number of the last ID to use (m in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
+         actionLink("annotValidateID", "Validate IDs")
+       )
+     }
+   })
+
   
   observeEvent(eventExpr=input$annotValidateID,
                handlerExpr={
-                 if (input$annotTypeSelID == "Select one ID" & length(input$annotSelectOneID)==1) {
-                   annote$ID <- input$annotSelectOneID
-                 }
-                 else if (input$annotTypeSelID == "Select ID 1 -> n" & !is.null(input$annotSelect1nID)) {
-                   annote$ID <- global$data$ID[global$data$ID %in% c(1:input$annotSelect1nID)]
+                 if (input$annotTypeSelID == "Select one or more ID(s)") {
+                   annote$ID <- input$annotSelectIDs
                  }
                  else if (input$annotTypeSelID == "Select ID n -> m") {
                    annote$ID <- global$data$ID[global$data$ID %in% c(input$annotSelectnID:input$annotSelectmID)]
                  }
-                 else if (input$annotTypeSelID == "Select IDs") {
-                   annote$ID <- input$annotSelectIDs
-                 }
-                 removeModal(session=getDefaultReactiveDomain())
                })
   
   # ROIs to annotate depending on selection 
@@ -2087,25 +2075,15 @@ server <- function(input, output, session) {
     })
   
   # Overlay channels 
-  observeEvent(eventExpr = input$annotOverlay,
-               handlerExpr = {
-                 if (input$annotOverlay==TRUE) {
-                   showModal(modalDialog(
-                     title = "Channel to overlay",
-                     uiOutput("annotChannelOverlay"),
-                     footer=tagList(
-                       modalButton("Cancel"),
-                       actionButton("annotOverlayApply", "Apply"))
-                   ))
-                 }
-               })
-  
   output$annotChannelOverlay <- renderUI ({
+    req(input$annotOverlay==TRUE)
     req(global$nChan)
     tagList(
       radioButtons("annotRedOverlay", "First channel to overlay (in RED)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
       radioButtons("annotGreenOverlay", "Second channel to overlay (in GREEN)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
       radioButtons("annotBlueOverlay", "Third channel to overlay (in BLUE)", choiceNames=c(c(1:global$nChan), "None"), choiceValues = c(c(1:global$nChan), "None"), inline=TRUE),
+      actionLink("annotOverlayApply", "Apply overlay"),
+      tags$br()
     )
   })
   
@@ -2171,10 +2149,6 @@ server <- function(input, output, session) {
       }
     })
   
-  observeEvent(eventExpr = input$annotOverlayApply,
-               handlerExpr = {
-                 removeModal(session=getDefaultReactiveDomain())
-               })
   
   observeEvent(eventExpr = {
     input$annotOverlay
