@@ -237,18 +237,18 @@ ui <- dashboardPage(
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
                              title = "Parameters - Select ROIs",
-                             helpText("Select the variables you want to plot and to annotate."),
-                             radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE),
-                             uiOutput("variablesHistoAnnot"),
-                             uiOutput("variablesScatterAnnot"),
-                             checkboxInput("columnToAnnot", "Annotate the plot variables", value=TRUE),
+                             helpText("Select the variable to annotate."),
                              uiOutput("choiceColumnToAnnot")
                         ),
                         box (width = NULL, solidHeader = TRUE, status="primary", collapsible=TRUE,
                              title="Select ROIs",
-                             radioButtons("filterTypeAnnot", "Type of selection", choices=c("Free selection", "Select ROI(s) with their ID" ,"Select all"), selected="Free selection"),
+                             radioButtons("filterTypeAnnot", "Type of selection", choices=c("Select ROI(s) within a plot", "Select ROI(s) with their ID" ,"Select all"), selected="Select all"),
                              uiOutput("annotTypeSelID"),
                              uiOutput("annotSelID"),
+                             uiOutput("useVariableAnnot"), 
+                             uiOutput("plotTypeAnnot"),
+                             uiOutput("variablesHistoAnnot"),
+                             uiOutput("variablesScatterAnnot"),
                              helpText("Select the ROIs (click or brush) to annotate."),
                              plotlyOutput("selectRoisAnnot"),
                              uiOutput("annotate"),
@@ -1854,35 +1854,50 @@ server <- function(input, output, session) {
   })
   
   ### MENU ANNOTATIONS 
-  # X variable
-  output$variablesHistoAnnot <- renderUI({
-    req(!is.null(global$data))
-    selectizeInput(inputId = "variablesHistoAnnot",
-                   label = "Column to plot in X",
+  # Choice of the columns to annotate
+  output$choiceColumnToAnnot <- renderUI ({
+    selectizeInput(inputId = "variableAnnot",
+                   label = "Variable to annotate",
                    multiple = TRUE,
                    choices = names(global$data),
                    options = list(maxItems = 1))
   })
   
-  # If scatter plot : Y variable 
-  observeEvent(eventExpr=input$plotTypeAnnot, handlerExpr= {
-    output$variablesScatterAnnot <- renderUI({
-      req(!is.null(global$data))
-      if (input$plotTypeAnnot=="Scatterplot") {
-        selectizeInput(inputId = "variablesScatterAnnot",
-                       label = "Column to plot in Y",
-                       multiple = TRUE,
-                       choices = names(global$data),
-                       options = list(maxItems = 1))
-      }
-    })
+  output$useVariableAnnot <- renderUI ({
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot") {
+      checkboxInput("useVariableAnnot", "Use the variable to annotate for the plot", TRUE)
+    }
   })
   
-  # If user wants to annotate an other column than the one plotted
-  output$choiceColumnToAnnot <- renderUI ({
-    if (input$columnToAnnot == FALSE) {
-      selectizeInput(inputId = "variableAnnot",
-                     label = "Variable to annotate",
+  output$plotTypeAnnot <- renderUI ({
+    req(!is.null(input$useVariableAnnot))
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE) {
+      radioButtons("plotTypeAnnot", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE)
+    }
+  })
+  
+  # X variable
+  output$variablesHistoAnnot <- renderUI({
+    req(!is.null(global$data))
+    req(!is.null(input$plotTypeAnnot))
+    req(!is.null(input$useVariableAnnot))
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE) {
+      selectizeInput(inputId = "variablesHistoAnnot",
+                     label = "Column to plot in X",
+                     multiple = TRUE,
+                     choices = names(global$data),
+                     options = list(maxItems = 1))
+    }
+  })
+  
+  # If scatter plot : Y variable 
+  output$variablesScatterAnnot <- renderUI({
+    req(!is.null(global$data))
+    req(!is.null(input$plotTypeAnnot))
+    req(!is.null(input$useVariableAnnot))
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot" & input$useVariableAnnot==FALSE & input$plotTypeAnnot=="Scatterplot") {
+      selectizeInput(inputId = "variablesScatterAnnot",
+                     label = "Column to plot in Y",
                      multiple = TRUE,
                      choices = names(global$data),
                      options = list(maxItems = 1))
@@ -1893,29 +1908,52 @@ server <- function(input, output, session) {
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectRoisAnnot <- renderPlotly({
     req(!is.null(global$data))
-    req(!is.null(input$variablesHistoAnnot))
-    if (input$plotTypeAnnot == "Histogram") {
-      gg <- ggplot(data=global$data, aes_string(x=input$variablesHistoAnnot, customdata="ID")) + 
-        geom_histogram(binwidth=(max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20)
-      v <- ggplotly(gg, source="a")
-      v %>% 
-        layout(dragmode = "select") %>%
-        event_register("plotly_selected")
+    req(input$filterTypeAnnot == "Select ROI(s) within a plot")
+    req(!is.null(input$useVariableAnnot))
+    if (input$useVariableAnnot == "TRUE") {
+      req(!is.null(input$variableAnnot))
+      if (class(global$data[input$variableAnnot][,1])=="numeric" | class(global$data[input$variableAnnot][,1])=="integer") {
+        gg <- ggplot(data=global$data, aes_string(x=input$variableAnnot, customdata="ID")) + 
+          geom_histogram(binwidth=(max(global$data[input$variableAnnot])-min(global$data[input$variableAnnot]))/20)
+        v <- ggplotly(gg, source="a")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
+      else {
+        gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$variableAnnot, customdata=input$variableAnnot))
+        v <- ggplotly(gg, source="a")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
     }
-    else if (input$plotTypeAnnot == "Scatterplot") {
-      req(!is.null(input$variablesScatterAnnot))
-      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHistoAnnot, y=input$variablesScatterAnnot, customdata="ID"))
-      v <- ggplotly(gg, source="a")
-      v %>% 
-        layout(dragmode = "select") %>%
-        event_register("plotly_selected")
-    }
-    else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
-      gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$variablesHistoAnnot, customdata=input$variablesHistoAnnot))
-      v <- ggplotly(gg, source="a")
-      v %>% 
-        layout(dragmode = "select") %>%
-        event_register("plotly_selected")
+    else {
+      req(!is.null(input$plotTypeAnnot))
+      req(!is.null(input$variablesHistoAnnot))
+      if (input$plotTypeAnnot == "Histogram") {
+        gg <- ggplot(data=global$data, aes_string(x=input$variablesHistoAnnot, customdata="ID")) + 
+          geom_histogram(binwidth=(max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20)
+        v <- ggplotly(gg, source="a")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
+      else if (input$plotTypeAnnot == "Scatterplot") {
+        req(!is.null(input$variablesScatterAnnot))
+        gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHistoAnnot, y=input$variablesScatterAnnot, customdata="ID"))
+        v <- ggplotly(gg, source="a")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
+      else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
+        gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$variablesHistoAnnot, customdata=input$variablesHistoAnnot))
+        v <- ggplotly(gg, source="a")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
     }
   })
   
@@ -1925,7 +1963,6 @@ server <- function(input, output, session) {
       radioButtons("annotTypeSelID", "Type of selection", choices=c("Select one or more ID(s)", "Select ID n -> m"))
     }
   })
-
 
    output$annotSelID <- renderUI({
      req(input$filterTypeAnnot == "Select ROI(s) with their ID")
@@ -1943,7 +1980,6 @@ server <- function(input, output, session) {
      }
    })
 
-  
   observeEvent(eventExpr=input$annotValidateID,
                handlerExpr={
                  if (input$annotTypeSelID == "Select one or more ID(s)") {
@@ -1957,38 +1993,66 @@ server <- function(input, output, session) {
   # ROIs to annotate depending on selection 
   rois_toAnnotate <- reactive({
     req(!is.null(global$data))
+    req(!is.null(input$useVariableAnnot))
     # If histogram : select ROIs having values selected
-    if (input$filterTypeAnnot == "Free selection") {
-      req(!is.null(input$variablesHistoAnnot))
-      if (input$plotTypeAnnot == "Histogram") {
-        d <- (max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20 # Size of the histogram bar : values corresponding to this bars
-        if (!is.null(event_data("plotly_selected", source="a")$x)) {
-          min <- event_data("plotly_selected", source="a")$x[1]-d/2 
-          max <- event_data("plotly_selected", source="a")$x[length(event_data("plotly_selected", source="a")$x)]+d/2
-          global$data[(global$data[input$variablesHistoAnnot] > min) & (global$data[input$variablesHistoAnnot] < max),]
+    if (input$filterTypeAnnot == "Select ROI(s) within a plot") {
+      if (input$useVariableAnnot == TRUE ) {
+        req(!is.null(input$variableAnnot))
+        if (class(global$data[input$variableAnnot][,1])=="numeric" | class(global$data[input$variableAnnot][,1])=="integer") {
+          d <- (max(global$data[input$variableAnnot])-min(global$data[input$variableAnnot]))/20 # Size of the histogram bar : values corresponding to this bars
+          if (!is.null(event_data("plotly_selected", source="a")$x)) {
+            min <- event_data("plotly_selected", source="a")$x[1]-d/2 
+            max <- event_data("plotly_selected", source="a")$x[length(event_data("plotly_selected", source="a")$x)]+d/2
+            global$data[(global$data[input$variableAnnot] > min) & (global$data[input$variableAnnot] < max),]
+          }
+          else if (!is.null(event_data("plotly_click", source="a")$x)) {
+            min <- (event_data("plotly_click", source="a")$x)-d/2
+            max <- (event_data("plotly_click", source="a")$x)+d/2
+            global$data[(global$data[input$variableAnnot] > min) & (global$data[input$variableAnnot] < max),]
+          }
         }
-        else if (!is.null(event_data("plotly_click", source="a")$x)) {
-          min <- (event_data("plotly_click", source="a")$x)-d/2
-          max <- (event_data("plotly_click", source="a")$x)+d/2
-          global$data[(global$data[input$variablesHistoAnnot] > min) & (global$data[input$variablesHistoAnnot] < max),]
+        else {
+          if (!is.null(event_data("plotly_selected", source="a")$x)) {
+            global$data[global$data[input$variableAnnot][,1] %in% event_data("plotly_selected", source="a")$customdata,]
+          }
+          else if (!is.null(event_data("plotly_click", source="a")$x)) {
+            global$data[global$data[input$variableAnnot] == event_data("plotly_click", source="a")$customdata,]
+          }
         }
       }
-      # If scatterplot : select ROIs corresponding to points selected
-      else if (input$plotTypeAnnot == "Scatterplot") {
-        req(!is.null(input$variablesScatterAnnot))
-        if (!is.null(event_data("plotly_selected", source="a")$customdata)) {
-          global$data[event_data("plotly_selected", source="a")$customdata,]
+      else {
+        req(!is.null(input$plotTypeAnnot))
+        req(!is.null(input$variablesHistoAnnot))
+        if (input$plotTypeAnnot == "Histogram") {
+          d <- (max(global$data[input$variablesHistoAnnot])-min(global$data[input$variablesHistoAnnot]))/20 # Size of the histogram bar : values corresponding to this bars
+          if (!is.null(event_data("plotly_selected", source="a")$x)) {
+            min <- event_data("plotly_selected", source="a")$x[1]-d/2 
+            max <- event_data("plotly_selected", source="a")$x[length(event_data("plotly_selected", source="a")$x)]+d/2
+            global$data[(global$data[input$variablesHistoAnnot] > min) & (global$data[input$variablesHistoAnnot] < max),]
+          }
+          else if (!is.null(event_data("plotly_click", source="a")$x)) {
+            min <- (event_data("plotly_click", source="a")$x)-d/2
+            max <- (event_data("plotly_click", source="a")$x)+d/2
+            global$data[(global$data[input$variablesHistoAnnot] > min) & (global$data[input$variablesHistoAnnot] < max),]
+          }
         }
-        else if (!is.null(event_data("plotly_click", source="a")$customdata)) {
-          global$data[event_data("plotly_click", source="a")$customdata,]
+        # If scatterplot : select ROIs corresponding to points selected
+        else if (input$plotTypeAnnot == "Scatterplot") {
+          req(!is.null(input$variablesScatterAnnot))
+          if (!is.null(event_data("plotly_selected", source="a")$customdata)) {
+            global$data[event_data("plotly_selected", source="a")$customdata,]
+          }
+          else if (!is.null(event_data("plotly_click", source="a")$customdata)) {
+            global$data[event_data("plotly_click", source="a")$customdata,]
+          }
         }
-      }
-      else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
-        if (!is.null(event_data("plotly_selected", source="a")$x)) {
-          global$data[global$data[input$variablesHistoAnnot][,1] %in% event_data("plotly_selected", source="a")$customdata,]
-        }
-        else if (!is.null(event_data("plotly_click", source="a")$x)) {
-          global$data[global$data[input$variablesHistoAnnot] == event_data("plotly_click", source="a")$customdata,]
+        else if (input$plotTypeAnnot == "Barplot (non numerical datas)") {
+          if (!is.null(event_data("plotly_selected", source="a")$x)) {
+            global$data[global$data[input$variablesHistoAnnot][,1] %in% event_data("plotly_selected", source="a")$customdata,]
+          }
+          else if (!is.null(event_data("plotly_click", source="a")$x)) {
+            global$data[global$data[input$variablesHistoAnnot] == event_data("plotly_click", source="a")$customdata,]
+          }
         }
       }
     }
@@ -2004,17 +2068,7 @@ server <- function(input, output, session) {
   
   colToAnnotate <- reactive ({
     req(!is.null(global$data))
-    if (input$columnToAnnot==TRUE) {
-      if (input$plotTypeAnnot == "Histogram" | input$plotTypeAnnot == "Barplot (non numerical datas)") {
-        input$variablesHistoAnnot
-      }
-      else if (input$plotTypeAnnot == "Scatterplot") {
-        c(input$variablesHistoAnnot, input$variablesScatterAnnot)
-      }
-    }
-    else {
-      input$variableAnnot
-    }
+    input$variableAnnot
   })
   
   output$roisAnnot <- renderPrint({
@@ -2038,18 +2092,8 @@ server <- function(input, output, session) {
                    annote$imgFrame <- global$data$Slice[global$data$ID==annote$actual]
                    annote$data <- data.frame(annote$rois)
                    colnames(annote$data) <- c("ID")
-                   if (!is.null(global$data[input$variablesHistoAnnot]) & input$columnToAnnot == TRUE) {
-                     annote$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,]
-                     if (input$plotTypeAnnot=="Scatterplot") {
-                       if (!is.null(global$data[input$variablesScatterAnnot])) {
-                         annote$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,]
-                       }
-                     }
-                   }
-                   else if (input$columnToAnnot==FALSE) {
-                     if (!is.null(global$data[input$variableAnnot])) {
-                       annote$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot][global$data$ID %in% annote$rois,]
-                     }
+                   if (!is.null(global$data[input$variableAnnot])) {
+                     annote$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot][global$data$ID %in% annote$rois,]
                    }
                    output$validateModifAnnot <- renderUI ({
                      actionButton("validateModifAnnot", "Validate modifications")
@@ -2197,19 +2241,9 @@ server <- function(input, output, session) {
                handlerExpr={annote$imgChan = input$annotChan})
   
   output$annotValue <- renderText ({
-    if ((input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") & input$columnToAnnot==TRUE) {
-      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-      value = global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]
-      paste0("Actual value of ", input$variablesHistoAnnot, " for ROI ", annote$actual, " : ", "\n", value)
-    }
-    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & input$columnToAnnot==TRUE) {
-      value = c(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,], global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,])
-      paste0("Actual value for ROI ", annote$actual, " of ", input$variablesHistoAnnot, " : ", value[1], "\n", "and  ", input$variablesScatterAnnot," : ", value[2])
-    }
-    else if (input$columnToAnnot==FALSE & length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0) {
+    req(length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0)
       value = global$data[input$variableAnnot][global$data$ID==annote$actual,]
       paste0("Actual value of ", input$variableAnnot, " for ROI ", annote$actual, " : ", "\n", value)
-    }
   })
   
   observeEvent (eventExpr = 
@@ -2287,87 +2321,30 @@ server <- function(input, output, session) {
                })
   
   output$modifyAnnot <- renderUI ({
-    if ((input$plotTypeAnnot=="Histogram" | input$plotTypeAnnot=="Barplot (non numerical datas)") & input$columnToAnnot==TRUE) {
-      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-      radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
-    }
-    else if (input$plotTypeAnnot=="Scatterplot" & !is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & input$columnToAnnot==TRUE) {
-      tagList(
-      radioButtons("modifyAnnot", "Modify the first value", choices=c("Yes", "No"), selected="No"),
-      radioButtons("modifySecondAnnot", "Modify the second value", choices=c("Yes", "No"), selected="No"))
-    }
-    else if (input$columnToAnnot==FALSE & length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0) {
+    if (length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0) {
       radioButtons("modifyAnnot", "Modify the value", choices=c("Yes", "No"), selected="No")
     }
   })
   
   
   observeEvent (eventExpr = 
-                  {input$modifyAnnot
-                    input$modifySecondAnnot},
+                  {input$modifyAnnot},
                 handlerExpr = {
                   req(input$modifyAnnot)
-                    if (input$modifyAnnot=="Yes" & input$columnToAnnot == TRUE) {
-                      req(length(global$data[input$variablesHistoAnnot][global$data$ID==annote$actual,]) != 0)
-                      output$numModifyAnnot <- renderUI ({
-                        if (input$columnToAnnot == TRUE) {
-                          if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Histogram") {
-                            tagList(
-                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
-                              actionButton("validateNumModifyAnnot", "Ok"))
-                          }
-                          else if (input$modifyAnnot=="Yes" & input$plotTypeAnnot=="Barplot (non numerical datas)") {
-                            tagList(
-                              textInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), ""),
-                              actionButton("validateNumModifyAnnot", "Ok"))
-                          }
-                        }
-                      })
-                    }
-                    if (input$plotTypeAnnot=="Scatterplot" & input$columnToAnnot==TRUE) {
-                      if (length(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,] != 0) & (input$modifySecondAnnot=="Yes")) {
-                        output$numModifyAnnot <- renderUI ({
-                          if (!is.null(global$data[input$variablesScatterAnnot][global$data$ID==annote$actual,]) & (input$modifySecondAnnot=="Yes")) {
-                            tagList(
-                              numericInput("numModifyAnnot", paste0("Input new value for ", input$variablesHistoAnnot), 0),
-                              actionButton("validateNumModifyAnnot", "Ok"),
-                              numericInput("numModifySecondAnnot", paste0("Input new value for ", input$variablesScatterAnnot), 0),
-                              actionButton("validateNumModifySecondAnnot", "Ok"))
-                          }
-                        })
+                  req(length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0)
+                  output$numModifyAnnot <- renderUI ({
+                      if (input$modifyAnnot=="Yes" & !is.null(input$variableAnnot)) {
+                        tagList(
+                          textInput("numModifyAnnot", paste0("Input new value for ", input$variableAnnot), ""),
+                          actionButton("validateNumModifyAnnot", "Ok"))
                       }
-                    }
-                    if (input$columnToAnnot == FALSE) {
-                      req(length(global$data[input$variableAnnot][global$data$ID==annote$actual,]) != 0)
-                      output$numModifyAnnot <- renderUI ({
-                        if (input$columnToAnnot == FALSE) {
-                          if (input$modifyAnnot=="Yes" & !is.null(input$variableAnnot)) {
-                            tagList(
-                              textInput("numModifyAnnot", paste0("Input new value for ", input$variableAnnot), ""),
-                              actionButton("validateNumModifyAnnot", "Ok"))
-                          }
-                        }
-                      })
-                    }
-                  
+                  })
                 }, ignoreNULL=FALSE)
   
   
   observeEvent (eventExpr = input$validateNumModifyAnnot,
                 handlerExpr = {
-                  if (input$columnToAnnot == TRUE) {
-                    annote$data[paste0("corrected_", input$variablesHistoAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
-                  }
-                  else if (input$columnToAnnot == FALSE) {
-                    annote$data[paste0("corrected_", input$variableAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
-                  }
-                })
-  
-  observeEvent (eventExpr = input$validateNumModifySecondAnnot,
-                handlerExpr = {
-                  if (input$columnToAnnot == TRUE) {
-                    annote$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID==annote$actual,] <- input$numModifySecondAnnot
-                  }
+                  annote$data[paste0("corrected_", input$variableAnnot)][annote$data$ID==annote$actual,] <- input$numModifyAnnot
                 })
   
   output$annoteData <- renderPrint ({
@@ -2377,23 +2354,9 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr = input$validateModifAnnot, 
                handlerExpr = {
-                 if (input$columnToAnnot==TRUE) {
-                   if (any(global$data[input$variablesHistoAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesHistoAnnot)])) {
-                     global$data[paste0("corrected_", input$variablesHistoAnnot)] <- global$data[input$variablesHistoAnnot]
-                     global$data[paste0("corrected_", input$variablesHistoAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesHistoAnnot)]
-                   }
-                   if (input$plotTypeAnnot=="Scatterplot") {
-                     if (any(global$data[input$variablesScatterAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variablesScatterAnnot)])) {
-                       global$data[paste0("corrected_", input$variablesScatterAnnot)] <- global$data[input$variablesScatterAnnot]
-                       global$data[paste0("corrected_", input$variablesScatterAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variablesScatterAnnot)]
-                     }
-                   }
-                 }
-                 else if (input$columnToAnnot==FALSE) {
-                   if (any(global$data[input$variableAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variableAnnot)])) {
-                     global$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot]
-                     global$data[paste0("corrected_", input$variableAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variableAnnot)]
-                   }
+                 if (any(global$data[input$variableAnnot][global$data$ID %in% annote$rois,] != annote$data[paste0("corrected_", input$variableAnnot)])) {
+                   global$data[paste0("corrected_", input$variableAnnot)] <- global$data[input$variableAnnot]
+                   global$data[paste0("corrected_", input$variableAnnot)][global$data$ID %in% annote$rois,] <- annote$data[paste0("corrected_", input$variableAnnot)]
                  }
                  annote$imgPNG <- NULL
                  annote$rois <- NULL 
