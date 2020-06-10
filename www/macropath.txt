@@ -1,1 +1,0 @@
-/Applications/ImageJ.app/macros/Quantif_LB_Lung.ijm
