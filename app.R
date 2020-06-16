@@ -575,7 +575,7 @@ server <- function(input, output, session) {
         })
       }
     }
-    global$data <- read.table("www/intensity.csv",header=TRUE, sep=";", dec=".")
+    global$data <- read.table("www/intensity.txt",header=TRUE, sep="\t", dec=".")
     global$zip <- read.ijzip("www/roiset.zip")
     for (i in c(1:length(global$zip))) {
       global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
