@@ -540,34 +540,37 @@ server <- function(input, output, session) {
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
           global$img <- as_EBImage(global$img)
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
+          global$resolution <- global$resolution*2
         }
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
           if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
             global$img[[i]] <- as_EBImage(global$img[[i]])
-            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
             global$resize <- TRUE
+            global$resolution <- global$resolution*2
           }
         }
         global$nChan <- dim(global$img[[1]])[3] 
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
           global$img <- as_EBImage(global$img)
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
+          global$resolution <- global$resolution*2
         }
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -596,37 +599,40 @@ server <- function(input, output, session) {
       if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image menu plot to image
         global$nChan <- dim(global$img)[3] # Number of channel on the image
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
           global$img <- as_EBImage(global$img)
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
+          global$resolution <- global$resolution*2
         }
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
+        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
           if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
             global$img[[i]] <- as_EBImage(global$img[[i]])
-            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
             global$resize <- TRUE
+            global$resolution <- global$resolution*2
           }
         }
         global$nChan <- dim(global$img[[1]])[3] 
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
       }
     }
     else {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
           global$img <- as_EBImage(global$img)
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
+          global$resolution <- global$resolution*2
         }
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -783,7 +789,7 @@ server <- function(input, output, session) {
   output$colShape <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colShape", 
-                   label = "Columns to use",
+                   label = "Columns to use for the shape of the points",
                    multiple = FALSE,
                    choices = c("None", names(global$data)),
                    selected = "None",
@@ -1447,10 +1453,10 @@ server <- function(input, output, session) {
     req(length(global$img)!=0)
     out <- tempfile(fileext='.png')
     if (global$nFrame == 1) {
-      png(out, height=dim(global$img)[1], width=dim(global$img)[2])
+      png(out, height=dim(global$img)[2], width=dim(global$img)[1])
     }
     else if (global$nFrame > 1) {
-      png(out, height=dim(global$img[[global$imgFrame]])[1], width=dim(global$img[[global$imgFrame]])[2])
+      png(out, height=dim(global$img[[global$imgFrame]])[2], width=dim(global$img[[global$imgFrame]])[1])
     }
     if (input$overlay==TRUE & !is.null(overlays$imgOverlay)) { # If input overlay -> display overlayed image
       display(overlays$imgOverlay, method="raster")
@@ -1466,10 +1472,10 @@ server <- function(input, output, session) {
     if (input$associated == TRUE & global$nFrame > 1) { # If more than one frame and ROIs associated with their original frame
       if (length(rois_plot1())>0) { # If ROIs selected on the plot
         for (i in rois_plot1()) {
-          col <- global$colors$color[global$colors$ID==i] 
-          # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
-          col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
+            col <- global$colors$color[global$colors$ID==i] 
+            # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
+            col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             lines(global$zipcoords[[i]], col=col) # Plot this ROI 
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
               lines(ring$ringCoords[[i]], col=col) # If display ring, add the ring corresponding to its ringcoords
@@ -1596,6 +1602,7 @@ server <- function(input, output, session) {
     input$channel1
     input$frame1 
     input$ids
+    input$size
   },
   handlerExpr= {
     output$list <- EBImage::renderDisplay({
@@ -1607,8 +1614,8 @@ server <- function(input, output, session) {
         dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG)) # Initial image with dimension depending on slider input
         for (i in rois_plot1()) { # For each ROI, determine its center 
-          xcenter = round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
-          ycenter = round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
+          xcenter = (max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2
+          ycenter = (max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2
           # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
           xmin = xcenter-d 
           xmax= xcenter+d
@@ -1641,13 +1648,13 @@ server <- function(input, output, session) {
       }
       else if (global$nFrame >1) { # Same but association with slice
         d <- ((input$size/global$resolution)-1)/2 # Half of the image dimension 
-        dim <- input$size/global$resolution# Dimension of the image
+        dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
         if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
           for (i in rois_plot1()) {
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
-              xcenter = round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
-              ycenter = round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
+              xcenter = (max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2
+              ycenter = (max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2
               xmin = xcenter-d
               xmax= xcenter+d
               ymin = ycenter-d
