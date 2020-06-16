@@ -536,10 +536,10 @@ server <- function(input, output, session) {
     if (read_tags(global$imgPath)$frame1$color_space!="palette") {
       if ((count_frames(global$imgPath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
+        global$img <- as_EBImage(global$img)
         global$nChan <- dim(global$img)[3] # Number of channel on the image
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
-          global$img <- as_EBImage(global$img)
           global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
           global$resolution <- global$resolution*2
@@ -550,8 +550,8 @@ server <- function(input, output, session) {
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
+          global$img[[i]] <- as_EBImage(global$img[[i]])
           if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
-            global$img[[i]] <- as_EBImage(global$img[[i]])
             global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
             global$resize <- TRUE
             global$resolution <- global$resolution*2
@@ -564,9 +564,9 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$img <- as_EBImage(global$img)
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
-          global$img <- as_EBImage(global$img)
           global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
           global$resolution <- global$resolution*2
@@ -599,9 +599,9 @@ server <- function(input, output, session) {
       if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image menu plot to image
         global$nChan <- dim(global$img)[3] # Number of channel on the image
+        global$img <- as_EBImage(global$img)
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
-          global$img <- as_EBImage(global$img)
           global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
           global$resolution <- global$resolution*2
@@ -612,8 +612,8 @@ server <- function(input, output, session) {
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
+          global$img[[i]] <- as_EBImage(global$img[[i]])
           if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
-            global$img[[i]] <- as_EBImage(global$img[[i]])
             global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
             global$resize <- TRUE
             global$resolution <- global$resolution*2
@@ -626,9 +626,9 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
+        global$img <- as_EBImage(global$img)
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
-          global$img <- as_EBImage(global$img)
           global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
           global$resize <- TRUE
           global$resolution <- global$resolution*2
