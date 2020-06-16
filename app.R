@@ -294,7 +294,7 @@ server <- function(input, output, session) {
   
   # Global reactive variable 
   global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, 
-                           imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, zipcoords=list())
+                           imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, zipcoords=list(), resize = FALSE)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -537,16 +537,22 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
         global$nChan <- dim(global$img)[3] # Number of channel on the image
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
-        global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
+        if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
+          global$img <- as_EBImage(global$img)
+          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$resize <- TRUE
+        }
       }
       else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
-          global$img[[i]] <- as_EBImage(global$img[[i]])
-          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+          if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
+            global$img[[i]] <- as_EBImage(global$img[[i]])
+            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+            global$resize <- TRUE
+          }
         }
         global$nChan <- dim(global$img[[1]])[3] 
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
@@ -556,9 +562,12 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
-        global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+        if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
+          global$img <- as_EBImage(global$img)
+          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$resize <- TRUE
+        }
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -571,10 +580,12 @@ server <- function(input, output, session) {
     for (i in c(1:length(global$zip))) {
       global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
     }
-    for (i in c(1:length(global$zipcoords))) {
-      global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
-      global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
-    } 
+    if (global$resize == TRUE) {
+      for (i in c(1:length(global$zipcoords))) {
+        global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
+        global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
+      } 
+    }
     global$legend <- read.table("www/legend.csv", header=TRUE, sep="\t", dec=".")
   })
   
@@ -585,16 +596,22 @@ server <- function(input, output, session) {
       if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image menu plot to image
         global$nChan <- dim(global$img)[3] # Number of channel on the image
-        global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+        if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
+          global$img <- as_EBImage(global$img)
+          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$resize <- TRUE
+        }
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
-          global$img[[i]] <- as_EBImage(global$img[[i]])
-          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+          if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
+            global$img[[i]] <- as_EBImage(global$img[[i]])
+            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+            global$resize <- TRUE
+          }
         }
         global$nChan <- dim(global$img[[1]])[3] 
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
@@ -604,9 +621,12 @@ server <- function(input, output, session) {
       if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
         global$img <- read_tif(global$imgPath)
         global$nChan <- dim(global$img)[3]
-        global$img <- as_EBImage(global$img)
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+        if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
+          global$img <- as_EBImage(global$img)
+          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+          global$resize <- TRUE
+        }
+        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
       }
       else {
         output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
@@ -638,10 +658,12 @@ server <- function(input, output, session) {
     for (i in c(1:length(global$zip))) {
       global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
     }
-    for (i in c(1:length(global$zipcoords))) {
-      global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
-      global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
-    } 
+    if (global$resize == TRUE) {
+      for (i in c(1:length(global$zipcoords))) {
+        global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
+        global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
+      } 
+    }
   }, label = "files")
   
   ## MENU PLOT TO IMAGE
@@ -1463,7 +1485,7 @@ server <- function(input, output, session) {
             if (input$colorType==TRUE) { # If color of the ROI determined with the different selections
               lines(global$zipcoords[[i]], col="yellow") # Plot it in yellow
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) { # Plus their ring
-                lines(ring$ringCoords[[i]], col=col)
+                lines(ring$ringCoords[[i]], col="yellow")
               }
             }
             else { # If color of the ROI not determined by the different selections but by the lines on the plot
@@ -1495,7 +1517,7 @@ server <- function(input, output, session) {
           if (input$colorType==TRUE) {
             lines(global$zipcoords[[i]], col="yellow")
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-              lines(ring$ringCoords[[i]], col=col)
+              lines(ring$ringCoords[[i]], col="yellow")
             }
           }
           else {
@@ -1515,26 +1537,26 @@ server <- function(input, output, session) {
     
     if (input$ids==TRUE) {
       if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
+        global$imgPNG <- magick::image_read(global$imgPNG)
         for (i in rois_plot1()) {
           xID <- round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
           yID <- round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
           coord <- paste("+", xID, "+", yID, sep="")
-          global$imgPNG <- magick::image_read(global$imgPNG)
           global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
-          global$imgPNG <- magick::as_EBImage(global$imgPNG)
         }
+        global$imgPNG <- magick::as_EBImage(global$imgPNG)
       }
       if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
+        global$imgPNG <- magick::image_read(global$imgPNG)
         for (i in rois_plot1()) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
             xID <- round((max(global$zipcoords[[i]][,1])+min(global$zipcoords[[i]][,1]))/2)
             yID <- round((max(global$zipcoords[[i]][,2])+min(global$zipcoords[[i]][,2]))/2)
             coord <- paste("+", xID, "+", yID, sep="")
-            global$imgPNG <- magick::image_read(global$imgPNG)
             global$imgPNG <- magick::image_annotate(global$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
-            global$imgPNG <- magick::as_EBImage(global$imgPNG)
           }
         }
+        global$imgPNG <- magick::as_EBImage(global$imgPNG)
       }
     }
     if (input$contrastImg==TRUE) {
