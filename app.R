@@ -80,11 +80,12 @@ ui <- dashboardPage(
               fluidRow(
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Use files stored in the www directory",
-                     helpText("To use this button, you will need 3 files with predetermined names stored in a repertory \"www\" in your working directory.
+                     helpText("To use this button, you will need 4 files stored in a repertory \"www\" in your working directory.
                               For prerequisites, click on the \"Prerequisites\" link."),
                      actionLink("help", "Prerequisites"),
                      tags$br(),
-                     actionButton("default", "Use default files")),
+                     actionButton("default", "Use default files"),
+                     verbatimTextOutput("errorDefaultFiles")),
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
@@ -520,11 +521,10 @@ server <- function(input, output, session) {
   observeEvent(input$help, {
     showModal(modalDialog(
       title = "Prerequisites for default files",
-      "4 files needed : ", tags$br(), "- image.tif containing your image in TIF format", tags$br(), 
-      "- intensity.csv containing your intensity results in csv format, with a TAB separator and a HEADER", tags$br(),
-      "- legend.csv containing your legends result in csv format, with a TAB separator and a HEADER", tags$br(), 
-      "- roiset.zip containing your ImageJ ROIs. ", tags$br(),
-      "WARNING : If the names does not match, they are not going to be read.", tags$br(), 
+      "4 files needed : ", tags$br(), "- file .tif containing your image in TIF format", tags$br(), 
+      "- file .txt containing your intensity results in csv format, with a TAB separator and a HEADER", tags$br(),
+      "- file .csv containing your legends result in csv format, with a TAB separator and a HEADER", tags$br(), 
+      "- file .zip containing your ImageJ ROIs. ", tags$br(),
       "Store these files in a repository named www in your working directory and click on the button, you won't have to choose your files after, 
       the files in the directory will be used.",
       easyClose = TRUE
@@ -532,64 +532,79 @@ server <- function(input, output, session) {
   })
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
-    global$imgPath <- "www/image.tif"
-    if (read_tags(global$imgPath)$frame1$color_space!="palette") {
-      if ((count_frames(global$imgPath))[1]==1) { # If only one frame
-        global$img <- read_tif(global$imgPath) # Image 
-        global$img <- as_EBImage(global$img)
-        global$nChan <- dim(global$img)[3] # Number of channel on the image
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-        if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
-          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
-          global$resize <- TRUE
-          global$resolution <- global$resolution*2
-        }
-      }
-      else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
-        global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
-        for (i in c(1:global$nFrame)) {
-          global$img[[i]] <- read_tif(global$imgPath, frames=i)
-          global$img[[i]] <- as_EBImage(global$img[[i]])
-          if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
-            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
+    if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==1 &
+        length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==1) {
+      global$imgPath <- dir(path = getwd(), pattern = "*.tif$", recursive=TRUE)
+      if (read_tags(global$imgPath)$frame1$color_space!="palette") {
+        if ((count_frames(global$imgPath))[1]==1) { # If only one frame
+          global$img <- read_tif(global$imgPath) # Image 
+          global$img <- as_EBImage(global$img)
+          global$nChan <- dim(global$img)[3] # Number of channel on the image
+          global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
+          if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
+            global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
             global$resize <- TRUE
             global$resolution <- global$resolution*2
           }
         }
-        global$nChan <- dim(global$img[[1]])[3] 
-      }
-    }
-    else {
-      if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
-        global$img <- read_tif(global$imgPath)
-        global$nChan <- dim(global$img)[3]
-        global$img <- as_EBImage(global$img)
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-        if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
-          global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
-          global$resize <- TRUE
-          global$resolution <- global$resolution*2
+        else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
+          global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
+          global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+          for (i in c(1:global$nFrame)) {
+            global$img[[i]] <- read_tif(global$imgPath, frames=i)
+            global$img[[i]] <- as_EBImage(global$img[[i]])
+            if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
+              global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[2]/2, dim(global$img[[i]])[1]/2)
+              global$resize <- TRUE
+              global$resolution <- global$resolution*2
+            }
+          }
+          global$nChan <- dim(global$img[[1]])[3] 
         }
       }
       else {
-        output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
-          paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
-        })
+        if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
+          global$img <- read_tif(global$imgPath)
+          global$nChan <- dim(global$img)[3]
+          global$img <- as_EBImage(global$img)
+          global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
+          if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
+            global$img <- EBImage::resize(global$img, dim(global$img)[2]/2, dim(global$img)[1]/2)
+            global$resize <- TRUE
+            global$resolution <- global$resolution*2
+          }
+        }
+        else {
+          output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
+            paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
+          })
+        }
       }
+      global$data <- read.table(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE),header=TRUE, sep="\t", dec=".")
+      global$zip <- read.ijzip(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))
+      for (i in c(1:length(global$zip))) {
+        global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
+      }
+      if (global$resize == TRUE) {
+        for (i in c(1:length(global$zipcoords))) {
+          global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
+          global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
+        } 
+      }
+      global$legend <- read.table(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE), header=TRUE, sep="\t", dec=".")
     }
-    global$data <- read.table("www/intensity.txt",header=TRUE, sep="\t", dec=".")
-    global$zip <- read.ijzip("www/roiset.zip")
-    for (i in c(1:length(global$zip))) {
-      global$zipcoords <- append(global$zipcoords, list(global$zip[[i]]$coords))
+    else {
+      output$errorDefaultFiles <- renderPrint ({
+        if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))>1 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))>1 |
+           length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))>1 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))>1) {
+          paste0("ERROR : Multiple files with the same extension. Please read prerequisites. ")
+        }
+        else if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==0 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==0 |
+                 length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==0 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==0) {
+          paste0("ERROR : Missing files. Please read prerequisites. ")
+        }
+      })
     }
-    if (global$resize == TRUE) {
-      for (i in c(1:length(global$zipcoords))) {
-        global$zipcoords[[i]][,2]<- global$zipcoords[[i]][,2]/2
-        global$zipcoords[[i]][,1] <- global$zipcoords[[i]][,1]/2
-      } 
-    }
-    global$legend <- read.table("www/legend.csv", header=TRUE, sep="\t", dec=".")
   })
   
   # Image variables
@@ -999,8 +1014,8 @@ server <- function(input, output, session) {
           layout(dragmode = "select") %>%
           event_register("plotly_selected") %>%
           layout(
-            xaxis = list(title= colsX1(),range = c(0, 300)),
-            yaxis = list(title= colsY1(),range = c(0, 300)),
+            xaxis = list(title= colsX1(),range = c(0, 300), dtick=20),
+            yaxis = list(title= colsY1(),range = c(0, 300), dtick=20),
             shapes = list(list(
               type = "line", 
               line = list(color = "black",dash = "dash"),
@@ -1025,8 +1040,8 @@ server <- function(input, output, session) {
           layout(dragmode = "select") %>%
           event_register("plotly_selected") %>%
           layout(
-            xaxis = list(range = c(0, 300)),
-            yaxis = list(range = c(0, 300)),
+            xaxis = list(range = c(0, 300), dtick=20),
+            yaxis = list(range = c(0, 300), dtick=20),
             shapes = list(list(
               type = "line", 
               line = list(color = "black",dash = "dash"),
@@ -1567,7 +1582,7 @@ server <- function(input, output, session) {
     }
     if (input$contrastImg==TRUE) {
       global$imgPNG <- magick::image_read(global$imgPNG)
-      global$imgPNG <- magick::image_normalize(global$imgPNG)
+      global$imgPNG <- magick::image_modulate(global$imgPNG,saturation=500,brightness = 200, hue=500)
       global$imgPNG <- magick::as_EBImage(global$imgPNG)
     }
     
@@ -2301,7 +2316,7 @@ server <- function(input, output, session) {
                   { if ((length(global$img) != 0) & (length(global$zipcoords)>0)) {
                       out3 <- tempfile(fileext='.png')
                       if (global$nFrame == 1) {
-                        png(out3, height=dim(global$img)[1], width=dim(global$img)[2])
+                        png(out3, height=dim(global$img)[2], width=dim(global$img)[1])
                         if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
                           display(global$img[,,annote$imgChan,1], method="raster")
                         }
@@ -2314,7 +2329,7 @@ server <- function(input, output, session) {
                       }
                       else if (global$nFrame > 1) {
                         if (input$annotAssociate==TRUE) {
-                          png(out3, height=dim(global$img[[annote$imgFrame]])[1], width=dim(global$img[[annote$imgFrame]])[2])
+                          png(out3, height=dim(global$img[[annote$imgFrame]])[2], width=dim(global$img[[annote$imgFrame]])[1])
                           if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
                             display(global$img[[annote$imgFrame]][,,annote$imgChan,1], method="raster")
                           }
@@ -2328,7 +2343,7 @@ server <- function(input, output, session) {
                           }
                         }
                         else {
-                          png(out3, height=dim(global$img[[annote$imgFrame]])[1], width=dim(global$img[[annote$imgFrame]])[2])
+                          png(out3, height=dim(global$img[[annote$imgFrame]])[2], width=dim(global$img[[annote$imgFrame]])[1])
                           if (input$annotOverlay==FALSE | is.null(annotOverlays$imgOverlay)) {
                             display(global$img[[annote$imgFrame]][,,annote$imgChan,1], method="raster")
                           }
