@@ -121,9 +121,11 @@ ui <- dashboardPage(
                              radioButtons("plotType", "Number of parameters to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
                              uiOutput("variablesHisto"),
                              uiOutput("variablesScatter"),
-                             radioButtons("filterType", "Type of selection", choices=c("Free selection", "Select all"), selected="Free selection"),
+                             radioButtons("filterType", "Type of selection", choices=c("One selection", "Multiple selection"), selected="One selection"),
                              helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
-                             plotlyOutput("selectVar")
+                             plotlyOutput("selectVar"),
+                             uiOutput("filterNextSel"),
+                             uiOutput("resetFilterAllSel")
                         ),
                         box( width = NULL,
                              title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
@@ -139,15 +141,15 @@ ui <- dashboardPage(
                                plotlyOutput("plot_rois1")),
                              uiOutput("nextSel"),
                              uiOutput("resetAllSel"),
-                             helpText("Click or select points on the plot, check datas on these cells and see which cells it is in the image."),
+                             helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
                              checkboxInput("associated", "Associate with slice", value=TRUE),
                              uiOutput("colorType"),
                              useShinyjs(),
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
                              radioButtons("selectionType", "Type of selection",
-                                          choices=c("Free selection", "Multiple selection", "Select all plotted cells from a given z slice"),
-                                          selected="Free selection"),
+                                          choices=c("One selection", "Multiple selection", "Select all plotted cells from a given z slice"),
+                                          selected="One selection"),
                              uiOutput("specificFrame")
                         ),
                 ),
@@ -163,7 +165,7 @@ ui <- dashboardPage(
                         box( width=NULL, 
                              title = "Image display", solidHeader= TRUE, status = "primary",
                              checkboxInput("ids", "Display IDs"),
-                             checkboxInput("ring", "Display ring ROI"),
+                             checkboxInput("ring", "Encircle cell"),
                              uiOutput("ringSlider"),
                              withSpinner(
                                EBImage::displayOutput("zoomImg")
@@ -694,7 +696,7 @@ server <- function(input, output, session) {
   output$variablesHisto <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "variablesHisto",
-                   label = "Column to plot in X",
+                   label = "Variable to plot in X",
                    multiple = TRUE,
                    choices = names(global$data),
                    options = list(maxItems = 1))
@@ -706,7 +708,7 @@ server <- function(input, output, session) {
       req(!is.null(global$data))
       if (input$plotType=="Two") {
         selectizeInput(inputId = "variablesScatter",
-                       label = "Column to plot in Y",
+                       label = "Variable to plot in Y",
                        multiple = TRUE,
                        choices = names(global$data),
                        options = list(maxItems = 1))
@@ -736,39 +738,107 @@ server <- function(input, output, session) {
     }
   })
   
+  selectionFilterRois <- reactive({
+    req(!is.null(global$data))
+    req(!is.null(input$variablesHisto))
+    if (input$plotType == "One") {
+      d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
+      if (!is.null(event_data("plotly_selected", source="v")$x)) {
+        min <- event_data("plotly_selected", source="v")$x[1]-d/2 
+        max <- event_data("plotly_selected", source="v")$x[length(event_data("plotly_selected", source="v")$x)]+d/2
+        global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
+      }
+      else if (!is.null(event_data("plotly_click", source="v")$x)) {
+        min <- (event_data("plotly_click", source="v")$x)-d/2
+        max <- (event_data("plotly_click", source="v")$x)+d/2
+        global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
+      }
+      else {
+        event_data("plotly_deselect", source="v")
+      }
+    }
+    # If scatterplot : select ROIs corresponding to points selected
+    else {
+      req(!is.null(input$variablesScatter))
+      if (!is.null(event_data("plotly_selected", source="v")$customdata)) {
+        global$data$ID[event_data("plotly_selected", source="v")$customdata]
+      }
+      else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
+        global$data$ID[event_data("plotly_click", source="v")$customdata]
+      }
+      else {
+        event_data("plotly_deselect", source="v")
+      }
+    }
+  })
+  
   # ROIs to plot on the interactive plot depending on selection 
-  rois_toPlot <- reactive({
+  rois_toPlot <- eventReactive({
+    input$filterType
+    input$plotType
+    multiFiltering$final
+    selectionFilterRois()
+  },{
     req(!is.null(global$data))
     req(!is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
-    if (input$filterType == "Free selection") {
-      if (input$plotType == "One") {
-        d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
-        if (!is.null(event_data("plotly_selected", source="v")$x)) {
-          min <- event_data("plotly_selected", source="v")$x[1]-d/2 
-          max <- event_data("plotly_selected", source="v")$x[length(event_data("plotly_selected", source="v")$x)]+d/2
-          global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
-        }
-        else if (!is.null(event_data("plotly_click", source="v")$x)) {
-          min <- (event_data("plotly_click", source="v")$x)-d/2
-          max <- (event_data("plotly_click", source="v")$x)+d/2
-          global$data[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max),]
-        }
-      }
-      # If scatterplot : select ROIs corresponding to points selected
-      else {
-        req(!is.null(input$variablesScatter))
-        if (!is.null(event_data("plotly_selected", source="v")$customdata)) {
-          global$data[event_data("plotly_selected", source="v")$customdata,]
-        }
-        else if (!is.null(event_data("plotly_click", source="v")$customdata)) {
-          global$data[event_data("plotly_click", source="v")$customdata,]
-        }
-      }
+    if (input$filterType == "One selection") {
+      req(length(selectionFilterRois()) > 0)
+      rois_toPlot <- selectionFilterRois()
+      rois_toPlot <- global$data[global$data$ID %in% rois_toPlot,]
     }
-    else if (input$filterType == "Select all") {
-      global$data
+    else if (input$filterType == "Multiple selection") {
+      rois_toPlot <- unique(multiFiltering$final)
+      rois_toPlot <- global$data[global$data$ID %in% rois_toPlot,]
     }
+  }, ignoreNULL=FALSE)
+  
+  multiFiltering <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0)
+
+  output$filterNextSel <- renderUI ({
+    req(!is.null(selectionFilterRois()))
+    req(nrow(rois_toPlot())==0)
+    if (input$filterType == "Multiple selection" & length(selectionFilterRois()) > 0) {
+      tagList(
+        helpText("Select your cells and click on the button to select other cells."),
+        actionButton("filterNextSel", "Next selection"),
+        if (multiFiltering$nSel > 1) {
+          actionButton("filterValidateSel", "Confirm selections")
+        },
+        tags$br()
+      )
+    }
+  })
+  
+  output$resetFilterAllSel <- renderUI({
+    req(nrow(rois_toPlot())==0)
+    if (input$filterType=="Multiple selection" & length(multiFiltering$totale) > 0) {
+      actionLink("resetFilterAllSel", "Reset all selections")
+    }
+  })
+  
+  observeEvent(eventExpr= {
+    input$filterNextSel
+  }, handlerExpr = {
+    if (input$filterType=="Multiple selection" & length(selectionFilterRois()) > 0) {
+      multiFiltering$indiv <- selectionFilterRois()
+      multiFiltering$totale <- c(multiFiltering$totale, multiFiltering$indiv)
+      multiFiltering$nSel <- multiFiltering$nSel + 1
+    }
+  })
+  
+  observeEvent(eventExpr= {
+    input$filterValidateSel
+  }, handlerExpr = {
+    multiFiltering$final <- unique(multiFiltering$totale)
+  })
+  
+  observeEvent(eventExpr = {
+    input$resetFilterAllSel
+  }, handlerExpr = {
+    multiFiltering$totale <- c()
+    multiFiltering$indiv <- c()
+    multiFiltering$nSel <- 0
   })
   
   # Interactive plot
@@ -1189,7 +1259,7 @@ server <- function(input, output, session) {
     {
       req(!is.null(global$data))
       req(!is.null(global$colors))
-      if (input$selectionType == "Free selection") { # If free selection : use only the selection on the plot
+      if (input$selectionType == "One selection") { # If One selection : use only the selection on the plot
         rois_plot1 <- selectionRois()
         rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
@@ -1364,6 +1434,7 @@ server <- function(input, output, session) {
   # UI to choose slice to display
   output$frame1 <- renderUI ({
     req(length(global$img)!=0)
+    req(global$nFrame > 1)
     sliderInput("frame1", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame, step=1)
   })
   
@@ -1399,7 +1470,7 @@ server <- function(input, output, session) {
   }, handlerExpr={
     output$ringSlider <- renderUI({
       if (input$ring==TRUE) {
-        sliderInput("ringSlider", label="Size of the ring (microns)", min=5, max=50, step=0.5, value=2)
+        sliderInput("ringSlider", label="Size of the circle (microns)", min=5, max=50, step=0.5, value=2)
       }
     })
   })
