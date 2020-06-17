@@ -146,7 +146,7 @@ ui <- dashboardPage(
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
                              radioButtons("selectionType", "Type of selection",
-                                          choices=c("Select none","Free selection", "Multiple selection", "Select all ROIs of a specific frame","Select all"),
+                                          choices=c("Free selection", "Multiple selection", "Select all plotted cells from a given z slice"),
                                           selected="Free selection"),
                              uiOutput("specificFrame")
                         ),
@@ -776,7 +776,7 @@ server <- function(input, output, session) {
   output$colsX1 <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colsX1", 
-                   label = "Column for X coordinates",
+                   label = "X coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
                    selected = names(global$data)[3],
@@ -785,7 +785,7 @@ server <- function(input, output, session) {
   output$colsY1 <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colsY1", 
-                   label = "Column for Y coordinates",
+                   label = "Y coordinates",
                    multiple = FALSE,
                    choices = names(global$data),
                    selected = names(global$data)[2],
@@ -804,7 +804,7 @@ server <- function(input, output, session) {
   output$colShape <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colShape", 
-                   label = "Columns to use for the shape of the points",
+                   label = "Symbol shape change parameter ",
                    multiple = FALSE,
                    choices = c("None", names(global$data)),
                    selected = "None",
@@ -823,7 +823,7 @@ server <- function(input, output, session) {
     req(!is.null(input$colShape))
     if (input$colShape != "None") {
       tagList(
-      sliderInput(inputId = paste0("threshold", input$colShape), label = paste("Threshold for column ", input$colShape),
+      sliderInput(inputId = paste0("threshold", input$colShape), label = paste0("Threshold for symbol shape change depending on ", input$colShape, "value (circle to triangle)"),
                   min = min(global$data[input$colShape]), max = max(global$data[input$colShape]), value = mean(global$data[input$colShape])),
       actionLink("validateThreshold", "Validate threshold"))
     }
@@ -836,10 +836,10 @@ server <- function(input, output, session) {
     req(length(thresholds())==1)
     for (i in global$colors$ID) {
       if (global$data[input$colShape][global$data$ID==i,] >= thresholds()) {
-        global$colors$shape[global$colors$ID==i] <- "Superior or equal"
+        global$colors$shape[global$colors$ID==i] <- "Above threshold"
       }
       else {
-        global$colors$shape[global$colors$ID==i] <- "Inferior"
+        global$colors$shape[global$colors$ID==i] <- "Below threshold"
       }
     }
   })
@@ -1097,7 +1097,7 @@ server <- function(input, output, session) {
   })
   
   output$specificFrame <- renderUI ({
-    if (input$selectionType=="Select all ROIs of a specific frame" & global$nFrame > 1) {
+    if (input$selectionType=="Select all plotted cells from a given z slice" & global$nFrame > 1) {
       numericInput("specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1)
     }
   })
@@ -1197,20 +1197,13 @@ server <- function(input, output, session) {
         rois_plot1 <- unique(multiSelect$total)
         rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
       }
-      else if (input$selectionType == "Select all") { # If select all : all ROIs 
-        rois_plot1 <- global$colors$ID
-        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
-      }
-      else if (input$selectionType == "Select all ROIs of a specific frame") { # If select all ROIs of a specific frame 
+      else if (input$selectionType == "Select all plotted cells from a given z slice") { # If select all ROIs of a specific frame 
         if ((global$nFrame > 1) & (!is.null(input$specificFrame))) { # If more than one frame : only ROIs which are on this specific frame
           rois_plot1 <- global$colors$ID[global$colors$ID %in% global$data$ID[global$data$Slice==input$specificFrame]]
         }
         else if (global$nFrame == 1) { # If only one frame : all ROIs 
           rois_plot1 <- global$colors$ID
         }
-      }
-      else {
-        rois_plot1 <- event_data("plotly_deselect", source="p") # If none : no selection
       }
     }, ignoreNULL=FALSE)
   
@@ -1755,14 +1748,14 @@ server <- function(input, output, session) {
     if ((length(global$img) != 0) & (length(global$zipcoords)>0)) {
       out2 <- tempfile(fileext='.png')
       if (global$nFrame == 1) {
-        png(out2, height=dim(global$img)[1], width=dim(global$img)[2])
+        png(out2, height=dim(global$img)[2], width=dim(global$img)[1])
         display(global$img[,,global$imgChan2,1], method="raster")
         for (i in c(1:length(global$zipcoords))) {
           lines(global$zipcoords[[i]], col=input$color2)
         }
       }
       else if (global$nFrame > 1) {
-        png(out2, height=dim(global$img[[global$imgFrame2]])[1], width=dim(global$img[[global$imgFrame2]])[2])
+        png(out2, height=dim(global$img[[global$imgFrame2]])[2], width=dim(global$img[[global$imgFrame2]])[1])
         display(global$img[[global$imgFrame2]][,,global$imgChan2,1], method="raster")
         for (i in global$data$ID) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame2) {
