@@ -138,7 +138,7 @@ ui <- dashboardPage(
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
                              withSpinner(
-                               plotlyOutput("plot_rois1")),
+                               plotlyOutput("plot_rois1", height = "600px")),
                              uiOutput("nextSel"),
                              uiOutput("resetAllSel"),
                              helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
@@ -874,16 +874,18 @@ server <- function(input, output, session) {
   output$colShape <- renderUI({
     req(!is.null(global$data))
     selectizeInput(inputId = "colShape", 
-                   label = "Symbol shape change parameter ",
+                   label = "Symbol shape change parameter (max 2)",
                    multiple = FALSE,
                    choices = c("None", names(global$data)),
                    selected = "None",
-                   options = list(maxItems = 1))
+                   options = list(maxItems = 2))
   })
   
   # Reactive values with thresholds
   thresholds <- reactive({
-    as.numeric(input[[paste0("threshold", input$colShape)]]) 
+    nbCols <- length(input$colShape)
+    thresholds <- sapply(1:nbCols, function(i) {
+      as.numeric(input[[paste0("threshold", i)]]) })
   }) 
   
 
@@ -892,9 +894,12 @@ server <- function(input, output, session) {
     req(!is.null(global$data))
     req(!is.null(input$colShape))
     if (input$colShape != "None") {
+      nbCols <- length(input$colShape)
       tagList(
-      sliderInput(inputId = paste0("threshold", input$colShape), label = paste0("Threshold for symbol shape change depending on ", input$colShape, "value (circle to triangle)"),
-                  min = min(global$data[input$colShape]), max = max(global$data[input$colShape]), value = mean(global$data[input$colShape])),
+        lapply(1:nbCols, function(i) {
+          sliderInput(inputId = paste0("threshold", i), label = paste("Threshold for symbol shape change depending on ", input$colShape[[i]]),
+                      min = min(global$data[input$colShape[[i]]]), max = max(global$data[input$colShape[[i]]]), value = mean(global$data[input$colShape[[i]]]))
+        }),
       actionLink("validateThreshold", "Validate threshold"))
     }
   })
@@ -902,17 +907,27 @@ server <- function(input, output, session) {
   observeEvent ( eventExpr = {
     input$validateThreshold
   }, handlerExpr = {
-    req(length(input$colShape) == 1)
-    req(length(thresholds())==1)
+    req(length(input$colShape) == length(thresholds()))
+    req(length(input$colShape) >= 1)
     for (i in global$colors$ID) {
-      if (global$data[input$colShape][global$data$ID==i,] >= thresholds()) {
-        global$colors$shape[global$colors$ID==i] <- "Above threshold"
-      }
-      else {
-        global$colors$shape[global$colors$ID==i] <- "Below threshold"
+      comparisons = c()
+      for (j in 1:length(input$colShape)) {
+        comparisons <- c(comparisons, (global$data[input$colShape[[j]]][global$data$ID==i,] >= thresholds()[j]))
+        if (sum(comparisons) == 1) {
+          trueCol <- which(comparisons==TRUE)
+          global$colors$shape[global$colors$ID==i] <- paste("Above threshold for ", input$colShape[[trueCol]])
+        }
+        else if (sum(comparisons) >= 2) {
+          global$colors$shape[global$colors$ID==i] <- "Above threshold for both variables"
+        }
+        else {
+          global$colors$shape[global$colors$ID==i] <- "Below threshold for both variables"
+        }
       }
     }
   })
+  
+  
   ## Global colors
   # Datas to plot if no Filtering 
   observeEvent(
@@ -1106,7 +1121,7 @@ server <- function(input, output, session) {
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()], color=global$colors$color, symbol=global$colors$shape,
                      customdata=global$colors[,"ID"], text=~paste("ID :", global$colors[,"ID"]), source="p", type="scatter", mode="markers")
         p %>% 
-          layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
+          layout(legend = list(orientation="h", x=0.0, y=-0.1)) %>%
           layout(dragmode = "select") %>%
           event_register("plotly_selected") %>%
           layout(
