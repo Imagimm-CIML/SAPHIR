@@ -921,7 +921,7 @@ server <- function(input, output, session) {
           global$colors$shape[global$colors$ID==i] <- "Above threshold for both variables"
         }
         else {
-          global$colors$shape[global$colors$ID==i] <- "Below threshold for both variables"
+          global$colors$shape[global$colors$ID==i] <- "Below threshold for all variables"
         }
       }
     }
@@ -1064,13 +1064,21 @@ server <- function(input, output, session) {
   ## Text output to see number of cells in each group 
   output$groups <- renderText ({
     req(!is.null(global$data))
+    req(input$colShape)
     groups <- c()
     for (i in unique(global$colors$color)) {
-      nCell <- paste("Number of ROIs in ",i, " : ",length(global$colors$ID[global$colors$color==i]), ", ", 
-                     round(100*(length(global$colors$ID[global$colors$color==i])/nrow(global$data)), 2), " percent of the cells")
+      shapes <- NULL
+      if (input$colShape != "None") {
+        for (j in unique(global$colors$shape)) {
+          nShape <- paste0(length(global$colors$ID[global$colors$color==i & global$colors$shape==j])," cells " ,str_to_lower(j))
+          shapes <- paste(shapes, "," , nShape)
+        }
+      }
+      nCell <- paste0("Number of cells in ",i, " : ",length(global$colors$ID[global$colors$color==i]), ", ", 
+                     round(100*(length(global$colors$ID[global$colors$color==i])/nrow(global$data)), 2)," percent of the cells. ", str_sub(shapes, 3, -1))
       groups <- c(nCell, groups)
     }
-    paste(groups, "\n", sep="")
+    paste0(groups, "\n")
   })
   
   output$summary <- renderPrint ({
@@ -1091,6 +1099,7 @@ server <- function(input, output, session) {
     output$plot_rois1 <- renderPlotly({
       req(!is.null(global$data))
       req(!is.null(global$colors))
+      req(input$colShape)
       if (input$colShape=="None") { # No shape attribute
         p <- plot_ly(data=global$colors, x=global$colors[,colsX1()], y=global$colors[,colsY1()],customdata=global$colors[,"ID"], 
                      text=~paste("ID :", global$colors[,"ID"]), color=global$colors[,"color"], source="p", type="scatter", mode="markers")
@@ -1309,8 +1318,16 @@ server <- function(input, output, session) {
   # RenderText : number of selected cells 
   output$rois_plot1 <- renderText({
     req(!is.null(global$data))
+    req(!is.null(input$colShape))
     nbCell <- nrow(rois_plot_table1())
-    paste("You selected", nbCell, "cells")
+    shapes <- NULL 
+    if (input$colShape != "None") {
+      for (i in unique(global$colors$shape)) {
+        nbShapeCell <- paste0(length(global$colors$ID[global$colors$ID %in% rois_plot1() & global$colors$shape == i]), " cells ", str_to_lower(i))
+        shapes <- paste0(shapes, ", ", nbShapeCell)
+      }
+    }
+    paste("You selected", nbCell, "cells, i.e. ", round(nbCell/nrow(global$data), 2), " percent of the cells. ", "\n", str_sub(shapes, 3, -1))
   })
   
   # Table containing infos on selected cells 
