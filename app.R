@@ -154,35 +154,9 @@ ui <- dashboardPage(
                         ),
                 ),
                 # Second box : Image displayer
-                column (width=6,
-                        box( width=NULL, 
-                             title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
-                             helpText("Legends of the channels : "),
-                             tableOutput("legend1"),
-                             helpText("Legends of the colors : "), 
-                             tableOutput("colorLegend")
-                        ),
-                        box( width=NULL, 
-                             title = "Image display", solidHeader= TRUE, status = "primary",
-                             checkboxInput("ids", "Display IDs"),
-                             checkboxInput("ring", "Encircle cell"),
-                             uiOutput("ringSlider"),
-                             withSpinner(
-                               EBImage::displayOutput("zoomImg")
-                             ),
-                             checkboxInput("overlay", "Overlay channels (up to 3)"),
-                             uiOutput("channelOverlay"),
-                             uiOutput("channel1"),
-                             uiOutput("frame1"),
-                             checkboxInput("contrastImg", "Enhance contrast in image")
-                        ),
-                        box (width=NULL, 
-                             title = "ROIs", solidHeader=TRUE, status="primary",
-                             uiOutput("size"),
-                             withSpinner(
-                               EBImage::displayOutput("list")
-                             )
-                        )
+                column (width=6, 
+                        checkboxInput("displayImg", "Display selection on the image", value=FALSE),
+                        uiOutput("imageDisplayers")
                 )
               ),
               fluidRow( 
@@ -263,6 +237,7 @@ ui <- dashboardPage(
                              title = "Image of the ROI",
                              uiOutput("annotChan"),
                              uiOutput("annotFrame"),
+                             uiOutput("annoteSize"),
                              checkboxInput("annotAssociate", "Associate with slice", value=TRUE),
                              checkboxInput("annotOverlay", "Overlay channels (up to 3)"),
                              uiOutput("annotChannelOverlay"),
@@ -987,16 +962,16 @@ server <- function(input, output, session) {
     if (is.null(input$colorType) | input$selectionType!="Multiple selection") {
       for (i in c(1:nrow(global$colors))) {
         if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-          global$colors$color[i] <- "R1"
+          global$colors$color[i] <- "Q1"
         }
         else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-          global$colors$color[i] <- "R4"
+          global$colors$color[i] <- "Q4"
         }
         else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-          global$colors$color[i] <- "R2"
+          global$colors$color[i] <- "Q2"
         }
         else {
-          global$colors$color[i] <- "R3"
+          global$colors$color[i] <- "Q3"
         }
       }
     }
@@ -1004,16 +979,16 @@ server <- function(input, output, session) {
       if (input$colorType==FALSE) {
         for (i in c(1:nrow(global$colors))) {
           if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] < y())){
-            global$colors$color[i] <- "R1"
+            global$colors$color[i] <- "Q1"
           }
           else if ((global$colors[colsX1()][i,] > x()) & (global$colors[colsY1()][i,] > y())){
-            global$colors$color[i] <- "R4"
+            global$colors$color[i] <- "Q4"
           }
           else if ((global$colors[colsX1()][i,] < x()) & (global$colors[colsY1()][i,] > y())) {
-            global$colors$color[i] <- "R2"
+            global$colors$color[i] <- "Q2"
           }
           else {
-            global$colors$color[i] <- "R3"
+            global$colors$color[i] <- "Q3"
           }
         }
       }
@@ -1037,7 +1012,7 @@ server <- function(input, output, session) {
       groups <- unique(global$colors$color)
       fls <- paste0("group",groups, ".csv")
       for (i in groups) {
-        write.csv(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],], paste0("group",i, ".csv"))
+        write.csv(data.frame(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],], global$colors$color[global$colors$color==i]), paste0("group",i, ".csv"))
       }
       zip::zipr(zipfile = file,fls)
       if (file.exists (paste0 (file," .zip "))) {file.rename (paste0 (file," .zip "), file)}
@@ -1054,7 +1029,7 @@ server <- function(input, output, session) {
       groups <- unique(global$colors$color)
       fls <- paste0("summary_group",groups, ".csv")
       lapply(groups, function(i) {
-        write.csv(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],]), paste0("summary_group",i, ".csv"))
+        write.csv(summary(data.frame(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],], global$colors$color[global$colors$color==i])), paste0("summary_group",i, ".csv"))
       })
       zip::zipr(zipfile = file,fls)
       if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
@@ -1312,7 +1287,7 @@ server <- function(input, output, session) {
   # Reactive variable : infos on points selected on the plot (infos from global$data)
   rois_plot_table1 <- reactive ({
     req(!is.null(global$data))
-    global$data[global$data$ID %in% rois_plot1(),]
+    data.frame(global$data[global$data$ID %in% rois_plot1(),], global$colors$color[global$colors$ID %in% rois_plot1()])
   })
   
   # RenderText : number of selected cells 
@@ -1356,20 +1331,59 @@ server <- function(input, output, session) {
     }
   )
   
+  
+  output$imageDisplayers <- renderUI (
+    if (input$displayImg==TRUE) {
+      column(width=12, 
+           box( width=NULL, 
+           title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
+           helpText("Legends of the channels : "),
+           tableOutput("legend1"),
+           checkboxInput("overlay", "Overlay channels (up to 3)"),
+           uiOutput("channelOverlay"),
+           helpText("Legends of the colors : "), 
+           tableOutput("colorLegend")
+      ),
+      box( width=NULL, 
+           title = "Image display", solidHeader= TRUE, status = "primary",
+           checkboxInput("ids", "Display IDs"),
+           checkboxInput("ring", "Encircle cell"),
+           uiOutput("ringSlider"),
+           withSpinner(
+             EBImage::displayOutput("zoomImg")
+           ),
+           uiOutput("channel1"),
+           uiOutput("frame1"),
+           checkboxInput("contrastImg", "Enhance contrast in image")
+      ),
+      box (width=NULL, 
+           title = "ROIs", solidHeader=TRUE, status="primary",
+           uiOutput("size"),
+           withSpinner(
+             EBImage::displayOutput("list")
+           )
+      ))
+    }
+  )
+  
+  
   # Table with legend channel 
   output$legend1 <- renderTable({
+    req(input$displayImg==TRUE)
     global$legend
   })
   
   # Table with color legend channel 
   output$colorLegend <- renderTable({
-    tableColor <- data.frame("R1" = "Red", "R2"="Dark blue", "R3"= "Green", "R4"= "Pink")
-    colnames(tableColor) <- c("R1", "R2", "R3", "R4")
+    req(input$displayImg==TRUE)
+    tableColor <- data.frame("Q1" = "Red", "Q2"="Dark blue", "Q3"= "Green", "Q4"= "Pink")
+    colnames(tableColor) <- c("Q1", "Q2", "Q3", "Q4")
     tableColor
   })
   
   # Overlay channels 
   output$channelOverlay <- renderUI ({
+    req(input$displayImg==TRUE)
     req(global$nChan)
     if (input$overlay==TRUE) {
       tagList(
@@ -1387,6 +1401,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = {input$overlayApply
     input$frame1},
     handlerExpr = {
+      req(input$displayImg==TRUE)
       req(global$img)
       if (!is.null(input$redOverlay) & !is.null(input$greenOverlay) & !is.null(input$blueOverlay)) {
         if (global$nFrame == 1) {
@@ -1451,6 +1466,7 @@ server <- function(input, output, session) {
     overlays$green
   }, 
   handlerExpr = {
+    req(input$displayImg==TRUE)
     if (input$overlay==TRUE & any(!is.null(c(overlays$redChan, overlays$greenChan, overlays$blueChan)))) {
       overlays$imgOverlay <- EBImage::rgbImage(red=overlays$red, green=overlays$green, blue=overlays$blue)
     }
@@ -1458,6 +1474,7 @@ server <- function(input, output, session) {
   
   # UI to choose channel to display for the image
   output$channel1 <- renderUI({
+    req(input$displayImg==TRUE)
     req(length(global$img)!=0)
     req(input$overlay==FALSE)
     sliderInput("channel1", label="Channel to display", min=1, max= global$nChan, value=global$imgChan, step=1)
@@ -1465,6 +1482,7 @@ server <- function(input, output, session) {
   
   # UI to choose slice to display
   output$frame1 <- renderUI ({
+    req(input$displayImg==TRUE)
     req(length(global$img)!=0)
     req(global$nFrame > 1)
     sliderInput("frame1", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame, step=1)
@@ -1473,6 +1491,7 @@ server <- function(input, output, session) {
   # Modification of image read when modification of frame slider 
   observeEvent(eventExpr=input$frame1,
                handlerExpr={
+                 req(input$displayImg==TRUE)
                  if (global$nFrame > 1) {
                    global$imgFrame <- input$frame1
                    global$imgChan <- input$channel1
@@ -1484,6 +1503,7 @@ server <- function(input, output, session) {
     rois_plot1()
   },
   handlerExpr={
+    req(input$displayImg==TRUE)
     if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) { 
       newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
       global$imgFrame <- newFrame
@@ -1493,13 +1513,16 @@ server <- function(input, output, session) {
   
   # When channel slider modified : change the actual channel of the image
   observeEvent(eventExpr=input$channel1,
-               handlerExpr={global$imgChan = input$channel1})
+               handlerExpr={
+                 req(input$displayImg==TRUE)
+                 global$imgChan = input$channel1})
   
   # Displaying ring of the ROI 
   # Render UI for the size of the ring
   observeEvent(eventExpr={
     input$ring
   }, handlerExpr={
+    req(input$displayImg==TRUE)
     output$ringSlider <- renderUI({
       if (input$ring==TRUE) {
         sliderInput("ringSlider", label="Size of the circle (microns)", min=5, max=50, step=0.5, value=2)
@@ -1516,6 +1539,7 @@ server <- function(input, output, session) {
     rois_plot1()
   }, 
   handlerExpr = {
+    req(input$displayImg==TRUE)
     ring$ringCoords <- list()
     if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
       ring$ringCoords <- global$zipcoords # Add coords of ALL ROIs on the ringCoords list 
@@ -1561,6 +1585,7 @@ server <- function(input, output, session) {
     input$contrastImg
   },
   handlerExpr= {
+    req(input$displayImg==TRUE)
     req(length(global$img)!=0)
     out <- tempfile(fileext='.png')
     if (global$nFrame == 1) {
@@ -1586,7 +1611,7 @@ server <- function(input, output, session) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
             col <- global$colors$color[global$colors$ID==i] 
             # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
-            col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             lines(global$zipcoords[[i]], col=col) # Plot this ROI 
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
               lines(ring$ringCoords[[i]], col=col) # If display ring, add the ring corresponding to its ringcoords
@@ -1607,7 +1632,7 @@ server <- function(input, output, session) {
             }
             else { # If color of the ROI not determined by the different selections but by the lines on the plot
               col <- global$colors$color[global$colors$ID==i]
-              col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+              col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
               lines(global$zipcoords[[i]], col=col)
               if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
                 lines(ring$ringCoords[[i]], col=col)
@@ -1622,7 +1647,7 @@ server <- function(input, output, session) {
       if (length(rois_plot1())>0) {
         for (i in rois_plot1()) {
           col <- global$colors$color[global$colors$ID==i]
-          col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+          col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           lines(global$zipcoords[[i]], col=col)
           if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
             lines(ring$ringCoords[[i]], col=col)
@@ -1639,7 +1664,7 @@ server <- function(input, output, session) {
           }
           else {
             col <- global$colors$color[global$colors$ID==i]
-            col <- switch (col, "R1"=2,"R3"=3,"R2"=4, "R4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             lines(global$zipcoords[[i]], col=col)
             if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
               lines(ring$ringCoords[[i]], col=col)
@@ -1688,6 +1713,7 @@ server <- function(input, output, session) {
   # Crop ROIs
   # Slider with size of the ROI in microns 
   output$size <- renderUI ({
+    req(input$displayImg==TRUE)
     req(length(global$img) != 0)
     req(length(global$zipcoords) != 0)
     val <- 0
@@ -1716,6 +1742,7 @@ server <- function(input, output, session) {
     input$size
   },
   handlerExpr= {
+    req(input$displayImg==TRUE)
     output$list <- EBImage::renderDisplay({
       req(length(rois_plot1()) != 0)
       req(global$img)
@@ -1803,6 +1830,7 @@ server <- function(input, output, session) {
   
   # Zoom displayer -> Image PNG in a displayer
   output$zoomImg <- EBImage::renderDisplay({
+    req(input$displayImg==TRUE)
     req(global$imgPNG)
     EBImage::display(global$imgPNG, method = 'browser')
   })
@@ -2371,15 +2399,65 @@ server <- function(input, output, session) {
   # UI to choose slice to display
   output$annotFrame <- renderUI ({
     req(length(global$img) != 0)
+    req(global$nFrame > 1)
     sliderInput("annotFrame", label = "Slice to display", min = 1, max = global$nFrame, value = annote$imgFrame, step=1)
   })
+  
+  output$annoteSize <- renderUI ({
+    req(!is.null(annote$actual))
+    req(length(global$img) != 0)
+    req(length(global$zipcoords) != 0)
+    val <- 0
+    for (i in length(global$zipcoords)) {
+      if (max(max(global$zipcoords[[i]][,2])-min(global$zipcoords[[i]][,2]), max(global$zipcoords[[i]][,1])-min(global$zipcoords[[i]][,1])) > val) {
+        val <- max(max(global$zipcoords[[i]][,2])-min(global$zipcoords[[i]][,2]), max(global$zipcoords[[i]][,1])-min(global$zipcoords[[i]][,1]))
+      }
+    } # Take the maximum range of x coords or y coords from all the ROIs 
+    if (global$nFrame == 1) {
+      val <- val*global$resolution
+      max <- min(dim(global$img)[1], dim(global$img)[2])*global$resolution # Dimension of the image if only one slice 
+    }
+    else if (global$nFrame > 1) {
+      max <- min(dim(global$img[[annote$imgFrame]])[1], dim(global$img[[annote$imgFrame]])[2])*global$resolution # Dimension of the image if more than one slice
+      val <- val*global$resolution
+    }
+    sliderInput("annoteSize", label = "Size of the ROI crop (microns)", min = 0, max = max, value = val) # Slider
+  })
+  
   
   observeEvent ( eventExpr = 
                    {annote$imgPNG},
                  handlerExpr = {
                    output$annotRoi <- EBImage::renderDisplay({
                      req(!is.null(annote$imgPNG)) 
-                     EBImage::display(annote$imgPNG, method = 'browser')
+                     if (is.null(annote$actual)) {
+                       EBImage::display(annote$imgPNG, method = 'browser')
+                     }
+                     else {
+                       req(input$annoteSize)
+                       d <- ((input$annoteSize/global$resolution)-1)/2 # Half of the image dimension 
+                       dim <- input$annoteSize/global$resolution # Dimension of the image
+                       xcenter = (max(global$zipcoords[[annote$actual]][,1])+min(global$zipcoords[[annote$actual]][,1]))/2
+                       ycenter = (max(global$zipcoords[[annote$actual]][,2])+min(global$zipcoords[[annote$actual]][,2]))/2
+                       xmin = xcenter-d
+                       xmax= xcenter+d
+                       ymin = ycenter-d
+                       ymax = ycenter+d
+                       if (xmin < 0) { 
+                         xmin <- 0
+                         xmax <- dim}
+                       if (ymin < 0) { 
+                         ymin <- 0
+                         ymax <- dim}
+                       if (ymax > dim(annote$imgPNG)[2]) { 
+                         ymin <- dim(annote$imgPNG)[2] - dim +1
+                         ymax <- dim(annote$imgPNG)[2]}
+                       if (xmax > dim(annote$imgPNG)[1]) { 
+                         xmax <- dim(annote$imgPNG)[1]
+                         xmin <- dim(annote$imgPNG)[1] - dim +1
+                       }
+                       EBImage::display(annote$imgPNG[xmin:xmax, ymin:ymax,], method = 'browser')
+                     }
                    })
                  })
 
