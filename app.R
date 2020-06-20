@@ -150,7 +150,8 @@ ui <- dashboardPage(
                              radioButtons("selectionType", "Type of selection",
                                           choices=c("One selection", "Multiple selection", "Select all plotted cells from a given z slice"),
                                           selected="One selection"),
-                             uiOutput("specificFrame")
+                             uiOutput("specificFrame"),
+                             uiOutput("validateAndAnnote")
                         ),
                 ),
                 # Second box : Image displayer
@@ -1275,6 +1276,17 @@ server <- function(input, output, session) {
         }
       }
     }, ignoreNULL=FALSE)
+  
+  # Validate gates and annote datas
+  output$validateAndAnnote <- renderUI({
+    req(global$data)
+    actionLink("validateAndAnnote", "Validate the gates and annote your datas", icon=icon("check"))
+  })
+  
+  observeEvent(input$validateAndAnnote,
+               { global$data$gate <- "R0"
+                 global$data$gate[global$data$ID %in% global$colors$ID] <- global$colors$color
+                 updateTabItems(session, "menu", selected="annotation")})
   
   # Update tabset panel : go to panel "Selected" instead of groups when there is a selection
   observeEvent(eventExpr={rois_plot1()}, 
