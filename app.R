@@ -706,12 +706,10 @@ server <- function(input, output, session) {
   # ROIs to plot on the interactive plot depending on selection 
   rois_toPlot <- eventReactive({
     input$filterType
-    input$plotType
     multiFiltering$final
     selectionFilterRois()
   },{
     req(global$data, !is.null(input$variablesHisto))
-    # If histogram : select ROIs having values selected
     if (input$filterType == "One selection") {
       req(length(selectionFilterRois()) > 0)
       rois_toPlot <- selectionFilterRois()
@@ -1305,8 +1303,6 @@ server <- function(input, output, session) {
         box( width=NULL, 
              title = "Image display", solidHeader= TRUE, status = "primary",
              checkboxInput("ids", "Display IDs"),
-             checkboxInput("ring", "Encircle cell"),
-             uiOutput("ringSlider"),
              withSpinner(
                EBImage::displayOutput("zoomImg")
              ),
@@ -1439,49 +1435,6 @@ server <- function(input, output, session) {
                  req(input$displayImg)
                  global$imgChan = input$channel1})
   
-  # Displaying ring of the ROI 
-  # Render UI for the size of the ring
-  output$ringSlider <- renderUI({
-    req(input$displayImg, input$ring)
-    if (input$ring==TRUE) {
-      sliderInput("ringSlider", label="Size of the circle (microns)", min=5, max=50, step=0.5, value=2)
-    }
-  })
-  
-  # Reactive values containing the coords of the ring for each selected ROI
-  ring <- reactiveValues(ringCoords = list())
-  
-  observeEvent(eventExpr={
-    input$ring
-    input$ringSlider
-    rois_plot1()
-  }, 
-  handlerExpr = {
-    req(input$displayImg)
-    ring$ringCoords <- global$zip
-    if (input$ring==TRUE & length(rois_plot1()) > 0 & !is.null(input$ringSlider)) {
-      for (j in rois_plot1()) {  
-        for (i in 1:nrow(ring$ringCoords[[j]]$coords)) { # Modify the ringCoords of each ROIs selected 
-          if (ring$ringCoords[[j]]$coords[i,1] >= mean(global$zip[[j]]$coords[,1])) { # If the x coordinate is superior to the mean x coordinate of the ROI -> means that this point is on the
-            # upper zone of the ROI -> substract the size of the ring -> ring point will be below the initial point
-            ring$ringCoords[[j]]$coords[i,1] <- ring$ringCoords[[j]]$coords[i,1] - as.numeric(input$ringSlider)/global$resolution
-          }  
-          else { # If the x coordinate is inferior to the mean x coordinate of the ROI -> means that this point is on the
-            # lower zone of the ROI -> add the size of the ring -> ring point will be above the initial point
-            ring$ringCoords[[j]]$coords[i,1] <- ring$ringCoords[[j]]$coords[i,1] + as.numeric(input$ringSlider)/global$resolution
-          } 
-          if (ring$ringCoords[[j]]$coords[i,2] >= mean(global$zip[[j]]$coords[,2])) { # If the y coordinate is superior to the mean y coordinate of the ROI -> means that this point is on the
-            # right zone of the ROI -> substract the size of the ring -> ring point will be on the left of the initial point
-            ring$ringCoords[[j]]$coords[i,2] <- ring$ringCoords[[j]]$coords[i,2] - as.numeric(input$ringSlider)/global$resolution
-          }
-          else { # If the y coordinate is inferior to the mean y coordinate of the ROI -> means that this point is on the
-            # left zone of the ROI -> substract the size of the ring -> ring point will be on the right of the initial point
-            ring$ringCoords[[j]]$coords[i,2] <- ring$ringCoords[[j]]$coords[i,2] + as.numeric(input$ringSlider)/global$resolution
-          }
-        }
-      }
-    }
-  })
   
   # Image PNG
   observeEvent(eventExpr= {
@@ -1493,9 +1446,6 @@ server <- function(input, output, session) {
     y()
     input$associated
     multiSelect$indiv
-    ring$ringCoords
-    input$ring
-    input$ringSlider
     overlays$imgOverlay
     input$overlay
     input$ids
@@ -1519,9 +1469,6 @@ server <- function(input, output, session) {
             # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
             col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             plot(global$zip[[i]], add=TRUE, col=col) # Plot this ROI 
-            if (length(ring$ringCoords) > 0 & input$ring==TRUE) { 
-              plot(ring$ringCoords[[i]], add=TRUE,col=col) # If display ring, add the ring corresponding to its ringcoords
-            }
           }
         }
       }
@@ -1536,9 +1483,6 @@ server <- function(input, output, session) {
               col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             }
             plot(global$zip[[i]], add=TRUE, col=col)
-            if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-              plot(ring$ringCoords[[i]], add=TRUE, col=col)
-            }
           }
         }
       }
@@ -1550,9 +1494,6 @@ server <- function(input, output, session) {
           col <- global$colors$color[global$colors$ID==i]
           col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           plot(global$zip[[i]], add=TRUE, col=col)
-          if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-            plot(ring$ringCoords[[i]], add=TRUE, col=col)
-          }
         }
       }
       if (input$selectionType=="Multiple selection" & length(multiSelect$indiv)>0 & !is.null(input$colorType)) {
@@ -1565,9 +1506,6 @@ server <- function(input, output, session) {
             col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           }
           plot(global$zip[[i]], add=TRUE, col=col)
-          if (length(ring$ringCoords) > 0 & input$ring==TRUE) {
-            plot(ring$ringCoords[[i]], add=TRUE, col=col)
-          }
         }
       }
     } 
