@@ -272,7 +272,7 @@ server <- function(input, output, session) {
   })
   
   # Global reactive variable 
-  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, legend=NULL, imgPath = "", img=list(), actualImg1=NULL, actualImg2=NULL, actualImg3=NULL,zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, 
+  global <- reactiveValues(ijPath="", fijiPath="", macroPath="", data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), actualImg1=NULL, actualImg2=NULL, actualImg3=NULL,zip=NULL, IDs=NULL, colors=NULL, imgPNG=NULL, nFrame=1, 
                            imgFrame=1, nChan=1, imgChan=1, imgFrame2=1, imgChan2=1, imgPNG2=NULL, resolution=NULL, resize = FALSE)
   
   # Roots for shinyfiles chooser
@@ -508,64 +508,15 @@ server <- function(input, output, session) {
       easyClose = TRUE
     ))
   })
+  
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
     if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==1 &
         length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==1) {
       global$imgPath <- dir(path = getwd(), pattern = "*.tif$", recursive=TRUE)
-      if (read_tags(global$imgPath)$frame1$color_space!="palette") {
-        if ((count_frames(global$imgPath))[1]==1) { # If only one frame
-          global$img <- read_tif(global$imgPath) # Image 
-          global$img <- as_EBImage(global$img)
-          global$nChan <- dim(global$img)[3] # Number of channel on the image
-          global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-          if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
-            global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-            global$resize <- TRUE
-            global$resolution <- global$resolution*2
-          }
-        }
-        else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
-          global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
-          global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
-          for (i in c(1:global$nFrame)) {
-            global$img[[i]] <- read_tif(global$imgPath, frames=i)
-            global$img[[i]] <- as_EBImage(global$img[[i]])
-            if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
-              global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
-              global$resize <- TRUE
-              global$resolution <- global$resolution*2
-            }
-          }
-          global$nChan <- dim(global$img[[1]])[3] 
-        }
-      }
-      else {
-        if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
-          global$img <- read_tif(global$imgPath)
-          global$nChan <- dim(global$img)[3]
-          global$img <- as_EBImage(global$img)
-          global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-          if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
-            global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-            global$resize <- TRUE
-            global$resolution <- global$resolution*2
-          }
-        }
-        else {
-          output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
-            paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
-          })
-        }
-      }
-      global$data <- read.table(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE),header=TRUE, sep="\t", dec=".")
-      global$zip <- read.ijzip(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))
-      if (global$resize == TRUE) {
-        for (i in c(1:length(global$zip))) {
-          global$zip[[i]]$coords <- global$zip[[i]]$coords/2
-        } 
-      }
-      global$legend <- read.table(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE), header=TRUE, sep="\t", dec=".")
+      global$dataPath <- dir(path = getwd(), pattern = "*.txt$", recursive=TRUE)
+      global$zipPath <- dir(path = getwd(), pattern = "*.zip$", recursive=TRUE)
+      global$legendPath <- dir(path = getwd(), pattern = "*.csv$", recursive=TRUE)
     }
     else {
       output$errorDefaultFiles <- renderPrint ({
@@ -582,13 +533,30 @@ server <- function(input, output, session) {
   })
   
   # Image variables
-  observeEvent(eventExpr= input$imgFile, handlerExpr = {
-    global$imgPath <- input$imgFile$datapath
-    if (read_tags(input$imgFile$datapath)$frame1$color_space!="palette") {
-      if ((count_frames(input$imgFile$datapath))[1]==1) { # If only one frame
-        global$img <- read_tif(global$imgPath) # Image menu plot to image
-        global$nChan <- dim(global$img)[3] # Number of channel on the image
+  observeEvent(eventExpr= input$imgFile, handlerExpr = { global$imgPath <- input$imgFile$datapath }, label = "files")
+  
+  # Legend variable
+  observeEvent(eventExpr=input$legendFile, handlerExpr = { global$legendPath <- input$legendFile$datapath })
+  
+  # Datas variables
+  observeEvent(eventExpr= input$dataFile, handlerExpr = { global$dataPath <- input$dataFile$datapath }, label = "files")
+  
+  # ROIs variables
+  observeEvent(eventExpr= input$zipFile, handlerExpr = { global$zipPath <- input$zipFile$datapath }, label = "files")
+  
+  
+  observeEvent ({
+    global$imgPath
+    global$legendPath
+    global$dataPath
+    global$zipPath
+  },{
+    req(global$imgPath, global$legendPath, global$dataPath, global$zipPath)
+    if (read_tags(global$imgPath)$frame1$color_space!="palette") {
+      if ((count_frames(global$imgPath))[1]==1) { # If only one frame
+        global$img <- read_tif(global$imgPath) # Image 
         global$img <- as_EBImage(global$img)
+        global$nChan <- dim(global$img)[3] # Number of channel on the image
         global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
         if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
           global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
@@ -596,7 +564,7 @@ server <- function(input, output, session) {
           global$resolution <- global$resolution*2
         }
       }
-      else if ((count_frames(input$imgFile$datapath))[1] > 1) { # If multiple frame
+      else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
         global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
@@ -629,7 +597,18 @@ server <- function(input, output, session) {
         })
       }
     }
-  }, label = "files")
+    separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
+    decimal <- switch (input$dec, "Point"=".", "Comma"=",")
+    global$data <- read.table(global$dataPath,header=input$header, sep=separator, dec=decimal)
+    global$zip <- read.ijzip(global$zipPath)
+    if (global$resize == TRUE) {
+      for (i in c(1:length(global$zip))) {
+        global$zip[[i]]$coords <- global$zip[[i]]$coords/2
+      } 
+    }
+    sepLegend <- switch( input$sepLegend, "Tab"="\t", "Comma"=",", "Semicolon"=";")
+    global$legend <- read.table(global$legendPath, header=TRUE, sep=sepLegend, dec=".")
+  })
   
   observe({ 
     req(length(global$img) > 0)
@@ -644,33 +623,6 @@ server <- function(input, output, session) {
       global$actualImg3 <- global$img
     }
   })
-  
-  # Legend variable
-  observeEvent(eventExpr=input$legendFile, 
-               handlerExpr = {
-                 sepLegend <- switch( input$sepLegend, "Tab"="\t", "Comma"=",", "Semicolon"=";")
-                 global$legend <- read.table(input$legendFile$datapath, header=input$headerLegend, sep=sepLegend)
-               })
-  
-  # Datas variables
-  observeEvent(eventExpr= input$dataFile, handlerExpr = {
-    separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
-    decimal <- switch (input$dec, "Point"=".", "Comma"=",")
-    # Datas
-    global$data <- read.table(input$dataFile$datapath,header=input$header, sep=separator, dec=decimal)
-  }, label = "files")
-  
-  # ROIs variables
-  observeEvent(eventExpr= input$zipFile, handlerExpr = {
-    #ROIzip file
-    global$zip <- read.ijzip(input$zipFile$datapath)
-    if (global$resize == TRUE) {
-      for (i in c(1:length(global$zip))) {
-        global$zip[[i]]$coords <- global$zip[[i]]$coords/2
-      } 
-    }
-  }, label = "files")
-  
   
   ## MENU PLOT TO IMAGE
   # Filtering Plot
@@ -699,8 +651,7 @@ server <- function(input, output, session) {
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectVar <- renderPlotly({
-    req(global$data)
-    req(!is.null(input$variablesHisto))
+    req(global$data, !is.null(input$variablesHisto))
     if (input$plotType == "One") {
       gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + 
         geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
@@ -720,8 +671,7 @@ server <- function(input, output, session) {
   })
   
   selectionFilterRois <- reactive({
-    req(global$data)
-    req(!is.null(input$variablesHisto))
+    req(global$data, !is.null(input$variablesHisto))
     if (input$plotType == "One") {
       d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
       if (!is.null(event_data("plotly_selected", source="v")$x)) {
@@ -760,8 +710,7 @@ server <- function(input, output, session) {
     multiFiltering$final
     selectionFilterRois()
   },{
-    req(global$data)
-    req(!is.null(input$variablesHisto))
+    req(global$data, !is.null(input$variablesHisto))
     # If histogram : select ROIs having values selected
     if (input$filterType == "One selection") {
       req(length(selectionFilterRois()) > 0)
@@ -777,8 +726,7 @@ server <- function(input, output, session) {
   multiFiltering <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0)
 
   output$filterNextSel <- renderUI ({
-    req(!is.null(selectionFilterRois()))
-    req(nrow(rois_toPlot())==0)
+    req(!is.null(selectionFilterRois()), nrow(rois_toPlot())==0)
     if (input$filterType == "Multiple selection" & length(selectionFilterRois()) > 0) {
       tagList(
         helpText("Select your cells and click on the button to select other cells."),
