@@ -125,7 +125,8 @@ ui <- dashboardPage(
                              helpText("Select the ROIs (click or brush) to plot in the interactive Plot"),
                              plotlyOutput("selectVar"),
                              uiOutput("filterNextSel"),
-                             uiOutput("resetFilterAllSel")
+                             uiOutput("resetFilterAllSel"),
+                             uiOutput("resetFilter")
                         ),
                         box( width = NULL,
                              title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
@@ -651,17 +652,26 @@ server <- function(input, output, session) {
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$selectVar <- renderPlotly({
-    req(global$data, !is.null(input$variablesHisto))
+    req(global$data, input$variablesHisto)
     if (input$plotType == "One") {
-      gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + 
-        geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
-      v <- ggplotly(gg, source="v")
-      v %>% 
-        layout(dragmode = "select") %>%
-        event_register("plotly_selected")
+      if (class(global$data[input$variablesHisto][,1])=="numeric" | class(global$data[input$variablesHisto][,1])=="integer") {
+        gg <- ggplot(data=global$data, aes_string(x=input$variablesHisto, customdata="ID")) + 
+          geom_histogram(binwidth=(max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20)
+        v <- ggplotly(gg, source="v")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
+      else {
+        gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$variablesHisto, customdata=input$variablesHisto))
+        v <- ggplotly(gg, source="v")
+        v %>% 
+          layout(dragmode = "select") %>%
+          event_register("plotly_selected")
+      }
     }
     else if (input$plotType == "Two") {
-      req(!is.null(input$variablesScatter))
+      req(input$variablesScatter)
       gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$variablesHisto, y=input$variablesScatter, customdata="ID"))
       v <- ggplotly(gg, source="v")
       v %>% 
@@ -671,26 +681,39 @@ server <- function(input, output, session) {
   })
   
   selectionFilterRois <- reactive({
-    req(global$data, !is.null(input$variablesHisto))
+    req(global$data, input$variablesHisto)
     if (input$plotType == "One") {
-      d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
-      if (!is.null(event_data("plotly_selected", source="v")$x)) {
-        min <- event_data("plotly_selected", source="v")$x[1]-d/2 
-        max <- event_data("plotly_selected", source="v")$x[length(event_data("plotly_selected", source="v")$x)]+d/2
-        global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
-      }
-      else if (!is.null(event_data("plotly_click", source="v")$x)) {
-        min <- (event_data("plotly_click", source="v")$x)-d/2
-        max <- (event_data("plotly_click", source="v")$x)+d/2
-        global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
+      if (class(global$data[input$variablesHisto][,1])=="numeric" | class(global$data[input$variablesHisto][,1])=="integer") {
+        d <- (max(global$data[input$variablesHisto])-min(global$data[input$variablesHisto]))/20 # Size of the histogram bar : values corresponding to this bars
+        if (!is.null(event_data("plotly_selected", source="v")$x)) {
+          min <- event_data("plotly_selected", source="v")$x[1]-d/2 
+          max <- event_data("plotly_selected", source="v")$x[length(event_data("plotly_selected", source="v")$x)]+d/2
+          global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
+        }
+        else if (!is.null(event_data("plotly_click", source="v")$x)) {
+          min <- (event_data("plotly_click", source="v")$x)-d/2
+          max <- (event_data("plotly_click", source="v")$x)+d/2
+          global$data$ID[(global$data[input$variablesHisto] > min) & (global$data[input$variablesHisto] < max)]
+        }
+        else {
+          event_data("plotly_deselect", source="v")
+        }
       }
       else {
-        event_data("plotly_deselect", source="v")
+        if (!is.null(event_data("plotly_selected", source="v")$x)) {
+          global$data$ID[global$data[input$variablesHisto][,1] %in% event_data("plotly_selected", source="v")$customdata]
+        }
+        else if (!is.null(event_data("plotly_click", source="v")$x)) {
+          global$data$ID[global$data[input$variablesHisto] == event_data("plotly_click", source="v")$customdata]
+        }
+        else {
+          event_data("plotly_deselect", source="v")
+        }
       }
     }
     # If scatterplot : select ROIs corresponding to points selected
     else {
-      req(!is.null(input$variablesScatter))
+      req(input$variablesScatter)
       if (!is.null(event_data("plotly_selected", source="v")$customdata)) {
         global$data$ID[event_data("plotly_selected", source="v")$customdata]
       }
@@ -703,28 +726,29 @@ server <- function(input, output, session) {
     }
   })
   
+  filtered <- reactiveValues(rois_toPlot = NULL)
   # ROIs to plot on the interactive plot depending on selection 
-  rois_toPlot <- eventReactive({
+  observeEvent({
     input$filterType
     multiFiltering$final
     selectionFilterRois()
   },{
-    req(global$data, !is.null(input$variablesHisto))
+    req(global$data, input$variablesHisto)
     if (input$filterType == "One selection") {
       req(length(selectionFilterRois()) > 0)
-      rois_toPlot <- selectionFilterRois()
-      rois_toPlot <- global$data[global$data$ID %in% rois_toPlot,]
+      filtered$rois_toPlot <- selectionFilterRois()
+      filtered$rois_toPlot <- global$data[global$data$ID %in% filtered$rois_toPlot,]
     }
     else if (input$filterType == "Multiple selection") {
-      rois_toPlot <- unique(multiFiltering$final)
-      rois_toPlot <- global$data[global$data$ID %in% rois_toPlot,]
+      filtered$rois_toPlot <- unique(multiFiltering$final)
+      filtered$rois_toPlot <- global$data[global$data$ID %in% filtered$rois_toPlot,]
     }
   }, ignoreNULL=FALSE)
   
   multiFiltering <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0)
 
   output$filterNextSel <- renderUI ({
-    req(!is.null(selectionFilterRois()), nrow(rois_toPlot())==0)
+    req(!is.null(selectionFilterRois()), nrow(filtered$rois_toPlot)==0)
     if (input$filterType == "Multiple selection" & length(selectionFilterRois()) > 0) {
       tagList(
         helpText("Select your cells and click on the button to select other cells."),
@@ -738,12 +762,17 @@ server <- function(input, output, session) {
   })
   
   output$resetFilterAllSel <- renderUI({
-    req(nrow(rois_toPlot())==0)
+    req(nrow(filtered$rois_toPlot)==0)
     if (input$filterType=="Multiple selection" & length(multiFiltering$totale) > 0) {
       actionLink("resetFilterAllSel", "Reset all selections")
     }
   })
   
+  output$resetFilter <- renderUI({
+    req(nrow(filtered$rois_toPlot) > 0)
+    actionLink("resetFilter", "Reset filtered cells")
+  })
+
   observeEvent(eventExpr= {
     input$filterNextSel
   }, handlerExpr = {
@@ -766,7 +795,17 @@ server <- function(input, output, session) {
     multiFiltering$totale <- c()
     multiFiltering$indiv <- c()
     multiFiltering$nSel <- 0
+    shinyjs::reset("variablesHisto") 
+    if (!is.null(input$variablesScatter)) shinyjs::reset("variablesScatter")
   })
+  
+  observeEvent(eventExpr = {input$resetFilter},
+               handlerExpr = { 
+                 filtered$rois_toPlot <- NULL
+                 shinyjs::reset("variablesHisto") 
+                 if (!is.null(input$variablesScatter)) shinyjs::reset("variablesScatter")
+                 })
+
   
   # Interactive plot
   # UI for choosing variables to display 
@@ -848,46 +887,36 @@ server <- function(input, output, session) {
   
   
   ## Global colors
-  # Datas to plot if no Filtering 
-  observeEvent(
-    eventExpr = {
-      global$data
-      input$colsX1
-      input$colsY1
-    },
-    handlerExpr = {
-      req((!is.null(global$data)), (!is.null(input$colsX1)), (!is.null(input$colsY1)))
-      # Dataframe which will contain datas to plot depending on cols selected 
-      global$colors <- data.frame(global$data$ID)
-      global$colors$color <- "R0"
-      colnames(global$colors) <- c("ID","color")
-      global$colors$shape <- "Neg"
-      global$colors[input$colsX1] <- global$data[input$colsX1]
-      global$colors[input$colsY1] <- global$data[input$colsY1]
-    }, ignoreNULL=FALSE)
-  
-  # Datas to plot if filtering
   observeEvent (
     eventExpr = { 
       # Depends of columns selected and sliders
       global$data
       input$colsX1
       input$colsY1
-      rois_toPlot()
+      filtered$rois_toPlot
     },
     handlerExpr = { 
-      if (nrow(data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID]))>0) {
-        req((!is.null(global$data)), (!is.null(input$colsX1)), (!is.null(input$colsY1)), (!is.null(rois_toPlot()$ID)))
+      req((!is.null(global$data)), (!is.null(input$colsX1)), (!is.null(input$colsY1)))
+      if (nrow(data.frame(global$data$ID[global$data$ID %in% filtered$rois_toPlot$ID]))>0) {
           # Dataframe which will contain datas to plot depending on cols selected 
-          global$colors <- data.frame(global$data$ID[global$data$ID %in% rois_toPlot()$ID])
+          global$colors <- data.frame(global$data$ID[global$data$ID %in% filtered$rois_toPlot$ID])
           global$colors$color <- "R0"
           colnames(global$colors) <- c("ID","color")
           global$colors$shape <- "Neg"
-          global$colors[input$colsX1] <- global$data[input$colsX1][global$data$ID %in% rois_toPlot()$ID,]
-          global$colors[input$colsY1] <- global$data[input$colsY1][global$data$ID %in% rois_toPlot()$ID,]
+          global$colors[input$colsX1] <- global$data[input$colsX1][global$data$ID %in% filtered$rois_toPlot$ID,]
+          global$colors[input$colsY1] <- global$data[input$colsY1][global$data$ID %in% filtered$rois_toPlot$ID,]
+      }
+      else {
+        global$colors <- data.frame(global$data$ID)
+        global$colors$color <- "R0"
+        colnames(global$colors) <- c("ID","color")
+        global$colors$shape <- "Neg"
+        global$colors[input$colsX1] <- global$data[input$colsX1]
+        global$colors[input$colsY1] <- global$data[input$colsY1]
       }
     }, ignoreNULL=FALSE 
   )
+  
   # Color datas 
   observeEvent(eventExpr= {
     global$colors
@@ -907,13 +936,13 @@ server <- function(input, output, session) {
           global$colors$color[i] <- "Q1"
         }
         else if ((global$colors[input$colsX1][i,] > x()) & (global$colors[input$colsY1][i,] > y())){
-          global$colors$color[i] <- "Q4"
+          global$colors$color[i] <- "Q3"
         }
         else if ((global$colors[input$colsX1][i,] < x()) & (global$colors[input$colsY1][i,] > y())) {
           global$colors$color[i] <- "Q2"
         }
         else {
-          global$colors$color[i] <- "Q3"
+          global$colors$color[i] <- "Q4"
         }
       }
     }
@@ -924,13 +953,13 @@ server <- function(input, output, session) {
             global$colors$color[i] <- "Q1"
           }
           else if ((global$colors[input$colsX1][i,] > x()) & (global$colors[input$colsY1][i,] > y())){
-            global$colors$color[i] <- "Q4"
+            global$colors$color[i] <- "Q3"
           }
           else if ((global$colors[input$colsX1][i,] < x()) & (global$colors[input$colsY1][i,] > y())) {
             global$colors$color[i] <- "Q2"
           }
           else {
-            global$colors$color[i] <- "Q3"
+            global$colors$color[i] <- "Q4"
           }
         }
       }
@@ -1168,10 +1197,8 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = {
     input$resetAllSel},
     handlerExpr = {
-      selectionRois <- event_data("plotly_deselect", source="p")
-      rois_plot1 <- c()
-      js$resetSelect()
-      js$resetClick()
+      shinyjs::reset("colsX1") 
+      shinyjs::reset("colsY1")
       if ((input$selectionType=="Multiple selection") & (!is.null(input$colorType))) {
         multiSelect$indiv <- c()
         multiSelect$total <- c()
@@ -1182,35 +1209,30 @@ server <- function(input, output, session) {
       }
     })
   
-  # Remove all selections when selection type radiobutton moved 
-  observeEvent(input$selectionType,
-               handlerExpr={
-                 js$resetSelect()
-                 js$resetClick()
-               })
-  
   # ROI selected on the plot
-  rois_plot1 <- eventReactive(eventExpr = {input$selectionType
+  select <- reactiveValues(rois_plot = c())
+  
+  observeEvent(eventExpr = {input$selectionType
     selectionRois()
     input$specificFrame
     multiSelect$total
-  }, valueExpr = 
+  }, handlerExpr = 
     {
       req(!is.null(global$data), !is.null(global$colors))
       if (input$selectionType == "One selection") { # If One selection : use only the selection on the plot
-        rois_plot1 <- selectionRois()
-        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
+        select$rois_plot <- selectionRois()
+        select$rois_plot <- global$data$ID[global$data$ID %in% select$rois_plot]
       }
       else if (input$selectionType=="Multiple selection") { # If multiple selection : use the registered selections (multiSelect$total vs multiSelect$indiv which are new selections)
-        rois_plot1 <- unique(multiSelect$total)
-        rois_plot1 <- global$data$ID[global$data$ID %in% rois_plot1]
+        select$rois_plot <- unique(multiSelect$total)
+        select$rois_plot <- global$data$ID[global$data$ID %in% select$rois_plot]
       }
       else if (input$selectionType == "Select all plotted cells from a given z slice") { # If select all ROIs of a specific frame 
         if ((global$nFrame > 1) & (!is.null(input$specificFrame))) { # If more than one frame : only ROIs which are on this specific frame
-          rois_plot1 <- global$colors$ID[global$colors$ID %in% global$data$ID[global$data$Slice==input$specificFrame]]
+          select$rois_plot <- global$colors$ID[global$colors$ID %in% global$data$ID[global$data$Slice==input$specificFrame]]
         }
         else if (global$nFrame == 1) { # If only one frame : all ROIs 
-          rois_plot1 <- global$colors$ID
+          select$rois_plot <- global$colors$ID
         }
       }
     }, ignoreNULL=FALSE)
@@ -1227,9 +1249,9 @@ server <- function(input, output, session) {
                  updateTabItems(session, "menu", selected="annotation")})
   
   # Update tabset panel : go to panel "Selected" instead of groups when there is a selection
-  observeEvent(eventExpr={rois_plot1()}, 
+  observeEvent(eventExpr={select$rois_plot}, 
                handlerExpr= {
-                 if (length(rois_plot1())>0) {
+                 if (length(select$rois_plot)>0) {
                    updateTabsetPanel(session, "infosGroup", selected="Selected")
                  }
                })
@@ -1237,7 +1259,7 @@ server <- function(input, output, session) {
   # Reactive variable : infos on points selected on the plot (infos from global$data)
   rois_plot_table1 <- reactive ({
     req(global$data)
-    data.frame(global$data[global$data$ID %in% rois_plot1(),], global$colors$color[global$colors$ID %in% rois_plot1()])
+    data.frame(global$data[global$data$ID %in% select$rois_plot,], global$colors$color[global$colors$ID %in% select$rois_plot])
   })
   
   # RenderText : number of selected cells 
@@ -1247,7 +1269,7 @@ server <- function(input, output, session) {
     shapes <- NULL 
     if (input$colShape != "None") {
       for (i in unique(global$colors$shape)) {
-        nbShapeCell <- paste0(length(global$colors$ID[global$colors$ID %in% rois_plot1() & global$colors$shape == i]), " cells ", str_to_lower(i))
+        nbShapeCell <- paste0(length(global$colors$ID[global$colors$ID %in% select$rois_plot & global$colors$shape == i]), " cells ", str_to_lower(i))
         shapes <- paste0(shapes, ", ", nbShapeCell)
       }
     }
@@ -1418,12 +1440,12 @@ server <- function(input, output, session) {
   
   # If ROIs selected all on the same frame -> change the actual frame to this frame
   observeEvent(eventExpr= {
-    rois_plot1()
+    select$rois_plot
   },
   handlerExpr={
     req(input$displayImg)
-    if (length(unique(global$data$Slice[global$data$ID %in% rois_plot1()]))==1) { 
-      newFrame <- unique(global$data$Slice[global$data$ID %in% rois_plot1()])
+    if (length(unique(global$data$Slice[global$data$ID %in% select$rois_plot]))==1) { 
+      newFrame <- unique(global$data$Slice[global$data$ID %in% select$rois_plot])
       global$imgFrame <- newFrame
       global$imgChan <- input$channel1
     }
@@ -1439,7 +1461,7 @@ server <- function(input, output, session) {
   # Image PNG
   observeEvent(eventExpr= {
     global$colors
-    rois_plot1()
+    select$rois_plot
     input$channel1
     input$frame1
     x()
@@ -1462,8 +1484,8 @@ server <- function(input, output, session) {
       display(global$actualImg1[,,global$imgChan,1], method="raster")
     }
     if (input$associated == TRUE & global$nFrame > 1) { # If more than one frame and ROIs associated with their original frame
-      if (length(rois_plot1())>0) { # If ROIs selected on the plot
-        for (i in rois_plot1()) {
+      if (length(select$rois_plot)>0) { # If ROIs selected on the plot
+        for (i in select$rois_plot) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) { # If this ROI is on the selected Slice
             col <- global$colors$color[global$colors$ID==i] 
             # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
@@ -1489,8 +1511,8 @@ server <- function(input, output, session) {
     }
     else if ((input$associated == FALSE & global$nFrame >1) | (input$associated==TRUE & global$nFrame==1) | (input$associated==FALSE & global$nFrame==1) ) {
       # If only one slice or if more than one slice and ROI not associated with their original slice -> Same procedure but without slice association 
-      if (length(rois_plot1())>0) {
-        for (i in rois_plot1()) {
+      if (length(select$rois_plot)>0) {
+        for (i in select$rois_plot) {
           col <- global$colors$color[global$colors$ID==i]
           col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           plot(global$zip[[i]], add=TRUE, col=col)
@@ -1513,9 +1535,9 @@ server <- function(input, output, session) {
     out <- normalizePath(out, "/")
     global$imgPNG <- EBImage::readImage(out)
     if (input$ids==TRUE) {
-      if ((global$nFrame==1 | input$associated==FALSE) & (length(rois_plot1()) > 0)) {
+      if ((global$nFrame==1 | input$associated==FALSE) & (length(select$rois_plot) > 0)) {
         global$imgPNG <- magick::image_read(global$imgPNG)
-        for (i in rois_plot1()) {
+        for (i in select$rois_plot) {
           xID <- round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
           yID <- round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
           coord <- paste("+", xID, "+", yID, sep="")
@@ -1523,9 +1545,9 @@ server <- function(input, output, session) {
         }
         global$imgPNG <- magick::as_EBImage(global$imgPNG)
       }
-      if (input$associated==TRUE & global$nFrame > 1 & length(rois_plot1()) > 0 & any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
+      if (input$associated==TRUE & global$nFrame > 1 & length(select$rois_plot) > 0 & any(global$data$Slice[global$data$ID %in% select$rois_plot]==input$frame1)) {
         global$imgPNG <- magick::image_read(global$imgPNG)
-        for (i in rois_plot1()) {
+        for (i in select$rois_plot) {
           if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
             xID <- round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
             yID <- round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
@@ -1562,7 +1584,7 @@ server <- function(input, output, session) {
   
   # Displayer cropped ROIs 
   observeEvent(eventExpr= {
-    rois_plot1()
+    select$rois_plot
     input$channel1
     input$frame1 
     input$ids
@@ -1571,14 +1593,14 @@ server <- function(input, output, session) {
   handlerExpr= {
     req(input$displayImg)
     output$list <- EBImage::renderDisplay({
-      req(length(rois_plot1()) != 0)
+      req(length(select$rois_plot) != 0)
       req(global$img)
       # Case one : one slice or no association with slice 
       if (global$nFrame==1 | input$associated==FALSE) {
         d <- ((input$size/global$resolution)-1)/2 # Half of the image dimension 
         dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG)) # Initial image with dimension depending on slider input
-        for (i in rois_plot1()) { # For each ROI, determine its center 
+        for (i in select$rois_plot) { # For each ROI, determine its center 
           xcenter = (max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2
           ycenter = (max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2
           # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
@@ -1615,8 +1637,8 @@ server <- function(input, output, session) {
         d <- ((input$size/global$resolution)-1)/2 # Half of the image dimension 
         dim <- input$size/global$resolution # Dimension of the image
         prem <- EBImage::Image(0,c(dim,dim,dim(global$imgPNG)[3]),EBImage::colorMode(global$imgPNG))
-        if (any(global$data$Slice[global$data$ID %in% rois_plot1()]==input$frame1)) {
-          for (i in rois_plot1()) {
+        if (any(global$data$Slice[global$data$ID %in% select$rois_plot]==input$frame1)) {
+          for (i in select$rois_plot) {
             if (global$data$Slice[global$data$ID==i]==global$imgFrame) {
               xcenter = (max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2
               ycenter = (max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2
@@ -1648,7 +1670,7 @@ server <- function(input, output, session) {
               prem <- EBImage::combine(prem, cross)
             }
           }
-          nbCell <- sum(global$data$Slice[global$data$ID %in% rois_plot1()]==global$imgFrame)
+          nbCell <- sum(global$data$Slice[global$data$ID %in% select$rois_plot]==global$imgFrame)
           EBImage::display(prem[,,,2:(nbCell+1)], method = 'browser')
         }
       }
@@ -1670,7 +1692,7 @@ server <- function(input, output, session) {
   
   # UI to choose slice to display
   output$frame2 <- renderUI ({
-    req(length(global$img) != 0)
+    req(length(global$img) != 0, global$nFrame > 1)
     sliderInput("frame2", label = "Slice to display", min = 1, max = global$nFrame, value = global$imgFrame2, step=1)
   })
   
