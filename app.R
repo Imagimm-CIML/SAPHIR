@@ -90,6 +90,7 @@ ui <- dashboardPage(
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
+                     verbatimTextOutput("error"),
                      tags$hr(),
                      helpText("Select the file containing the legend for the channels in the image."),
                      radioButtons("sepLegend", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
@@ -554,7 +555,7 @@ server <- function(input, output, session) {
   },{
     req(global$imgPath, global$legendPath, global$dataPath, global$zipPath)
     if (read_tags(global$imgPath)$frame1$color_space!="palette") {
-      if ((count_frames(global$imgPath))[1]==1) { # If only one frame
+      if ((dim(read_tif(global$imgPath)))[4]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
         global$img <- as_EBImage(global$img)
         global$nChan <- dim(global$img)[3] # Number of channel on the image
@@ -565,8 +566,8 @@ server <- function(input, output, session) {
           global$resolution <- global$resolution*2
         }
       }
-      else if ((count_frames(global$imgPath))[1] > 1) { # If multiple frame
-        global$nFrame <- count_frames(global$imgPath)[1] # Number of frames of the image
+      else if ((dim(read_tif(global$imgPath)))[4] > 1)  { # If multiple frame
+        global$nFrame <- (dim(read_tif(global$imgPath)))[4] # Number of frames of the image
         global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
         for (i in c(1:global$nFrame)) {
           global$img[[i]] <- read_tif(global$imgPath, frames=i)
@@ -581,22 +582,9 @@ server <- function(input, output, session) {
       }
     }
     else {
-      if ((count_frames(global$imgPath)[1]==attr(count_frames(global$imgPath), "n_dirs"))) { # If palette color space but only one frame 
-        global$img <- read_tif(global$imgPath)
-        global$nChan <- dim(global$img)[3]
-        global$img <- as_EBImage(global$img)
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-        if (dim(global$img)[2] > 1200 & dim(global$img)[1] > 1200) {
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-          global$resize <- TRUE
-          global$resolution <- global$resolution*2
-        }
-      }
-      else {
-        output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
-          paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
-        })
-      }
+      output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
+        paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
+      })
     }
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
     decimal <- switch (input$dec, "Point"=".", "Comma"=",")
@@ -727,6 +715,7 @@ server <- function(input, output, session) {
   })
   
   filtered <- reactiveValues(rois_toPlot = NULL)
+  
   # ROIs to plot on the interactive plot depending on selection 
   observeEvent({
     input$filterType
@@ -747,14 +736,15 @@ server <- function(input, output, session) {
   
   multiFiltering <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0)
 
+  
   output$filterNextSel <- renderUI ({
     req(!is.null(selectionFilterRois()), nrow(filtered$rois_toPlot)==0)
     if (input$filterType == "Multiple selection" & length(selectionFilterRois()) > 0) {
       tagList(
         helpText("Select your cells and click on the button to select other cells."),
-        actionButton("filterNextSel", "Next selection"),
+        actionButton("filterNextSel", "Add to selection"),
         if (multiFiltering$nSel > 1) {
-          actionButton("filterValidateSel", "Confirm selections")
+          actionButton("filterValidateSel", "Finalize selections")
         },
         tags$br()
       )
@@ -818,6 +808,7 @@ server <- function(input, output, session) {
                    selected = names(global$data)[3],
                    options = list(maxItems = 1))
   })
+  
   output$colsY1 <- renderUI({
     req(global$data)
     selectizeInput(inputId = "colsY1", 
@@ -902,7 +893,7 @@ server <- function(input, output, session) {
           global$colors <- data.frame(global$data$ID[global$data$ID %in% filtered$rois_toPlot$ID])
           global$colors$color <- "R0"
           colnames(global$colors) <- c("ID","color")
-          global$colors$shape <- "Neg"
+          global$colors$shape <- "No threshold"
           global$colors[input$colsX1] <- global$data[input$colsX1][global$data$ID %in% filtered$rois_toPlot$ID,]
           global$colors[input$colsY1] <- global$data[input$colsY1][global$data$ID %in% filtered$rois_toPlot$ID,]
       }
@@ -910,7 +901,7 @@ server <- function(input, output, session) {
         global$colors <- data.frame(global$data$ID)
         global$colors$color <- "R0"
         colnames(global$colors) <- c("ID","color")
-        global$colors$shape <- "Neg"
+        global$colors$shape <- "No threshold"
         global$colors[input$colsX1] <- global$data[input$colsX1]
         global$colors[input$colsY1] <- global$data[input$colsY1]
       }
@@ -1026,15 +1017,7 @@ server <- function(input, output, session) {
     }
     paste0(groups, "\n")
   })
-  
-  output$summary <- renderPrint ({
-    req(global$data)
-    for (i in unique(global$colors$color)) {
-      print(i)
-      print(summary(global$data[global$data$ID %in% global$colors$ID[global$colors$color==i],]))
-    }
-  })
-  
+
   ## Scatter plot
   observeEvent(eventExpr= {global$colors
     input$colorType
@@ -1178,8 +1161,7 @@ server <- function(input, output, session) {
   })
   
   # Save ROIs selected when Validate button pushed
-  observeEvent(eventExpr={
-    input$nextSel},
+  observeEvent(eventExpr={input$nextSel},
     handlerExpr={
       if (multiSelect$indice < 4) {
         multiSelect$indice <- multiSelect$indice + 1
