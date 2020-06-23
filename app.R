@@ -856,8 +856,9 @@ server <- function(input, output, session) {
   
   observeEvent ( eventExpr = {
     input$validateThreshold
+    global$colors
   }, handlerExpr = {
-    req(length(input$colShape) == length(thresholds()), length(input$colShape) >= 1)
+    req(length(input$colShape) == length(thresholds()), length(input$colShape) >= 1, input$colShape != "None", nrow(global$colors) > 0)
     for (i in global$colors$ID) {
       comparisons = c()
       for (j in 1:length(input$colShape)) {
@@ -1312,7 +1313,8 @@ server <- function(input, output, session) {
              ),
              uiOutput("channel1"),
              uiOutput("frame1"),
-             checkboxInput("contrastImg", "Enhance contrast in image")
+             checkboxInput("contrastImg", "Enhance contrast in image"),
+             uiOutput("contrastSlider")
         ),
         box (width=NULL, 
              title = "ROIs", solidHeader=TRUE, status="primary",
@@ -1325,6 +1327,15 @@ server <- function(input, output, session) {
     }
   )
   
+  output$contrastSlider <- renderUI ({
+    if (input$contrastImg) {
+      tagList(
+      sliderInput("contrastRate", "% of initial contrast",min=100, max=1000, value=100),
+      sliderInput("brightnessRate", "% of initial brightness", min=100, max=1000, value=100),
+      sliderInput("saturationRate", "% of initial saturation", min=100, max=1000, value=100)
+      )
+    }
+  })
   
   # Table with legend channel 
   output$legend1 <- renderTable({
@@ -1454,6 +1465,9 @@ server <- function(input, output, session) {
     input$overlay
     input$ids
     input$contrastImg
+    input$contrastRate
+    input$saturationRate
+    input$brightnessRate
   },
   handlerExpr= {
     req(input$displayImg, length(global$img) > 0, length(global$zip) > 0)
@@ -1541,8 +1555,9 @@ server <- function(input, output, session) {
       }
     }
     if (input$contrastImg==TRUE) {
+      req(input$contrastRate, input$saturationRate, input$brightnessRate)
       global$imgPNG <- magick::image_read(global$imgPNG)
-      global$imgPNG <- magick::image_modulate(global$imgPNG,saturation=500,brightness = 200, hue=500)
+      global$imgPNG <- magick::image_modulate(global$imgPNG,saturation=as.numeric(input$saturationRate),brightness = as.numeric(input$brightnessRate), hue=as.numeric(input$contrastRate))
       global$imgPNG <- magick::as_EBImage(global$imgPNG)
     }
     
