@@ -107,9 +107,7 @@ ui <- dashboardPage(
                      fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
                 ),
               ),
-              actionButton("refresh", "Reset"),
-              tags$br(),
-              tags$br(),
+              actionButton("refresh", "Reset")
       ),
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
@@ -200,7 +198,7 @@ ui <- dashboardPage(
                      uiOutput("imgToPlot_color"),
                      checkboxInput("imgToPlot_brightnessImg", "Enhance brightness in image"),
                      uiOutput("imgToPlot_brightnessSlider"),
-                     helpText("Click or select cells on the image and see their correspondance in the plot. "),
+                     helpText("Click or select cells on the image and see their correspondance in the plot."),
                      withSpinner(plotlyOutput("imgToPlot_img")),
                      verbatimTextOutput("imgToPlot_selected")
                 ),
@@ -664,7 +662,7 @@ server <- function(input, output, session) {
           event_register("plotly_selected")
       }
       else {
-        gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$plotToImgFilter_colsX, customdata=input$plotToImgFilter_colsX, fill="selected")) + 
+        gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$plotToImgFilter_colsX, customdata=input$plotToImgFilter_colsX, fill="selected"))  
         v <- ggplotly(gg, source="v")
         v %>% 
           layout(dragmode = "select") %>%
@@ -755,7 +753,6 @@ server <- function(input, output, session) {
     req(filterSelected(), nrow(plotToImg$filtered)==0)
     if (input$plotToImgFilter_selectionType == "Multiple selection" & length(filterSelected())>0) {
       tagList(
-        helpText("Select your cells and click on the button to validate the selected cells."),
         actionButton("plotToImgFilter_nextSelection", "Validate actual selection"),
         if (plotToImgFilter_multiSelect$nSel > 1) {
           actionButton("plotToImgFilter_validateSelection", "Validate final selection")
@@ -766,9 +763,9 @@ server <- function(input, output, session) {
   })
   
   output$plotToImgFilter_reset <- renderUI({
-    req(plotToImg$filtered)
-    if (nrow(plotToImg$filtered) > 0) {
-      actionLink("plotToImgFilter_reset", "Reset plot")
+    req(filterSelected())
+    if (length(filterSelected()) > 0) {
+      actionLink("plotToImgFilter_reset", "Reset selection")
     }
   })
 
