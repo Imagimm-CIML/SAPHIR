@@ -198,8 +198,8 @@ ui <- dashboardPage(
                      uiOutput("imgToPlot_frame"),
                      helpText("Select the color of the ROIs."),
                      uiOutput("imgToPlot_color"),
-                     checkboxInput("imgToPlot_contrastImg", "Enhance contrast in image"),
-                     uiOutput("imgToPlot_contrastSlider"),
+                     checkboxInput("imgToPlot_brightnessImg", "Enhance brightness in image"),
+                     uiOutput("imgToPlot_brightnessSlider"),
                      helpText("Click or select cells on the image and see their correspondance in the plot. "),
                      withSpinner(plotlyOutput("imgToPlot_img")),
                      verbatimTextOutput("imgToPlot_selected")
@@ -244,6 +244,8 @@ ui <- dashboardPage(
                              uiOutput("annote_cropSize"),
                              checkboxInput("annote_associate", "Associate with slice", value=TRUE),
                              checkboxInput("annote_overlay", "Overlay channels (up to 3)"),
+                             checkboxInput("annote_addBrightness", "Enhance brightness in image", value=FALSE),
+                             uiOutput("annote_brightnessSlider"),
                              uiOutput("annote_channelOverlay"),
                              withSpinner(EBImage::displayOutput("annote_cropImg")),
                              verbatimTextOutput("annote_actualValue"),
@@ -1312,8 +1314,8 @@ server <- function(input, output, session) {
              ),
              uiOutput("plotToImg_channel"),
              uiOutput("plotToImg_frame"),
-             checkboxInput("plotToImg_addContrast", "Enhance contrast in image"),
-             uiOutput("plotToImg_contrastSlider")
+             checkboxInput("plotToImg_addBrightness", "Enhance brightness in image"),
+             uiOutput("plotToImg_brightnessSlider")
         ),
         box (width=NULL, 
              title = "ROIs", solidHeader=TRUE, status="primary",
@@ -1326,13 +1328,9 @@ server <- function(input, output, session) {
     }
   )
   
-  output$plotToImg_contrastSlider <- renderUI ({
-    if (input$plotToImg_addContrast) {
-      tagList(
-      sliderInput("plotToImg_contrastRate", "% of initial contrast",min=100, max=1000, value=100),
-      sliderInput("plotToImg_brightnessRate", "% of initial brightness", min=100, max=1000, value=100),
-      sliderInput("plotToImg_saturationRate", "% of initial saturation", min=100, max=1000, value=100)
-      )
+  output$plotToImg_brightnessSlider <- renderUI ({
+    if (input$plotToImg_addBrightness) {
+      sliderInput("plotToImg_brightnessRate", "% of initial brightness", min=100, max=1000, value=100)
     }
   })
   
@@ -1463,9 +1461,7 @@ server <- function(input, output, session) {
     plotToImg_overlays$imgOverlay
     input$plotToImg_overlay
     input$plotToImg_ids
-    input$plotToImg_addContrast
-    input$plotToImg_contrastRate
-    input$plotToImg_saturationRate
+    input$plotToImg_addBrightness
     input$plotToImg_brightnessRate
   },
   handlerExpr= {
@@ -1553,15 +1549,14 @@ server <- function(input, output, session) {
         plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
       }
     }
-    if (input$plotToImg_addContrast==TRUE) {
-      req(input$plotToImg_contrastRate, input$plotToImg_saturationRate, input$plotToImg_brightnessRate)
+    if (input$plotToImg_addBrightness==TRUE) {
+      req(input$plotToImg_brightnessRate)
       plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
-      plotToImg$imgPNG <- magick::image_modulate(plotToImg$imgPNG,saturation=as.numeric(input$plotToImg_saturationRate),
+      plotToImg$imgPNG <- magick::image_modulate(plotToImg$imgPNG,saturation=100,
                                                  brightness = as.numeric(input$plotToImg_brightnessRate), 
-                                                 hue=as.numeric(input$plotToImg_contrastRate))
+                                                 hue=100)
       plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
     }
-    
   }, ignoreNULL=FALSE)
   
   
@@ -1708,13 +1703,9 @@ server <- function(input, output, session) {
     radioButtons("imgToPlot_color", label = "Color of the ROIs", choices=c("red", "blue", "green" ,"yellow", "white"), selected="red", inline=TRUE)
   })
   
-  output$imgToPlot_contrastSlider <- renderUI ({
-    if (input$imgToPlot_contrastImg) {
-      tagList(
-        sliderInput("imgToPlot_contrastRate", "% of initial contrast",min=100, max=1000, value=100),
-        sliderInput("imgToPlot_brightnessRate", "% of initial brightness", min=100, max=1000, value=100),
-        sliderInput("imgToPlot_saturationRate", "% of initial saturation", min=100, max=1000, value=100)
-      )
+  output$imgToPlot_brightnessSlider <- renderUI ({
+    if (input$imgToPlot_brightnessImg) {
+        sliderInput("imgToPlot_brightnessRate", "% of initial brightness", min=100, max=1000, value=100)
     }
   })
   
@@ -1726,8 +1717,6 @@ server <- function(input, output, session) {
     imgToPlot$imgFrame
     imgToPlot$imgChan
     input$imgToPlot_color
-    input$imgToPlot_contrastRate
-    input$imgToPlot_saturationRate
     input$imgToPlot_brightnessRate
   },
   handlerExpr= {
@@ -1748,10 +1737,10 @@ server <- function(input, output, session) {
     dev.off()
     out <- normalizePath(out, "/")
     imgToPlot$imgPNG <- png::readPNG(out)
-    if (input$imgToPlot_contrastImg==TRUE) {
-      req(input$imgToPlot_contrastRate, input$imgToPlot_saturationRate, input$imgToPlot_brightnessRate)
+    if (input$imgToPlot_brightnessImg==TRUE) {
+      req(input$imgToPlot_brightnessRate)
       imgToPlot$imgPNG <- magick::image_read(imgToPlot$imgPNG)
-      imgToPlot$imgPNG <- magick::image_modulate(imgToPlot$imgPNG,saturation=as.numeric(input$imgToPlot_saturationRate),brightness = as.numeric(input$imgToPlot_brightnessRate), hue=as.numeric(input$imgToPlot_contrastRate))
+      imgToPlot$imgPNG <- magick::image_modulate(imgToPlot$imgPNG,saturation=100,brightness = as.numeric(input$imgToPlot_brightnessRate), hue=100)
       imgToPlot$imgPNG <- magick::as_EBImage(imgToPlot$imgPNG)
     }
   }, ignoreNULL=FALSE)
@@ -2210,6 +2199,11 @@ server <- function(input, output, session) {
     sliderInput("annote_cropSize", label = "Size of the ROI crop (microns)", min = 0, max = max, value = val) # Slider
   })
   
+  output$annote_brightnessSlider <- renderUI ({
+    if (input$annote_addBrightness) {
+      sliderInput("annote_brightnessRate", "% of initial brightness", min=100, max=1000, value=100)
+    }
+  })
   
   observeEvent ( eventExpr = 
                    {annote$imgPNG},
@@ -2271,7 +2265,10 @@ server <- function(input, output, session) {
                     annote$imgChan
                     input$annote_associate
                     annote_overlays$imgOverlay
-                    input$annote_overlay}, 
+                    input$annote_overlay
+                    input$annote_brightnessRate
+                    input$annote_addBrightness
+                    }, 
                 handlerExpr = 
                   { if ((length(global$img) != 0) & (length(global$zip)>0)) {
                       out3 <- tempfile(fileext='.png')
@@ -2295,6 +2292,14 @@ server <- function(input, output, session) {
                       dev.off()
                       out3 <- normalizePath(out3, "/")
                       annote$imgPNG <- EBImage::readImage(out3)
+                      if (input$annote_addBrightness==TRUE) {
+                        req(input$annote_brightnessRate)
+                        annote$imgPNG <- magick::image_read(annote$imgPNG)
+                        annote$imgPNG <- magick::image_modulate(annote$imgPNG,saturation=100,
+                                                                   brightness = as.numeric(input$annote_brightnessRate), 
+                                                                   hue=100)
+                        annote$imgPNG <- magick::as_EBImage(annote$imgPNG)
+                      }
                     }
                     })
   
