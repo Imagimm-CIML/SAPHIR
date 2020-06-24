@@ -736,7 +736,6 @@ server <- function(input, output, session) {
   },{
     req(global$data, input$plotToImgFilter_colsX)
     if (input$plotToImgFilter_selectionType == "One selection") {
-      req(length(filterSelected()) > 0)
       plotToImg$filtered <- filterSelected()
       plotToImg$filtered <- global$data[global$data$ID %in% plotToImg$filtered,]
     }
