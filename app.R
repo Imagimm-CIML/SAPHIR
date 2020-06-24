@@ -752,10 +752,11 @@ server <- function(input, output, session) {
 
   
   output$plotToImgFilter_validateSelection <- renderUI ({
-    req(length(plotToImgFilter_multiSelect$totale)>0, nrow(plotToImg$filtered)==0)
-    if (input$plotToImgFilter_selectionType == "Multiple selection" & length(plotToImgFilter_multiSelect$totale)>0) {
+    req(filterSelected(), nrow(plotToImg$filtered)==0)
+    if (input$plotToImgFilter_selectionType == "Multiple selection" & length(filterSelected())>0) {
       tagList(
         helpText("Select your cells and click on the button to validate the selected cells."),
+        actionButton("plotToImgFilter_nextSelection", "Validate actual selection"),
         if (plotToImgFilter_multiSelect$nSel > 1) {
           actionButton("plotToImgFilter_validateSelection", "Validate final selection")
         },
@@ -772,7 +773,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(eventExpr= {
-    filterSelected()
+    input$plotToImgFilter_nextSelection
   }, handlerExpr = {
     if (input$plotToImgFilter_selectionType=="Multiple selection" & length(filterSelected()) > 0) {
       plotToImgFilter_multiSelect$indiv <- filterSelected()
