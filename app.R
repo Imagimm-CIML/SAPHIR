@@ -1239,7 +1239,7 @@ server <- function(input, output, session) {
   
   # Reactive variable : infos on points selected on the plot (infos from global$data)
   plotToImg_tableSelected <- reactive ({
-    req(global$data)
+    req(global$data, nrow(global$data[global$data$ID %in% plotToImg$selected,]) == length(plotToImg$subDatas$color[plotToImg$subDatas$ID %in% plotToImg$selected]))
     data.frame(global$data[global$data$ID %in% plotToImg$selected,], plotToImg$subDatas$color[plotToImg$subDatas$ID %in% plotToImg$selected])
   })
   
@@ -1405,7 +1405,7 @@ server <- function(input, output, session) {
   
   # UI to choose channel to display for the image
   output$plotToImg_channel <- renderUI({
-    req(input$plotToImg_displayImg, length(global$img)!=0, input$overlay==FALSE)
+    req(input$plotToImg_displayImg, length(global$img)!=0, input$plotToImg_overlay==FALSE)
     sliderInput("plotToImg_channel", label="Channel to display", min=1, max= global$nChan, value=plotToImg$imgChan, step=1)
   })
   
