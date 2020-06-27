@@ -198,8 +198,11 @@ ui <- dashboardPage(
                      uiOutput("imgToPlot_color"),
                      checkboxInput("imgToPlot_brightnessImg", "Enhance brightness in image"),
                      uiOutput("imgToPlot_brightnessSlider"),
+                     radioButtons("imgToPlot_selectionType", "Type of selection", choices=c("One selection", "Multiple selection"), selected="One selection"),
                      helpText("Click or select cells on the image and see their correspondance in the plot."),
                      withSpinner(plotlyOutput("imgToPlot_img")),
+                     uiOutput("imgToPlot_validateSelection"),
+                     uiOutput("imgToPlot_reset"),
                      verbatimTextOutput("imgToPlot_selected")
                 ),
                 # Second box : corresponding plot 
@@ -1697,7 +1700,7 @@ server <- function(input, output, session) {
   # UI to choose color of the ROIs 
   output$imgToPlot_color <- renderUI ({
     req(length(global$img) != 0)
-    radioButtons("imgToPlot_color", label = "Color of the ROIs", choices=c("red", "blue", "green" ,"yellow", "white"), selected="red", inline=TRUE)
+    radioButtons("imgToPlot_color", label = "Color of the ROIs", choices=c("red", "blue", "green" , "white", "pink"), selected="red", inline=TRUE)
   })
   
   output$imgToPlot_brightnessSlider <- renderUI ({
@@ -1715,6 +1718,9 @@ server <- function(input, output, session) {
     imgToPlot$imgChan
     input$imgToPlot_color
     input$imgToPlot_brightnessRate
+    imgToPlot_multiSelect$totale
+    imgSelected()
+    input$imgToPlot_selectionType
   },
   handlerExpr= {
     req(length(global$img) > 0, length(global$zip) > 0) 
@@ -1724,10 +1730,26 @@ server <- function(input, output, session) {
     for (i in global$data$ID) {
       if (global$nFrame == 1) {
         plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color)
+        if (i %in% imgSelected()) {
+          plot(global$zip[[i]], add=TRUE , col="yellow")
+        }
+        if (input$imgToPlot_selectionType=="Multiple selection") {
+          if (i %in% imgToPlot_multiSelect$totale) {
+            plot(global$zip[[i]], add=TRUE , col="orange")
+          }
+        }
       }
       else if (global$nFrame > 1) {
         if (global$data$Slice[global$data$ID==i]==imgToPlot$imgFrame) {
           plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color)
+          if (i %in% imgSelected()) {
+            plot(global$zip[[i]], add=TRUE , col="yellow")
+          }
+          if (input$imgToPlot_selectionType=="Multiple selection") {
+            if (i %in% imgToPlot_multiSelect$totale) {
+              plot(global$zip[[i]], add=TRUE , col="orange")
+            }
+          }
         }
       }
     }
@@ -1814,23 +1836,96 @@ server <- function(input, output, session) {
     }
   })
   
+  imgSelected <- reactiveVal()
+  
+  # ROIs to plot on the interactive plot depending on selection 
+  observeEvent({
+    input$imgToPlot_selectionType
+    imgToPlot_multiSelect$final
+    imgSelected()
+  },{
+    req(global$data)
+    if (input$imgToPlot_selectionType == "One selection") {
+      imgToPlot$selected <- imgSelected()
+      imgToPlot$selected <- global$data[global$data$ID %in% imgToPlot$selected,]
+    }
+    else if (input$imgToPlot_selectionType == "Multiple selection") {
+      imgToPlot$selected <- unique(imgToPlot_multiSelect$final)
+      imgToPlot$selected <- global$data[global$data$ID %in% imgToPlot$selected,]
+    }
+  }, ignoreNULL=FALSE)
+  
+  imgToPlot_multiSelect <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0)
+  
+  
+  output$imgToPlot_validateSelection <- renderUI ({
+    req(imgSelected(), nrow(imgToPlot$selected)==0)
+    if (input$imgToPlot_selectionType == "Multiple selection" & length(imgSelected())>0) {
+      tagList(
+        actionButton("imgToPlot_nextSelection", "Validate actual selection"),
+        if (imgToPlot_multiSelect$nSel > 1) {
+          actionButton("imgToPlot_validateSelection", "Validate final selection")
+        },
+        tags$br()
+      )
+    }
+  })
+  
+  output$imgToPlot_reset <- renderUI({
+    req(imgSelected())
+    if (length(imgSelected()) > 0) {
+      actionLink("imgToPlot_reset", "Reset selection")
+    }
+  })
+  
+  observeEvent(eventExpr= {
+    input$imgToPlot_nextSelection
+  }, handlerExpr = {
+    if (input$imgToPlot_selectionType=="Multiple selection" & length(imgSelected()) > 0) {
+      imgToPlot_multiSelect$indiv <- imgSelected()
+      imgToPlot_multiSelect$totale <- c(imgToPlot_multiSelect$totale, imgToPlot_multiSelect$indiv)
+      imgToPlot_multiSelect$totale <- unique(imgToPlot_multiSelect$totale)
+      imgToPlot_multiSelect$nSel <- imgToPlot_multiSelect$nSel + 1
+    }
+  })
+  
+  observeEvent(eventExpr= {
+    input$imgToPlot_validateSelection
+  }, handlerExpr = {
+    imgToPlot_multiSelect$final <- unique(imgToPlot_multiSelect$totale)
+  })
+  
+  observeEvent(eventExpr = {input$imgToPlot_reset},
+               handlerExpr = { 
+                 imgSelected(NULL)
+                 imgToPlot_multiSelect$indiv <- imgSelected()
+                 imgToPlot_multiSelect$totale <- imgSelected()
+                 imgToPlot_multiSelect$final <- NULL
+                 imgToPlot_multiSelect$nSel <- 0
+                 imgToPlot$selected <- NULL
+               })
+  
+  
+  observe({
+    req(length(global$img) != 0, global$data, length(global$zip)>0)
+    if (!is.null(event_data("plotly_click", source="i")$customdata)) {
+      imgSelected(event_data("plotly_click", source="i")$customdata)
+    }
+    if (!is.null(event_data("plotly_selected", source="i")$customdata)) {
+      imgSelected(event_data("plotly_selected", source="i")$customdata)
+    }
+  })
   
   # Infos on ROIs selected on the image 
   output$imgToPlot_selected <- renderPrint({
-    req(length(global$img) != 0, global$data, length(global$zip)>0)
-    if (!is.null(event_data("plotly_click", source="i")$customdata)) {
-      imgToPlot$selected <- event_data("plotly_click", source="i")$customdata
-    }
-    if (!is.null(event_data("plotly_selected", source="i")$customdata)) {
-      imgToPlot$selected <- event_data("plotly_selected", source="i")$customdata
-    }
-    global$data[global$data$ID %in% imgToPlot$selected,]
+    req(length(imgToPlot$selected) > 0)
+    imgToPlot$selected
   })
   
   # Plot corresponding to ROIs selected
   output$imgToPlot_plot <- renderPlot({
     req(!is.null(imgToPlot$selected), length(global$img) != 0, global$data, length(global$zip)>0)
-    ggplot(data=global$data[imgToPlot$selected,]) + 
+    ggplot(data=imgToPlot$selected) + 
       geom_point(aes_string(x=input$imgToPlot_colsX, y=input$imgToPlot_colsY)) + 
       labs(x=input$imgToPlot_colsX, y=input$imgToPlot_colsY) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
   })
