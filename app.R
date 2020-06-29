@@ -162,22 +162,17 @@ ui <- dashboardPage(
               fluidRow( 
                 box ( width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                       title="Statistics",
+                      actionLink("plotToImg_downloadDataLink", "Download results"),
+                      tags$br(),
+                      tags$br(),
                   tabsetPanel (id="infosGroup", selected="Global",
                                tabPanel("Global",
-                                        tags$br(),
-                                        downloadLink("plotToImg_downloadData", "Download Groups subtables"),
-                                        tags$br(),
-                                        downloadLink("plotToImg_downloadSummaryData", "Download summary of groups subtables"),
-                                        tags$br(),
-                                        tags$br(),
                                         verbatimTextOutput("plotToImg_groups")
                                ),
                                tabPanel("Selected", 
                                         tags$br(),
                                         verbatimTextOutput("plotToImg_infosSelection"),
-                                        downloadLink("plotToImg_downloadSubdata", "Download selected ROIs subtable"),
                                         tags$br(),
-                                        downloadLink("plotToImg_downloadSummarySubdata", "Download summary of selected ROIs subtable"),
                                         tableOutput("plotToImg_tableSelected")
                                )
                                
@@ -966,20 +961,72 @@ server <- function(input, output, session) {
     }
   }, ignoreNULL=FALSE)
   
+  
+  observeEvent({
+    input$plotToImg_downloadDataLink
+  }, 
+  {
+    showModal(modalDialog(title="Download results",
+                          checkboxInput("plotToImgDownload_modifyNames", "Modify the names of the subpopulations in downloaded files"),
+                          uiOutput("plotToImgDownload_inputNewNames"),
+                          downloadLink("plotToImg_downloadData", "Download Groups subtables"),
+                          tags$br(),
+                          downloadLink("plotToImg_downloadSummaryData", "Download summary of groups subtables"),
+                          tags$br(),
+                          downloadLink("plotToImg_downloadSubdata", "Download selected ROIs subtable"),
+                          tags$br(),
+                          downloadLink("plotToImg_downloadSummarySubdata", "Download summary of selected ROIs subtable"),
+                          easyClose = FALSE
+                          ))
+  })
+  
+  output$plotToImgDownload_inputNewNames <- renderUI ({
+    req(input$plotToImgDownload_modifyNames, plotToImg$subDatas)
+    groups <- unique(plotToImg$subDatas$color)
+    tagList(
+    lapply(groups, function(i) {
+      textInput(paste0("plotToImgDownload_inputNewName", i), paste0("New name for ", i))
+    }),
+    actionButton("plotToImgDownload_validateNewNames", "Validate new names")
+    )
+  })
+  
+  plotToImgDownload <- reactiveValues(groupNames = NULL)
+  
+  observeEvent(plotToImg$subDatas, {
+    req(global$data, plotToImg$subDatas)
+    plotToImgDownload$groupNames <- data.frame(plotToImg$subDatas$ID, plotToImg$subDatas$color)
+    colnames(plotToImgDownload$groupNames) <- c("ID", "Cell.type")})
+  
+  observeEvent(input$plotToImgDownload_validateNewNames,
+               {
+                 removeUI(selector = "#plotToImgDownload_inputNewNames")
+                 groups <- unique(plotToImg$subDatas$color)
+                 lapply(groups, function(i) {
+                     plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,2]==i] <- input[[paste0("plotToImgDownload_inputNewName", i)]]
+                 })
+               })
+  
+  
   ## Download button to separate files in 4 CSV files containing datas of the 4 different groups and download in a zip file 
   output$plotToImg_downloadData <- downloadHandler(
     filename = function(){
       paste("groupDatas.zip")
     },
     content = function(file){
-      req(global$data, plotToImg$subDatas)
+      req(global$data, plotToImg$subDatas, plotToImgDownload$groupNames)
       tmpdir <- tempdir()
       setwd(tempdir())
       groups <- unique(plotToImg$subDatas$color)
       fls <- c(paste0("global.txt"), paste0("group",groups, ".txt"))
-      write.table(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color), "global.txt", sep="\t", row.names=FALSE)
+      globalDataFrame <- data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color, plotToImgDownload$groupNames[,2])
+      colnames(globalDataFrame) <- c(colnames(global$data), "Gate", "Cell.type")
+      write.table(globalDataFrame, "global.txt", sep="\t", row.names=FALSE)
       for (i in groups) {
-        write.table(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i]), paste0("group",i, ".txt"), sep="\t", row.names=FALSE)
+        groupDataFrame <- data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i], 
+                                     plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,2]==input[[paste0("plotToImgDownload_inputNewName", i)]]])
+        colnames(groupDataFrame) <- c(colnames(global$data), "Gate", "Cell.type")
+        write.table(groupDataFrame, paste0("group",i, ".txt"), sep="\t", row.names=FALSE)
       }
       zip::zipr(zipfile = file,fls)
       if (file.exists (paste0 (file," .zip "))) {file.rename (paste0 (file," .zip "), file)}
@@ -991,14 +1038,21 @@ server <- function(input, output, session) {
       paste("groupSummaryDatas.zip")
     },
     content = function(file) {
-      req(global$data, plotToImg$subDatas)
+      req(global$data, plotToImg$subDatas, plotToImgDownload$groupNames)
       tmpdir <- tempdir()
       setwd(tempdir())
       groups <- unique(plotToImg$subDatas$color)
       fls <- c(paste0("summary_global.txt"),paste0("summary_group",groups, ".txt"))
-      write.table(summary(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color)), "summary_global.txt", sep="\t", row.names=FALSE)
+      globalDataFrame <- data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color, plotToImgDownload$groupNames[,2])
+      colnames(globalDataFrame) <- c(colnames(global$data), "Gate", "Cell.type")
+      write.table(summary(globalDataFrame), 
+                  "summary_global.txt", sep="\t", row.names=FALSE)
       lapply(groups, function(i) {
-        write.table(summary(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i])), paste0("summary_group",i, ".txt"), sep="\t", row.names=FALSE)
+        groupDataFrame <- data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], 
+                                     plotToImg$subDatas$color[plotToImg$subDatas$color==i], 
+                                     plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,2]==input[[paste0("plotToImgDownload_inputNewName", i)]]])
+        colnames(globalDataFrame) <- c(colnames(global$data), "Gate", "Cell.type")
+        write.table(summary(groupDataFrame), paste0("summary_group",i, ".txt"), sep="\t", row.names=FALSE)
       })
       zip::zipr(zipfile = file,fls)
       if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
@@ -1245,7 +1299,10 @@ server <- function(input, output, session) {
   # Reactive variable : infos on points selected on the plot (infos from global$data)
   plotToImg_tableSelected <- reactive ({
     req(global$data, nrow(global$data[global$data$ID %in% plotToImg$selected,]) == length(plotToImg$subDatas$color[plotToImg$subDatas$ID %in% plotToImg$selected]))
-    data.frame(global$data[global$data$ID %in% plotToImg$selected,], plotToImg$subDatas$color[plotToImg$subDatas$ID %in% plotToImg$selected])
+    dataFrame <- data.frame(global$data[global$data$ID %in% plotToImg$selected,], plotToImg$subDatas$color[plotToImg$subDatas$ID %in% plotToImg$selected], 
+                            plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,1] %in% plotToImg$selected])
+    colnames(dataFrame) <- c(colnames(global$data), "Gate", "Cell.type")
+    dataFrame
   })
   
   # RenderText : number of selected cells 
