@@ -976,9 +976,10 @@ server <- function(input, output, session) {
       tmpdir <- tempdir()
       setwd(tempdir())
       groups <- unique(plotToImg$subDatas$color)
-      fls <- paste0("group",groups, ".csv")
+      fls <- c(paste0("global.txt"), paste0("group",groups, ".txt"))
+      write.table(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color), "global.txt", sep="\t", row.names=FALSE)
       for (i in groups) {
-        write.csv(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i]), paste0("group",i, ".csv"))
+        write.table(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i]), paste0("group",i, ".txt"), sep="\t", row.names=FALSE)
       }
       zip::zipr(zipfile = file,fls)
       if (file.exists (paste0 (file," .zip "))) {file.rename (paste0 (file," .zip "), file)}
@@ -994,9 +995,10 @@ server <- function(input, output, session) {
       tmpdir <- tempdir()
       setwd(tempdir())
       groups <- unique(plotToImg$subDatas$color)
-      fls <- paste0("summary_group",groups, ".csv")
+      fls <- c(paste0("summary_global.txt"),paste0("summary_group",groups, ".txt"))
+      write.table(summary(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID,], plotToImg$subDatas$color)), "summary_global.txt", sep="\t", row.names=FALSE)
       lapply(groups, function(i) {
-        write.csv(summary(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i])), paste0("summary_group",i, ".csv"))
+        write.table(summary(data.frame(global$data[global$data$ID %in% plotToImg$subDatas$ID[plotToImg$subDatas$color==i],], plotToImg$subDatas$color[plotToImg$subDatas$color==i])), paste0("summary_group",i, ".txt"), sep="\t", row.names=FALSE)
       })
       zip::zipr(zipfile = file,fls)
       if (file.exists(paste0(file," .zip "))) {file.rename (paste0 (file, " .zip "), file)}
@@ -1269,22 +1271,22 @@ server <- function(input, output, session) {
   # Button to download infos on selected cells in a csv file
   output$plotToImg_downloadSubdata <- downloadHandler(
     filename = function() {
-      paste("data-", Sys.Date(), ".csv", sep="")
+      paste("selectedData-", Sys.Date(), ".txt", sep="")
     },
     content = function(file) {
       req(global$data)
-      write.csv(plotToImg_tableSelected(), file)
+      write.table(plotToImg_tableSelected(), file, sep="\t", row.names=FALSE)
     }
   )
   
   #Button to download summary on selected cells in a csv file
   output$plotToImg_downloadSummarySubdata <- downloadHandler(
     filename = function() {
-      paste("data-summary", Sys.Date(), ".csv", sep="")
+      paste("selectedData_summary", Sys.Date(), ".txt", sep="")
     },
     content = function(file) {
       req(global$data)
-      write.csv(summary(plotToImg_tableSelected()), file)
+      write.table(summary(plotToImg_tableSelected()), file, sep="\t", row.names=FALSE)
     }
   )
   
