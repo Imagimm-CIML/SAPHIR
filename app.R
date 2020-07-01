@@ -280,9 +280,9 @@ server <- function(input, output, session) {
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
-                          nChan=1, resolution=NULL, resize = FALSE)
+                          nChan=1, resolution=NULL, resize = FALSE, xcenters=NULL, ycenters=NULL)
   
-  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, crops = list(), totalCrops = NULL , subDatas=NULL, selected=NULL, filtered=NULL, xcenters=NULL, ycenters=NULL)
+  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, crops = list(), totalCrops = NULL , subDatas=NULL, selected=NULL, filtered=NULL)
   
   imgToPlot <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, selected=NULL)
   
@@ -927,37 +927,17 @@ server <- function(input, output, session) {
     req(plotToImg$subDatas)
     # Add columns "color" with position of the group the cell belong to
     if (is.null(input$plotToImg_colorType) | input$plotToImg_selectionType!="Multiple selection") {
-      for (i in c(1:nrow(plotToImg$subDatas))) {
-        if ((plotToImg$subDatas[input$plotToImg_colsX][i,] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] < plotToImg_y())){
-          plotToImg$subDatas$color[i] <- "Q1"
-        }
-        else if ((plotToImg$subDatas[input$plotToImg_colsX][i,] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] > plotToImg_y())){
-          plotToImg$subDatas$color[i] <- "Q3"
-        }
-        else if ((plotToImg$subDatas[input$plotToImg_colsX][i,] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] > plotToImg_y())) {
-          plotToImg$subDatas$color[i] <- "Q2"
-        }
-        else {
-          plotToImg$subDatas$color[i] <- "Q4"
-        }
-      }
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q1"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q3"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
     }
     else if (!is.null(input$plotToImg_colorType) & input$plotToImg_selectionType=="Multiple selection") {
       if (input$plotToImg_colorType==FALSE) {
-        for (i in c(1:nrow(plotToImg$subDatas))) {
-          if ((plotToImg$subDatas[input$plotToImg_colsX][i,] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] < plotToImg_y())){
-            plotToImg$subDatas$color[i] <- "Q1"
-          }
-          else if ((plotToImg$subDatas[input$plotToImg_colsX][i,] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] > plotToImg_y())){
-            plotToImg$subDatas$color[i] <- "Q3"
-          }
-          else if ((plotToImg$subDatas[input$plotToImg_colsX][i,] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY][i,] > plotToImg_y())) {
-            plotToImg$subDatas$color[i] <- "Q2"
-          }
-          else {
-            plotToImg$subDatas$color[i] <- "Q4"
-          }
-        }
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q1"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q3"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
       }
       else {
         if (!"R1_multiselect" %in% unique(plotToImg$subDatas$color)) {
@@ -1600,7 +1580,7 @@ server <- function(input, output, session) {
       if ((global$nFrame==1 | input$plotToImg_associated==FALSE) & (length(plotToImg$selected) > 0)) {
         plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
         for (i in plotToImg$selected) {
-          coord <- paste("+", plotToImg$xcenters[i], "+", plotToImg$ycenters[i], sep="")
+          coord <- paste("+", global$xcenters[i], "+", global$ycenters[i], sep="")
           plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
         }
         plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
@@ -1609,7 +1589,7 @@ server <- function(input, output, session) {
         plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
         for (i in plotToImg$selected) {
           if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) {
-            coord <- paste("+", plotToImg$xcenters[i], "+", plotToImg$ycenters[i], sep="")
+            coord <- paste("+", global$xcenters[i], "+", global$ycenters[i], sep="")
             plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
           }
         }
@@ -1643,8 +1623,8 @@ server <- function(input, output, session) {
   observeEvent( global$zip,
                { req(global$zip)
                  for (i in 1:length(global$zip)) { # For each ROI, determine its center 
-                   plotToImg$xcenters <- c(plotToImg$xcenters, round(max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
-                   plotToImg$ycenters <- c(plotToImg$ycenters, round(max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
+                   global$xcenters <- c(global$xcenters, round(max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
+                   global$ycenters <- c(global$ycenters, round(max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
                  }
                })
   
@@ -1661,10 +1641,10 @@ server <- function(input, output, session) {
     if (global$nFrame==1 | input$plotToImg_associated==FALSE) {
       for (i in plotToImg$selected) { # For each ROI, determine its center 
         # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
-        xmin = plotToImg$xcenters[i]-d 
-        xmax= plotToImg$xcenters[i]+d
-        ymin = plotToImg$ycenters[i]-d
-        ymax = plotToImg$ycenters[i]+d
+        xmin = global$xcenters[i]-d 
+        xmax= global$xcenters[i]+d
+        ymin = global$ycenters[i]-d
+        ymax = global$ycenters[i]+d
         if (xmin < 0) { 
           xmin <- 0
           xmax <- dim}
@@ -1678,7 +1658,7 @@ server <- function(input, output, session) {
           xmax <- dim(plotToImg$imgPNG)[1]
           xmin <- dim(plotToImg$imgPNG)[1] - dim +1}
         plotToImg$crops[[i]] <- plotToImg$imgPNG 
-        plotToImg$crops[[i]] <- EBImage::drawCircle(img=plotToImg$crops[[i]], x=plotToImg$xcenters[i],y= plotToImg$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1) # Draw a circle on the center of each ROI
+        plotToImg$crops[[i]] <- EBImage::drawCircle(img=plotToImg$crops[[i]], x=global$xcenters[i],y= global$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1) # Draw a circle on the center of each ROI
         plotToImg$crops[[i]] <- plotToImg$crops[[i]][xmin:xmax,ymin:ymax,] # Cropped image for one ROI 
         if (input$plotToImg_ids == FALSE) { # If ID not on imagePNG -> added on crops 
           plotToImg$crops[[i]] <- magick::image_read(plotToImg$crops[[i]])
@@ -1691,10 +1671,10 @@ server <- function(input, output, session) {
     else if (global$nFrame >1) { # Same but association with slice
       if (any(global$data$Slice[global$data$ID %in% plotToImg$selected]==plotToImg$imgFrame)) {
         for (i in global$data$ID[global$data$ID %in%plotToImg$selected & global$data$Slice==plotToImg$imgFrame]) {
-          xmin = plotToImg$xcenters[i]-d
-          xmax= plotToImg$xcenters[i]+d
-          ymin = plotToImg$ycenters[i]-d
-          ymax = plotToImg$ycenters[i]+d
+          xmin = global$xcenters[i]-d
+          xmax= global$xcenters[i]+d
+          ymin = global$ycenters[i]-d
+          ymax = global$ycenters[i]+d
           if (xmin < 0) { 
             xmin <- 0
             xmax <- dim}
@@ -1709,7 +1689,7 @@ server <- function(input, output, session) {
             xmin <- dim(plotToImg$imgPNG)[1] - dim +1
           }
           plotToImg$crops[[i]] <- plotToImg$imgPNG
-          plotToImg$crops[[i]] <- EBImage::drawCircle(img=plotToImg$crops[[i]], x=plotToImg$xcenters[i], y=plotToImg$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1)
+          plotToImg$crops[[i]] <- EBImage::drawCircle(img=plotToImg$crops[[i]], x=global$xcenters[i], y=global$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1)
           plotToImg$crops[[i]] <- plotToImg$crops[[i]][xmin:xmax,ymin:ymax,]
           if (input$plotToImg_ids == FALSE) {
             plotToImg$crops[[i]] <- magick::image_read(plotToImg$crops[[i]])
@@ -1772,8 +1752,6 @@ server <- function(input, output, session) {
   })
   
   observeEvent(eventExpr= {
-    global$img
-    global$zip
     input$imgToPlot_channel
     input$imgToPlot_frame 
     imgToPlot$imgFrame
@@ -1847,13 +1825,9 @@ server <- function(input, output, session) {
       range = c(0, dim(imgToPlot$imgPNG)[2]),
       scaleanchor = "x"
     )
-    xcenter = c()
-    ycenter = c()
     if (global$nFrame > 1 ) {
-      for (i in global$data$ID[global$data$Slice==imgToPlot$imgFrame]) {
-        xcenter = c(xcenter,round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2))
-        ycenter = c(ycenter, dim(imgToPlot$imgPNG)[2]-round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2))
-      }
+      xcenter <- global$xcenters[global$data$ID[global$data$Slice==imgToPlot$imgFrame]]
+      ycenter <- dim(imgToPlot$imgPNG)[2] - global$ycenters[global$data$ID[global$data$Slice==imgToPlot$imgFrame]] 
       i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID[global$data$Slice==imgToPlot$imgFrame], mode="markers", type="scatter", source="i", width = 500, height = 500) 
       i %>%
         layout(
@@ -1874,10 +1848,8 @@ server <- function(input, output, session) {
         layout(dragmode = "select",autosize = F) 
     }
     else if (global$nFrame == 1) {
-      for (i in global$data$ID) {
-        xcenter = c(xcenter,round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2))
-        ycenter = c(ycenter, dim(imgToPlot$imgPNG)[2]-round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2))
-      } 
+      xcenter <- global$xcenters
+      ycenter <- dim(imgToPlot$imgPNG)[2] - global$ycenters 
       i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID, mode="markers", type="scatter", source="i", width = 500, height = 500) 
       i %>%
         layout(
@@ -2371,12 +2343,10 @@ server <- function(input, output, session) {
                        req(input$annote_cropSize)
                        d <- ((input$annote_cropSize/global$resolution)-1)/2 # Half of the image dimension 
                        dim <- input$annote_cropSize/global$resolution # Dimension of the image
-                       xcenter = (max(global$zip[[annote$actualID]]$coords[,1])+min(global$zip[[annote$actualID]]$coords[,1]))/2
-                       ycenter = (max(global$zip[[annote$actualID]]$coords[,2])+min(global$zip[[annote$actualID]]$coords[,2]))/2
-                       xmin = xcenter-d
-                       xmax= xcenter+d
-                       ymin = ycenter-d
-                       ymax = ycenter+d
+                       xmin = global$xcenters[annote$actualID]-d
+                       xmax= global$xcenters[annote$actualID]+d
+                       ymin = global$ycenters[annote$actualID]-d
+                       ymax = global$ycenters[annote$actualID]+d
                        if (xmin < 0) { 
                          xmin <- 0
                          xmax <- dim}
