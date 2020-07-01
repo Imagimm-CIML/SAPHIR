@@ -64,7 +64,8 @@ ui <- dashboardPage(
                      tags$br(),
                      actionLink("changeMacro", "Change the path to your macro.", icon=icon("sync")),
                      tags$br(),
-                     actionButton("launch", "Launch macro"),
+                     actionButton("launch", "Launch macro", 
+                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                      tags$hr(),
                      helpText("If necessary, choose a second macro to launch."),
                      uiOutput("macro2"),
@@ -72,7 +73,8 @@ ui <- dashboardPage(
                      tags$br(), 
                      actionLink("changeMacro2", "Change the path to your macro.", icon=icon("sync")),
                      tags$br(),
-                     actionButton("launch2", "Launch second macro")
+                     actionButton("launch2", "Launch second macro", 
+                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                 )
               )),
       tabItem(tabName= "image",
@@ -84,7 +86,8 @@ ui <- dashboardPage(
                               For prerequisites, click on the \"Prerequisites\" link."),
                      actionLink("help", "Prerequisites"),
                      tags$br(),
-                     actionButton("default", "Use default files"),
+                     actionButton("default", "Use default files", 
+                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                      verbatimTextOutput("errorDefaultFiles")),
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
@@ -107,7 +110,8 @@ ui <- dashboardPage(
                      fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
                 ),
               ),
-              actionButton("refresh", "Reset")
+              actionButton("refresh", "Reset", 
+                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
       ),
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
@@ -195,7 +199,7 @@ ui <- dashboardPage(
                      uiOutput("imgToPlot_brightnessSlider"),
                      radioButtons("imgToPlot_selectionType", "Type of selection", choices=c("One selection", "Multiple selection"), selected="One selection"),
                      helpText("Click or select cells on the image and see their correspondance in the plot."),
-                     withSpinner(plotlyOutput("imgToPlot_img")),
+                     withSpinner(plotlyOutput("imgToPlot_img", height = "600px")),
                      uiOutput("imgToPlot_validateSelection"),
                      uiOutput("imgToPlot_reset"),
                      verbatimTextOutput("imgToPlot_selected")
@@ -750,9 +754,11 @@ server <- function(input, output, session) {
     req(filterSelected(), nrow(plotToImg$filtered)==0)
     if (input$plotToImgFilter_selectionType == "Multiple selection" & length(filterSelected())>0) {
       tagList(
-        actionButton("plotToImgFilter_nextSelection", "Validate actual selection"),
+        actionButton("plotToImgFilter_nextSelection", "Validate actual selection", 
+                     style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         if (plotToImgFilter_multiSelect$nSel > 1) {
-          actionButton("plotToImgFilter_validateSelection", "Validate final selection")
+          actionButton("plotToImgFilter_validateSelection", "Validate final selection", 
+                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
         },
         tags$br()
       )
@@ -987,7 +993,8 @@ server <- function(input, output, session) {
     lapply(groups, function(i) {
       textInput(paste0("plotToImgDownload_inputNewName", i), paste0("New name for ", i))
     }),
-    actionButton("plotToImgDownload_validateNewNames", "Validate new names")
+    actionButton("plotToImgDownload_validateNewNames", "Validate new names", 
+                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     )
   })
   
@@ -1208,7 +1215,8 @@ server <- function(input, output, session) {
     if (input$plotToImg_selectionType=="Multiple selection" & length(plotToImg_plotSelected())> 0  & length(unique(plotToImg$subDatas$color)) < 5) {
       tagList(
         helpText("Select your gate and click on the button to select an other gate."),
-        actionButton("plotToImg_nextSel", "Validate selection"),
+        actionButton("plotToImg_nextSel", "Validate selection", 
+                     style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         tags$br()
       )
     }
@@ -1846,7 +1854,7 @@ server <- function(input, output, session) {
         xcenter = c(xcenter,round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2))
         ycenter = c(ycenter, dim(imgToPlot$imgPNG)[2]-round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2))
       }
-      i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID[global$data$Slice==imgToPlot$imgFrame], mode="markers", type="scatter", source="i") 
+      i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID[global$data$Slice==imgToPlot$imgFrame], mode="markers", type="scatter", source="i", width = 500, height = 500) 
       i %>%
         layout(
           images = list(
@@ -1862,14 +1870,15 @@ server <- function(input, output, session) {
               sizing="stretch"
             )
           ), xaxis = axX, yaxis=axY) %>% 
-        event_register(event="plotly_selected")
+        event_register(event="plotly_selected") %>%
+        layout(dragmode = "select",autosize = F) 
     }
     else if (global$nFrame == 1) {
       for (i in global$data$ID) {
         xcenter = c(xcenter,round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2))
         ycenter = c(ycenter, dim(imgToPlot$imgPNG)[2]-round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2))
       } 
-      i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID, mode="markers", type="scatter", source="i") 
+      i <- plot_ly(x = xcenter, y = ycenter, customdata=global$data$ID, mode="markers", type="scatter", source="i", width = 500, height = 500) 
       i %>%
         layout(
           images = list(
@@ -1886,7 +1895,8 @@ server <- function(input, output, session) {
             )
           ), xaxis = axX, yaxis=axY
         ) %>%  
-        event_register(event="plotly_selected")
+        event_register(event="plotly_selected") %>%
+        layout(dragmode = "select", autosize = F) 
     }
   })
   
@@ -1916,9 +1926,11 @@ server <- function(input, output, session) {
     req(imgSelected(), nrow(imgToPlot$selected)==0)
     if (input$imgToPlot_selectionType == "Multiple selection" & length(imgSelected())>0) {
       tagList(
-        actionButton("imgToPlot_nextSelection", "Validate actual selection"),
+        actionButton("imgToPlot_nextSelection", "Validate actual selection and select an other", 
+        style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         if (imgToPlot_multiSelect$nSel > 1) {
-          actionButton("imgToPlot_validateSelection", "Validate final selection")
+          actionButton("imgToPlot_validateSelection", "Validate final selection", 
+          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
         },
         tags$br()
       )
@@ -2229,7 +2241,8 @@ server <- function(input, output, session) {
   
   output$annote_validateSelection <- renderUI ({
     req(length(annote_selected()) > 0, length(input$annote_variable) > 0)
-    actionButton("annote_validateSelection", "Validate and annotate")
+    actionButton("annote_validateSelection", "Validate and annotate", 
+                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
   })
   
   observeEvent (eventExpr = 
@@ -2245,7 +2258,8 @@ server <- function(input, output, session) {
                      annote$data[paste0("corrected_", input$annote_variable)] <- global$data[input$annote_variable][global$data$ID %in% annote$selected,]
                    }
                    output$annote_validateModif <- renderUI ({
-                     actionButton("annote_validateModif", "Validate modifications")
+                     actionButton("annote_validateModif", "Validate modifications", 
+                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                    })
                   })
   
@@ -2253,13 +2267,15 @@ server <- function(input, output, session) {
 
   output$annote_previous <- renderUI ({
     if (length(annote$selected) != 1 & annote$index > 1) {
-      actionButton("annote_previous", "Previous ROI")
+      actionButton("annote_previous", "Previous ROI", 
+                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     }
   })
 
   output$annote_next <- renderUI ({
     if (length(annote$selected) != 1 & annote$index < length(annote$selected)) {
-      actionButton("annote_next", "Next ROI")
+      actionButton("annote_next", "Next ROI", 
+                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     }
   })
 
@@ -2474,7 +2490,8 @@ server <- function(input, output, session) {
                       if (input$annote_modifyValue=="Yes" & !is.null(input$annote_variable)) {
                         tagList(
                           textInput("annote_inputNewValue", paste0("Input new value for ", input$annote_variable), ""),
-                          actionButton("annote_validateNewValue", "Ok"))
+                          actionButton("annote_validateNewValue", "Ok"), 
+                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                       }
                   })
                 }, ignoreNULL=FALSE)
@@ -2510,10 +2527,10 @@ server <- function(input, output, session) {
                  
                  output$downloadAnnotData <- downloadHandler(
                    filename = function() {
-                     paste("data-", Sys.Date(), ".csv", sep="")
+                     paste("data-", Sys.Date(), ".txt", sep="")
                    },
                    content = function(file) {
-                     write.csv(global$data, file)
+                     write.table(global$data, file, row.names=FALSE)
                    }
                  )
                  
