@@ -278,7 +278,7 @@ server <- function(input, output, session) {
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(),zip=NULL, nFrame=1, 
                           nChan=1, resolution=NULL, resize = FALSE)
   
-  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, subDatas=NULL, selected=NULL, filtered=NULL)
+  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, subDatas=NULL, selected=NULL, filtered=NULL, xcenters=NULL, ycenters=NULL)
   
   imgToPlot <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, selected=NULL)
   
@@ -1519,9 +1519,6 @@ server <- function(input, output, session) {
     plotToImg_multiSelect$indiv
     plotToImg_overlays$imgOverlay
     input$plotToImg_overlay
-    input$plotToImg_ids
-    input$plotToImg_addBrightness
-    input$plotToImg_brightnessRate
   },
   handlerExpr= {
     req(input$plotToImg_displayImg, length(global$img) > 0, length(global$zip) > 0)
@@ -1584,13 +1581,18 @@ server <- function(input, output, session) {
     dev.off()
     out <- normalizePath(out, "/")
     plotToImg$imgPNG <- EBImage::readImage(out)
+  }, ignoreNULL=FALSE)
+  
+  
+  observeEvent(eventExpr = {
+    input$plotToImg_ids
+  }, handlerExpr = {
+    req(plotToImg$imgPNG)
     if (input$plotToImg_ids==TRUE) {
       if ((global$nFrame==1 | input$plotToImg_associated==FALSE) & (length(plotToImg$selected) > 0)) {
         plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
         for (i in plotToImg$selected) {
-          xID <- round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
-          yID <- round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
-          coord <- paste("+", xID, "+", yID, sep="")
+          coord <- paste("+", plotToImg$xcenters[i], "+", plotToImg$ycenters[i], sep="")
           plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
         }
         plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
@@ -1599,15 +1601,20 @@ server <- function(input, output, session) {
         plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
         for (i in plotToImg$selected) {
           if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) {
-            xID <- round((max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
-            yID <- round((max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
-            coord <- paste("+", xID, "+", yID, sep="")
+            coord <- paste("+", plotToImg$xcenters[i], "+", plotToImg$ycenters[i], sep="")
             plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
           }
         }
         plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
       }
     }
+  })
+  
+  observeEvent(eventExpr = {
+    input$plotToImg_addBrightness
+    input$plotToImg_brightnessRate
+  }, handlerExpr = {
+    req(plotToImg$imgPNG)
     if (input$plotToImg_addBrightness==TRUE) {
       req(input$plotToImg_brightnessRate)
       plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
@@ -1616,23 +1623,22 @@ server <- function(input, output, session) {
                                                  hue=100)
       plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
     }
-  }, ignoreNULL=FALSE)
-  
+  })
   
   # Crop ROIs
   # Slider with size of the ROI in microns 
   output$plotToImg_cropSize <- renderUI ({
     req(input$plotToImg_displayImg, length(global$img) != 0, length(global$zip) != 0, global$resolution)
-    val <- 0
-    for (i in length(global$zip)) {
-      if (max(max(global$zip[[i]]$coords[,2])-min(global$zip[[i]]$coords[,2]), max(global$zip[[i]]$coords[,1])-min(global$zip[[i]]$coords[,1])) > val) {
-        val <- max(max(global$zip[[i]]$coords[,2])-min(global$zip[[i]]$coords[,2]), max(global$zip[[i]]$coords[,1])-min(global$zip[[i]]$coords[,1]))
-      }
-    } # Take the maximum range of x coords or y coords from all the ROIs 
-    val <- val*global$resolution
-    max <- min(dim(plotToImg$actualImg)[1], dim(plotToImg$actualImg)[2])*global$resolution # Dimension of the image if only one slice 
-    sliderInput("plotToImg_cropSize", label = "Size of the ROI crop (microns)", min = 0, max = max, value = val) # Slider
+    sliderInput("plotToImg_cropSize", label = "Size of the ROI crop (microns)", min = 0, max = 700, value = 70, round=TRUE) # Slider
   })
+  
+  observeEvent( global$zip,
+               { req(global$zip)
+                 for (i in 1:length(global$zip)) { # For each ROI, determine its center 
+                   plotToImg$xcenters <- c(plotToImg$xcenters, round(max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
+                   plotToImg$ycenters <- c(plotToImg$ycenters, round(max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
+                 }
+               })
   
   # Displayer cropped ROIs 
   observeEvent(eventExpr= {
@@ -1647,18 +1653,16 @@ server <- function(input, output, session) {
     output$plotToImg_cropImg <- EBImage::renderDisplay({
       req(length(plotToImg$selected) != 0, plotToImg$imgPNG)
       # Case one : one slice or no association with slice 
-      d <- ((input$plotToImg_cropSize/global$resolution)-1)/2 # Half of the image dimension 
-      dim <- input$plotToImg_cropSize/global$resolution # Dimension of the image
+      d <- round(((input$plotToImg_cropSize/global$resolution)-1)/2) # Half of the image dimension 
+      dim <- d*2+1 # Dimension of the image
       total <- EBImage::Image(0,c(dim,dim,dim(plotToImg$imgPNG)[3]),EBImage::colorMode(plotToImg$imgPNG))
       if (global$nFrame==1 | input$plotToImg_associated==FALSE) {
         for (i in plotToImg$selected) { # For each ROI, determine its center 
-          xcenter = (max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2
-          ycenter = (max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2
           # xmin, xmax, ymin & ymax represent the dimensions of the cropped image 
-          xmin = xcenter-d 
-          xmax= xcenter+d
-          ymin = ycenter-d
-          ymax = ycenter+d
+          xmin = plotToImg$xcenters[i]-d 
+          xmax= plotToImg$xcenters[i]+d
+          ymin = plotToImg$ycenters[i]-d
+          ymax = plotToImg$ycenters[i]+d
           if (xmin < 0) { 
             xmin <- 0
             xmax <- dim}
@@ -1672,7 +1676,7 @@ server <- function(input, output, session) {
             xmax <- dim(plotToImg$imgPNG)[1]
             xmin <- dim(plotToImg$imgPNG)[1] - dim +1}
           crop <- plotToImg$imgPNG 
-          crop <- EBImage::drawCircle(img=crop, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1) # Draw a circle on the center of each ROI
+          crop <- EBImage::drawCircle(img=crop, x=plotToImg$xcenters[i],y= plotToImg$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1) # Draw a circle on the center of each ROI
           crop <- crop[xmin:xmax,ymin:ymax,] # Cropped image for one ROI 
           if (input$plotToImg_ids == FALSE) { # If ID not on imagePNG -> added on crops 
             crop <- magick::image_read(crop)
@@ -1688,12 +1692,10 @@ server <- function(input, output, session) {
         if (any(global$data$Slice[global$data$ID %in% plotToImg$selected]==plotToImg$imgFrame)) {
           for (i in plotToImg$selected) {
             if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) {
-              xcenter = (max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2
-              ycenter = (max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2
-              xmin = xcenter-d
-              xmax= xcenter+d
-              ymin = ycenter-d
-              ymax = ycenter+d
+              xmin = plotToImg$xcenters[i]-d
+              xmax= plotToImg$xcenters[i]+d
+              ymin = plotToImg$ycenters[i]-d
+              ymax = plotToImg$ycenters[i]+d
               if (xmin < 0) { 
                 xmin <- 0
                 xmax <- dim}
@@ -1708,9 +1710,9 @@ server <- function(input, output, session) {
                 xmin <- dim(plotToImg$imgPNG)[1] - dim +1
               }
               crop <- plotToImg$imgPNG
-              crop <- EBImage::drawCircle(img=crop, x=xcenter, y=ycenter, radius=3, col="yellow", fill=FALSE, z=1)
+              crop <- EBImage::drawCircle(img=crop, x=plotToImg$xcenters[i], y=plotToImg$ycenters[i], radius=3, col="yellow", fill=FALSE, z=1)
               crop <- crop[xmin:xmax,ymin:ymax,]
-              if (input$ids == FALSE) {
+              if (input$plotToImg_ids == FALSE) {
                 crop <- magick::image_read(crop)
                 crop <- magick::image_annotate(crop, paste("ID ",i, sep=""), size = 12, gravity = "southwest", color = "yellow")
                 crop <- magick::as_EBImage(crop)
