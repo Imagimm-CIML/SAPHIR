@@ -526,10 +526,10 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$default, handlerExpr = {
     if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==1 &
         length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==1) {
-      global$imgPath <- dir(path = getwd(), pattern = "*.tif$", recursive=TRUE)
-      global$dataPath <- dir(path = getwd(), pattern = "*.txt$", recursive=TRUE)
-      global$zipPath <- dir(path = getwd(), pattern = "*.zip$", recursive=TRUE)
-      global$legendPath <- dir(path = getwd(), pattern = "*.csv$", recursive=TRUE)
+      global$imgPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE)
+      global$dataPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE)
+      global$zipPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE)
+      global$legendPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE)
     }
     else {
       output$errorDefaultFiles <- renderPrint ({
