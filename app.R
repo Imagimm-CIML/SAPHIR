@@ -754,6 +754,8 @@ server <- function(input, output, session) {
     req(filterSelected(), nrow(plotToImg$filtered)==0)
     if (input$plotToImgFilter_selectionType == "Multiple selection" & length(filterSelected())>0) {
       tagList(
+        helpText("Make a selection on the plot, click on the validate actual selection button to record it, your selection will change color and make an other selection. 
+                 When you have finish all your selections, click on the validate final selection and see it on the interactive plot. "),
         actionButton("plotToImgFilter_nextSelection", "Validate actual selection", 
                      style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         if (plotToImgFilter_multiSelect$nSel > 1) {
@@ -1194,7 +1196,7 @@ server <- function(input, output, session) {
   output$plotToImg_nextSel <- renderUI ({
     if (input$plotToImg_selectionType=="Multiple selection" & length(plotToImg_plotSelected())> 0  & length(unique(plotToImg$subDatas$color)) < 5) {
       tagList(
-        helpText("Select your gate and click on the button to select an other gate."),
+        helpText("Select your gate and click on the button Validate, your selection will be recorded and then you can select an other gate."),
         actionButton("plotToImg_nextSel", "Validate selection", 
                      style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         tags$br()
@@ -1304,7 +1306,7 @@ server <- function(input, output, session) {
         shapes <- paste0(shapes, ", ", nbShapeCell)
       }
     }
-    paste("You selected", nbCell, "cells, i.e. ", round(nbCell/nrow(global$data), 2), " percent of the cells. ", "\n", str_sub(shapes, 3, -1))
+    paste("You selected", nbCell, "cells, i.e. ", round(nbCell/nrow(global$data), 2)*100, " percent of the cells. ", "\n", str_sub(shapes, 3, -1))
   })
   
   # Table containing infos on selected cells 
@@ -1898,6 +1900,8 @@ server <- function(input, output, session) {
     req(imgSelected(), nrow(imgToPlot$selected)==0)
     if (input$imgToPlot_selectionType == "Multiple selection" & length(imgSelected())>0) {
       tagList(
+        helpText("Make a selection on the image, click on the validate actual selection button to record it, your selection will change color and make an other selection. 
+                 When you have finish all your selections, click on the validate final selection and see it on the plot."),
         actionButton("imgToPlot_nextSelection", "Validate actual selection and select an other", 
         style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         if (imgToPlot_multiSelect$nSel > 1) {
