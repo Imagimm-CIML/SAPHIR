@@ -88,7 +88,8 @@ ui <- dashboardPage(
                      tags$br(),
                      actionButton("default", "Use default files", 
                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
-                     verbatimTextOutput("errorDefaultFiles")),
+                     verbatimTextOutput("errorDefaultFiles")
+                     ),
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
@@ -108,7 +109,13 @@ ui <- dashboardPage(
                      tags$hr(),
                      helpText("Select the zip file containing your ROIs."),
                      fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
-                ),
+                     ),
+                box (width = 12, solidHeader=TRUE, status="primary", collapsible = TRUE,
+                     title = "Combine multiple images", 
+                     numericInput("multiImages_nb", "Number of files to use", 1, min=0, max=5, step=1),
+                     uiOutput("multiImages_selectors"),
+                     verbatimTextOutput("errorMultiImages")
+                     )
               ),
               actionButton("refresh", "Reset", 
                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
@@ -524,21 +531,21 @@ server <- function(input, output, session) {
   
   # File reactive variable : infos on file chosen & read datas
   observeEvent(eventExpr=input$default, handlerExpr = {
-    if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==1 &
-        length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==1) {
-      global$imgPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE)
-      global$dataPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE)
-      global$zipPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE)
-      global$legendPath <- dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE)
+    if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))==1 &
+        length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))==1) {
+      global$imgPath <- dir(path = getwd(), pattern = "*.tif$", recursive=TRUE)
+      global$dataPath <- dir(path = getwd(), pattern = "*.txt$", recursive=TRUE)
+      global$zipPath <- dir(path = getwd(), pattern = "*.zip$", recursive=TRUE)
+      global$legendPath <- dir(path = getwd(), pattern = "*.csv$", recursive=TRUE)
     }
     else {
       output$errorDefaultFiles <- renderPrint ({
-        if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))>1 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))>1 |
-           length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))>1 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))>1) {
+        if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))>1 | length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))>1 |
+            length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))>1 | length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))>1) {
           paste0("ERROR : Multiple files with the same extension. Please read prerequisites. ")
         }
-        else if (length(dir(path = paste0(getwd(), "/www"), pattern = "*.zip$", recursive=TRUE))==0 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.tif$", recursive=TRUE))==0 |
-                 length(dir(path = paste0(getwd(), "/www"), pattern = "*.txt$", recursive=TRUE))==0 | length(dir(path = paste0(getwd(), "/www"), pattern = "*.csv$", recursive=TRUE))==0) {
+        else if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))==0 | length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))==0 |
+                 length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))==0 | length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))==0) {
           paste0("ERROR : Missing files. Please read prerequisites. ")
         }
       })
@@ -563,8 +570,8 @@ server <- function(input, output, session) {
     global$legendPath
     global$dataPath
     global$zipPath
-  },{
-    req(global$imgPath, global$legendPath, global$dataPath, global$zipPath)
+  },
+  { req(global$imgPath, global$legendPath, global$dataPath, global$zipPath)
     if (read_tags(global$imgPath)$frame1$color_space!="palette") {
       if ((dim(read_tif(global$imgPath)))[4]==1) { # If only one frame
         global$img <- read_tif(global$imgPath) # Image 
@@ -586,8 +593,10 @@ server <- function(input, output, session) {
           if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
             global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
             global$resize <- TRUE
-            global$resolution <- global$resolution*2
           }
+        }
+        if (global$resize == TRUE) {
+          global$resolution <- global$resolution*2
         }
         global$nChan <- dim(global$img[[1]])[3] 
       }
@@ -623,6 +632,101 @@ server <- function(input, output, session) {
       annote$actualImg <- global$img
     }
   })
+  
+  output$multiImages_selectors <- renderUI ({
+    if (input$multiImages_nb > 1) {
+      tagList(radioButtons("multiImages_legendSep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
+      fileInput("multiImages_legendFile", "Choose legend file", multiple=FALSE),
+      lapply(1:input$multiImages_nb, function(i) 
+             { tagList(fileInput(paste0("multiImages_imgFile", i), paste0("Choose image number ", i), multiple=FALSE), 
+                       radioButtons(paste0("multiImages_sep", i), label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
+                       radioButtons(paste0("multiImages_dec", i), label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
+                       checkboxInput(paste0("multiImages_header", i), label = "Header", value = TRUE),
+                       fileInput(paste0("multiImages_dataFile", i), paste0("Choose data file number ", i), multiple=FALSE),
+                       fileInput(paste0("multiImages_zipFile", i), paste0("Choose Roi set number ", i), multiple=FALSE),)}),
+      actionButton("multiImages_validate", "Combine files"))
+    }
+  })
+  
+  multiImages <- reactiveValues(img = list(), legend = NULL, data = list(), zip = list(), resize=FALSE, fullImg = list())
+  
+  observeEvent({ 
+    input$multiImages_validate
+    }, { 
+    req(input[[paste0("multiImages_imgFile", input$multiImages_nb)]],
+        input[[paste0("multiImages_dataFile", input$multiImages_nb)]],
+        input[[paste0("multiImages_zipFile", input$multiImages_nb)]],
+        input$multiImages_legendFile, is.null(input$imgFile), is.null(input$dataFile),
+        is.null(input$legendFile), is.null(input$zipFile))
+    global$resolution <- attr(read_tif(input[[paste0("multiImages_imgFile", 1)]]$datapath), "x_resolution")
+    sepLegend <- switch(input$multiImages_legendSep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
+    multiImages$legend <- read.table(input$multiImages_legendFile$datapath, header=TRUE, sep=sepLegend, dec=".")
+    lapply(1:input$multiImages_nb, function(i) {
+      multiImages$img[[i]] <- read_tif(input[[paste0("multiImages_imgFile", i)]]$datapath) # Image 
+      multiImages$img[[i]]  <- as_EBImage(multiImages$img[[i]])
+      if (dim(multiImages$img[[i]])[1] > 1200 & dim(multiImages$img[[i]])[2] > 1200) {
+        multiImages$img[[i]] <- EBImage::resize(multiImages$img[[i]], dim(multiImages$img[[i]])[1]/2, dim(multiImages$img[[i]])[2]/2)
+        multiImages$resize <- TRUE
+      }
+      separator <- switch (input[[paste0("multiImages_sep",i)]], "Tab"="\t", "Comma"=",", "Semicolon"=";")
+      decimal <- switch (input[[paste0("multiImages_dec",i)]], "Point"=".", "Comma"=",")
+      multiImages$data[[i]] <- read.table(input[[paste0("multiImages_dataFile", i)]]$datapath,header=input[[paste0("multiImages_header", i)]], sep=separator, dec=decimal)
+      multiImages$zip[[i]] <- read.ijzip(input[[paste0("multiImages_zipFile", i)]]$datapath)
+      if (multiImages$resize == TRUE) {
+        multiImages$resolution <- multiImages$resolution*2
+        for (j in c(1:length(multiImages$zip[[i]]))) {
+          multiImages$zip[[i]][[j]]$coords <- multiImages$zip[[i]][[j]]$coords/2
+        } 
+      }
+    })
+  })
+  
+  observeEvent({
+    multiImages$img
+    multiImages$data
+    multiImages$zip
+    multiImages$legend
+  },{
+    req(length(multiImages$img)==input$multiImages_nb,
+        length(multiImages$data)==input$multiImages_nb,
+        length(multiImages$zip)==input$multiImages_nb,
+        multiImages$legend)
+    multiImages$fullData <- multiImages$data[[1]]
+    multiImages$fullData$Slice <- 1
+    multiImages$fullZip <- multiImages$zip[[1]]
+    multiImages$fullImg[[1]] <- multiImages$img[[1]]
+    for (i in 2:input$multiImages_nb) {
+      if (ncol(multiImages$data[[i]])==ncol(multiImages$fullData)-1) {
+        multiImages$data[[i]]$Slice <- i
+        multiImages$fullData <- rbind(multiImages$fullData, multiImages$data[[i]])
+      }
+      if (dim(multiImages$img[[i]])[1] == dim(multiImages$fullImg[[1]])[1] & dim(multiImages$img[[i]])[2] == dim(multiImages$fullImg[[1]])[2] &
+          dim(multiImages$img[[i]])[3] == dim(multiImages$fullImg[[1]])[3]) {
+        multiImages$fullImg[[i]] <- multiImages$img[[i]]
+      }
+      multiImages$fullZip <- append(multiImages$fullZip, multiImages$zip[[i]])
+    }
+    if (length(multiImages$fullZip)==nrow(multiImages$fullData) & length(multiImages$fullImg)==input$multiImages_nb) {
+      global$legend <- multiImages$legend
+      global$img <- multiImages$fullImg
+      global$data <- multiImages$fullData
+      global$data$ID <- 1:nrow(global$data)
+      global$zip <- multiImages$fullZip
+      global$nChan <- dim(global$img[[1]])[3]
+      global$nFrame <- input$multiImages_nb
+      global$resolution <- multiImages$resolution
+    }
+    else {
+      output$errorMultiImages <- renderText ({
+        if ((length(multiImages$fullZip) != nrow(multiImages$fullData) | length(multiImages$fullImg) !=input$multiImages_nb)) {
+          paste0("Your files don't match with each other. Please select files with the same dimensions (images with same dimensions, data files with the same number of columns)")
+        }
+      })
+    }
+  })
+  
+  
+  
   
   ## MENU PLOT TO IMAGE
   # Filtering Plot
@@ -1672,7 +1776,7 @@ server <- function(input, output, session) {
     }
     else if (global$nFrame >1) { # Same but association with slice
       if (any(global$data$Slice[global$data$ID %in% plotToImg$selected]==plotToImg$imgFrame)) {
-        for (i in global$data$ID[global$data$ID %in%plotToImg$selected & global$data$Slice==plotToImg$imgFrame]) {
+        for (i in global$data$ID[global$data$ID %in% plotToImg$selected & global$data$Slice==plotToImg$imgFrame]) {
           xmin = global$xcenters[i]-d
           xmax= global$xcenters[i]+d
           ymin = global$ycenters[i]-d
