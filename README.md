@@ -117,4 +117,17 @@ You can select ROIs on the image (one click or selection) and check the datas on
 #### **3. Annotate your data**
 
 If you want to verify or correct you data, you can use the fourth item of the menu : "Annotate your data". <br> 
-This menu allows you to select a subset of cells on a plot or by their ID and to verify or correct a value for these cells. 
+This menu allows you to select a subset of cells on a plot or by their ID and to verify or correct a value for these cells.
+
+To begin, select the variable you want to annotate with the selectizer in the box Parameters - Select ROIs. Then on the box "Select ROIs", you can select a subset of cells to annotate. 
+* You can select them within a plot. By default, this plot is an histogram or a barplot of the variable to annotate. If you want to select the cells in a plot with other variables, uncheck the box "Use the variable to annotate for the plot" and select the type of plot and the variables of the plot. You can then make a selection on this plot. 
+* You can select them with their IDs : two choices are possibles, Select one or more ID(s) or Select ID n -> m. 
+* You can select all the cells of your file. 
+Once you selected the cells you wanted, these ones are displayed on a table below. If you are satisfied with your selection, click on the "Validate and annotate" button. 
+
+A crop of the first cell you selected is then displayed on the right. You can change the channel and the size of the crop with the sliders, add brightness and overlay channels. 
+Below you can see the value of the variable you choose for this cell and you can choose to modify this value or not. 
+If you don't want to modify this value, use the "Next ROI" button to see the next cell of your selection. 
+If you want to modify this value, click on the "Yes" button, input the new value, click on "Ok" and then use the "Next ROI" button to see the next cell of your selection. 
+
+Once you made all the modifications you wanted, click on the "Validate modifications" button. A new column called "corrected_" + the name of the variable you annotate will be add to your intensity file. You can now download it with the button. 
