@@ -80,7 +80,7 @@ ui <- dashboardPage(
       tabItem(tabName= "image",
               # Image browser 
               fluidRow(
-                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
+                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, collapsed=TRUE, 
                      title = "Use files stored in the www directory",
                      helpText("To use this button, you will need 4 files stored in a repertory \"www\" in your working directory.
                               For prerequisites, click on the \"Prerequisites\" link."),
@@ -90,7 +90,7 @@ ui <- dashboardPage(
                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                      verbatimTextOutput("errorDefaultFiles")
                      ),
-                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, 
+                box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, collapsed=TRUE,
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
@@ -110,7 +110,7 @@ ui <- dashboardPage(
                      helpText("Select the zip file containing your ROIs."),
                      fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
                      ),
-                box (width = 12, solidHeader=TRUE, status="primary", collapsible = TRUE,
+                box (width = 12, solidHeader=TRUE, status="primary", collapsible = TRUE, collapsed=TRUE,
                      title = "Combine multiple images", 
                      numericInput("multiImages_nb", "Number of files to use", 1, min=0, max=5, step=1),
                      uiOutput("multiImages_selectors"),
