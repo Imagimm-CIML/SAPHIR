@@ -1680,6 +1680,7 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr = {
     input$plotToImg_ids
+    plotToImg$imgPNG
   }, handlerExpr = {
     req(plotToImg$imgPNG)
     if (input$plotToImg_ids==TRUE) {
@@ -1702,7 +1703,7 @@ server <- function(input, output, session) {
         plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
       }
     }
-  })
+  }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr = {
     input$plotToImg_addBrightness
@@ -2160,7 +2161,7 @@ server <- function(input, output, session) {
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$annote_plot <- renderPlotly({
-    req(global$data, !is.null(input$annote_useVariable))
+    req(global$data, input$annote_useVariable)
     if (input$annote_useVariable == "TRUE") {
       req(!is.null(input$annote_variable))
       if (class(global$data[input$annote_variable][,1])=="numeric" | class(global$data[input$annote_variable][,1])=="integer") {
