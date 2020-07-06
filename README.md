@@ -52,12 +52,12 @@ Then, upload your zip file containing the ROIs of your image.
 Use the second item of the menu : "Plot to Image". <br>
 
 ##### *Filtering* 
-If you want to filter your ROIs with other variables like Cell area, you can use the first box on the left : "Filtering parameters". 
+If you want to filter your ROIs with other variables like Cell area, you can use the first box on the left : "**Filtering parameters**". 
 It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. 
 
 Once the plot is made, you can make a selection of points (or bars) or you can click on a point (or on a bar). The selection you made will then change colors on this plot and will be plot on the next plot which is interactive with the image. 
 
-If you want to filter on more than one selection, use the radiobuttons "Type of selection" and select "Multiple selection" : make a first selection, validate it with the button "Validate actual selection", make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "Validate final selection" to see it on the interactive plot. 
+If you want to filter on more than one selection, use the radiobuttons "**Type of selection**" and select "**Multiple selection**" : make a first selection, validate it with the button "**Validate actual selection**", make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "**Validate final selection**" to see it on the interactive plot. 
 
 ##### Interactive plot 
 *Plot variables* : 
@@ -109,24 +109,24 @@ The ROIs are displayed in the viewer with their ID to identify them.
 
 #### **2. Image to plot**
 
-Use the third item of the menu : "Image to plot". <br> 
+Use the third item of the menu : "**Image to plot**". <br> 
 The image is displayed on the left with all the ROIs of your file. You can choose channel and slice to display with sliders and the color with which the ROIs are displayed. <br> 
 
 You can select ROIs on the image (one click or selection), the cells you selected will change color on the image, and check the datas on the ROIs selected. These data can be plotted on the plot on the left box. 
 
-You can also choose to select ROIs on the image with multiple selection. To do so, choose "Multiple selection" in the "Type of selection" button. Make a first selection, it will appear in yellow. If you are satisfy, validate it with "Validate actual selection". Then make other selections and validate them each time with this button. All your selections will be in orange once you validate them. 
-When you are satisfied with all your selection and you want to plot them, click on the "Validate final selection" button. 
+You can also choose to select ROIs on the image with multiple selection. To do so, choose "**Multiple selection**" in the "**Type of selection**" button. Make a first selection, it will appear in yellow. If you are satisfy, validate it with "**Validate actual selection**". Then make other selections and validate them each time with this button. All your selections will be in orange once you validate them. 
+When you are satisfied with all your selection and you want to plot them, click on the "**Validate final selection**" button. 
 
 #### **3. Annotate your data**
 
-If you want to verify or correct you data, you can use the fourth item of the menu : "Annotate your data". <br> 
+If you want to verify or correct you data, you can use the fourth item of the menu : "**Annotate your data**". <br> 
 This menu allows you to select a subset of cells on a plot or by their ID and to verify or correct a value for these cells.
 
-To begin, select the variable you want to annotate with the selectizer in the box Parameters - Select ROIs. Then on the box "Select ROIs", you can select a subset of cells to annotate. 
-* You can select them within a plot. By default, this plot is an histogram or a barplot of the variable to annotate. If you want to select the cells in a plot with other variables, uncheck the box "Use the variable to annotate for the plot" and select the type of plot and the variables of the plot. You can then make a selection on this plot. 
+To begin, select the variable you want to annotate with the selectizer in the box "**Parameters - Select ROIs**". Then on the box "**Select ROIs**", you can select a subset of cells to annotate. 
+* You can select them within a plot. By default, this plot is an histogram or a barplot of the variable to annotate. If you want to select the cells in a plot with other variables, uncheck the box "**Use the variable to annotate for the plot**" and select the type of plot and the variables of the plot. You can then make a selection on this plot. 
 * You can select them with their IDs : two choices are possibles, Select one or more ID(s) or Select ID n -> m. 
 * You can select all the cells of your file. 
-Once you selected the cells you wanted, these ones are displayed on a table below. If you are satisfied with your selection, click on the "Validate and annotate" button. 
+Once you selected the cells you wanted, these ones are displayed on a table below. If you are satisfied with your selection, click on the "**Validate and annotate**" button. 
 
 A crop of the first cell you selected is then displayed on the right. You can change the channel and the size of the crop with the sliders, add brightness and overlay channels. 
 Below you can see the value of the variable you choose for this cell and you can choose to modify this value or not. 
