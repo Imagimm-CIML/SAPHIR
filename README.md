@@ -112,7 +112,10 @@ The ROIs are displayed in the viewer with their ID to identify them.
 Use the third item of the menu : "Image to plot". <br> 
 The image is displayed on the left with all the ROIs of your file. You can choose channel and slice to display with sliders and the color with which the ROIs are displayed. <br> 
 
-You can select ROIs on the image (one click or selection) and check the datas on the ROIs selected. These data can be plotted on the plot on the left box. 
+You can select ROIs on the image (one click or selection), the cells you selected will change color on the image, and check the datas on the ROIs selected. These data can be plotted on the plot on the left box. 
+
+You can also choose to select ROIs on the image with multiple selection. To do so, choose "Multiple selection" in the "Type of selection" button. Make a first selection, it will appear in yellow. If you are satisfy, validate it with "Validate actual selection". Then make other selections and validate them each time with this button. All your selections will be in orange once you validate them. 
+When you are satisfied with all your selection and you want to plot them, click on the "Validate final selection" button. 
 
 #### **3. Annotate your data**
 
