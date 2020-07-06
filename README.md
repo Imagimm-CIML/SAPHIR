@@ -43,6 +43,8 @@ Store these files in a repository named www in your working directory and click 
 Then, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
 Then, upload your zip file containing the ROIs of your image. 
 
+* You can use multiple images of the same type and use them as an hyperstack with a z coordinate. To do so, you can use the box "Multiple images" and select how many images you want to use. Then, you have to browse your different file : one legend file and for each image : an intensity file, the image and a roi set file. When you have searched all your files, you can click on the button "Combine" to combine the images as one. 
+
 
 ### Second step 
 #### **1. Plot to Image**
@@ -51,10 +53,11 @@ Use the second item of the menu : "Plot to Image". <br>
 
 ##### *Filtering* 
 If you want to filter your ROIs with other variables like Cell area, you can use the first box on the left : "Filtering parameters". 
-It allows you to choose the type of plot and the variables to plot : if you want a histogram, you will have to select one variable and if you want a scatter plot, you will have to select two variables. 
-*Please note that histogram are only available with NUMERIC variables.*
+It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. 
 
-Once the plot is made, you can make a selection of points (or bars) or you can click on a point (or on a bar). The selection you made will then be plot on the next plot which is interactive with the image. 
+Once the plot is made, you can make a selection of points (or bars) or you can click on a point (or on a bar). The selection you made will then change colors on this plot and will be plot on the next plot which is interactive with the image. 
+
+If you want to filter on more than one selection, use the radiobuttons "Type of selection" and select "Multiple selection" : make a first selection, validate it with the button "Validate actual selection", make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "Validate final selection" to see it on the interactive plot. 
 
 ##### Interactive plot 
 *Plot variables* : 
