@@ -644,7 +644,7 @@ server <- function(input, output, session) {
                        checkboxInput(paste0("multiImages_header", i), label = "Header", value = TRUE),
                        fileInput(paste0("multiImages_dataFile", i), paste0("Choose data file number ", i), multiple=FALSE),
                        fileInput(paste0("multiImages_zipFile", i), paste0("Choose Roi set number ", i), multiple=FALSE),)}),
-      actionButton("multiImages_validate", "Combine files"))
+      actionButton("multiImages_validate", "Combine files", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
     }
   })
   
@@ -2568,8 +2568,8 @@ server <- function(input, output, session) {
                       if (input$annote_modifyValue=="Yes" & !is.null(input$annote_variable)) {
                         tagList(
                           textInput("annote_inputNewValue", paste0("Input new value for ", input$annote_variable), ""),
-                          actionButton("annote_validateNewValue", "Ok"), 
-                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                          actionButton("annote_validateNewValue", "Ok", 
+                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
                       }
                   })
                 }, ignoreNULL=FALSE)
