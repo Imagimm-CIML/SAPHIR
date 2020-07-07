@@ -25,9 +25,9 @@ To launch the app, you have to open the app.R file in RStudio and click on the "
 
 ### Preliminary step : ImageJ Macro
 If you first need to launch a macro in ImageJ to obtain your results, you can use the first menu "Segmentation". This menu allows you to choose your software (ImageJ or Fiji) and a macro and to launch it. 
-To do so, you need to choose your OS and the software to use. Then, you will need to search for your ImageJ/Fiji app : after clicking on the "Choose" link, a browser will appear and you will have to select the repository containing your app (often something like Fiji.app or ImageJ.app). The path to your file will be save in a txt file in a repository "www" created in your R Working directory. If you are still in the same working directory when you re-run the app next time, the path will be found automatically and you won't need to search for it again. 
-After that, you have to choose your macro to launch. The same principle of path saving is used. 
-You can also launch a second macro after the first one. 
+To do so, you need to choose your OS (1) and the software to use (2). Then, you will need to search for your ImageJ/Fiji app : after clicking on the "Choose" link (3), a browser will appear and you will have to select the repository containing your app (often something like Fiji.app or ImageJ.app). The path to your file will be save in a txt file in a repository "www" created in your R Working directory. If you are still in the same working directory when you re-run the app next time, the path will be found automatically and you won't need to search for it again. 
+After that, you have to choose your macro to launch. The same principle of path saving is used. (4)
+You can also launch a second macro after the first one. (5)
 
 <img width="1439" alt="segmentationMenu" src="https://user-images.githubusercontent.com/62395414/86744728-1ae3e300-c03a-11ea-9916-acfbea91098e.png">
 
@@ -38,7 +38,7 @@ You can also launch a second macro after the first one.
 ### First step : upload the files you want to analyse 
 Use the second item of the menu "Choose your results". 
 There is two methods to upload your files : 
-* You can use the first box and use "default files". 4 files needed : 
+* You can use the first box and use "default files" (1). 4 files needed : 
 	* image.tif containing your image in TIF format 
 	* intensity.csv containing your intensity results in csv format, with a TAB separator and a HEADER 
 	* legend.csv containing your legends result in csv format, with a ";" separator and a HEADER 
@@ -51,9 +51,9 @@ Store these files in a repository named www in your working directory and click 
 
 ***
 
-* You can also browse your different files. First, click on the top "Browse" button. Select the image you want to analyse. After, you can also choose a file containing the legends for the channel in the image. 
-Then, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
-Then, upload your zip file containing the ROIs of your image. 
+* You can also browse your different files. First, click on the top "Browse" button. Select the image you want to analyse. (1) After, you can also choose a file containing the legends for the channel in the image. (2)
+Then, you need to upload your data file. (3) You can change the type of separator in your file, if there is a header of not etc. 
+Then, upload your zip file containing the ROIs of your image. (4)
 
 <img width="1181" alt="selectFiles" src="https://user-images.githubusercontent.com/62395414/86744698-15869880-c03a-11ea-91e2-6350c1cd4b3e.png">
 
@@ -76,21 +76,21 @@ Use the second item of the menu : "Plot to Image". <br>
 
 ##### *Filtering* 
 If you want to filter your ROIs with other variables like Cell area, you can use the first box on the left : "**Filtering parameters**". 
-It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. (1)
+It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. (1) (2) 
 
 <img width="603" alt="filtrage" src="https://user-images.githubusercontent.com/62395414/86748131-875fe180-c03c-11ea-856b-4a33254ab909.png">
 
 *Filtering box*
 
 Once the plot is made, you can make a selection of points (or bars) or you can click on a point (or on a bar). The selection you made will then change colors on this plot and will be plot on the next plot which is interactive with the image. 
+The selection can be made with a square selectizer or a lasso selectizer (b). You can zoom on the plot with the +/- button (c) and move along the plot (a). 
+If you want, you can download a png version of your plot with the camera (d). 
 
-If you want to filter on more than one selection, use the radiobuttons "**Type of selection**" and select "**Multiple selection**" : make a first selection, validate it with the button "**Validate actual selection**", make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "**Validate final selection**" to see it on the interactive plot. 
+If you want to filter on more than one selection, use the radiobuttons "**Type of selection**" (3) and select "**Multiple selection**" : make a first selection, validate it with the button "**Validate actual selection**" (1) , make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "**Validate final selection**" (2) to see it on the interactive plot. 
 
 <img width="588" alt="multiFiltrage" src="https://user-images.githubusercontent.com/62395414/86748142-89c23b80-c03c-11ea-8985-3384bfa562ba.png">
 
 *Multiple selection in filtering*
-
-<br>
 
 ***
 
@@ -172,8 +172,8 @@ You can choose to display an image with channels in overlay. To do so, you have 
  *Overlay channels*
 <br>
 ##### Cropped ROIs : <br>
-The ROIs selected on the plot can be displayed below the image on the "**ROIs**" box. You can modify the size of the crop with a slider. 
-The ROIs are displayed in the viewer with their ID to identify them.  
+The ROIs selected on the plot can be displayed below the image on the "**ROIs**" box. You can modify the size of the crop with a slider (1). 
+The ROIs are displayed in the viewer with their ID to identify them. To see an other cell, click on the raw. (2)
 
 <img width="588" alt="cropRoi" src="https://user-images.githubusercontent.com/62395414/86773219-a9199280-c055-11ea-869d-e842e047501f.png">
 
@@ -191,9 +191,9 @@ The image is displayed on the left with all the ROIs of your file. You can choos
 
 *Menu image to plot*
 <br>
-You can select ROIs on the image (one click or selection), the cells you selected will change color on the image, and check the datas on the ROIs selected. These data can be plotted on the plot on the left box. 
+You can select ROIs on the image (one click or selection), the cells you selected will change color on the image, and check the datas on the ROIs selected. These data can be plotted on the plot on the left box. You can select the variables of the plot. (2)
 
-You can also choose to select ROIs on the image with multiple selection. To do so, choose "**Multiple selection**" in the "**Type of selection**" button. Make a first selection, it will appear in yellow. If you are satisfy, validate it with "**Validate actual selection**". Then make other selections and validate them each time with this button. All your selections will be in orange once you validate them. 
+You can also choose to select ROIs on the image with multiple selection. To do so, choose "**Multiple selection**" in the "**Type of selection**" (1) button. Make a first selection, it will appear in yellow. If you are satisfy, validate it with "**Validate actual selection**". Then make other selections and validate them each time with this button. All your selections will be in orange once you validate them. 
 When you are satisfied with all your selection and you want to plot them, click on the "**Validate final selection**" button. 
 
 #### **3. Annotate your data**
@@ -217,15 +217,15 @@ Once you selected the cells you wanted, these ones are displayed on a table belo
 
 *Validate annotation*
 <br>
-A crop of the first cell you selected is then displayed on the right. You can change the channel and the size of the crop with the sliders, add brightness and overlay channels. 
+A crop of the first cell you selected is then displayed on the right. You can change the channel and the size of the crop with the sliders, add brightness and overlay channels. You can also choose to associate the crop with the slice or to see it on every slice. (1) 
 
 <img width="583" alt="annotationImage" src="https://user-images.githubusercontent.com/62395414/86773211-a5860b80-c055-11ea-8e45-cebdc46a9b09.png">
 
 *Image of the cell to annotate*
 <br>
 
-Below you can see the value of the variable you choose for this cell and you can choose to modify this value or not. 
-If you don't want to modify this value, use the "Next ROI" button to see the next cell of your selection. 
+Below you can see the value of the variable you choose for this cell (1) and you can choose to modify this value or not. (2) 
+If you don't want to modify this value, use the "Next ROI" button to see the next cell of your selection. (3)
 If you want to modify this value, click on the "Yes" button, input the new value, click on "Ok" and then use the "Next ROI" button to see the next cell of your selection. 
 
 <img width="572" alt="annotationModifyValue" src="https://user-images.githubusercontent.com/62395414/86773216-a880fc00-c055-11ea-848d-b7d0bfd7b53c.png">
@@ -233,4 +233,4 @@ If you want to modify this value, click on the "Yes" button, input the new value
 *Modify the value of the cell*
 <br>
 
-Once you made all the modifications you wanted, click on the "Validate modifications" button. A new column called "corrected_" + the name of the variable you annotate will be add to your intensity file. You can now download it with the button. 
+Once you made all the modifications you wanted, click on the "Validate modifications" (4) button. A new column called "corrected_" + the name of the variable you annotate will be add to your intensity file. You can now download it with the "Download data" button. 
