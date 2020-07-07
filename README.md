@@ -33,6 +33,8 @@ You can also launch a second macro after the first one.
 
 *Menu segmentation*
 
+***
+
 ### First step : upload the files you want to analyse 
 Use the second item of the menu "Choose your results". 
 There is two methods to upload your files : 
@@ -47,6 +49,8 @@ Store these files in a repository named www in your working directory and click 
 
 *Default files button*
 
+***
+
 * You can also browse your different files. First, click on the top "Browse" button. Select the image you want to analyse. After, you can also choose a file containing the legends for the channel in the image. 
 Then, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
 Then, upload your zip file containing the ROIs of your image. 
@@ -55,11 +59,15 @@ Then, upload your zip file containing the ROIs of your image.
 
 *File selectizers*
 
+***
+
 * You can use multiple images of the same type and use them as an hyperstack with a z coordinate. To do so, you can use the box "Multiple images" and select how many images you want to use. Then, you have to browse your different file : one legend file and for each image : an intensity file, the image and a roi set file. When you have searched all your files, you can click on the button "Combine" to combine the images as one. 
 
 <img width="1186" alt="multiImages" src="https://user-images.githubusercontent.com/62395414/86744749-1dded380-c03a-11ea-8b70-efaff5d8e03a.png">
 
 *Multiple images selectizers*
+
+***
 
 ### Second step 
 #### **1. Plot to Image**
@@ -83,6 +91,9 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 *Multiple selection in filtering*
 
 <br>
+
+***
+
 ##### Interactive plot 
 *Plot variables* : 
 * A plot representing for ROIs their intensities on different channels is displayed. The variables plotted in X and Y can be modified. By default, the 2nd column of your intensity file will represent the X axis and the 3rd column the Y axis. 
@@ -92,6 +103,8 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 <img width="584" alt="interactivePlotParameters" src="https://user-images.githubusercontent.com/62395414/86773228-aa4abf80-c055-11ea-812f-51f3af9aab3f.png">
 
 *Interactive plot parameters* 
+
+***
 
 <br>
 *Zones of the plot* : 
@@ -122,6 +135,9 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 
 *Statistic of the selections*
 <br>
+
+***
+
 ##### Image <br>
 
 The image is displayed on the left, channel and slice to display can be modified with the sliders. 
@@ -161,6 +177,9 @@ The ROIs are displayed in the viewer with their ID to identify them.
 
 *Crop of the selected cells*
 <br>
+
+***
+
 #### **2. Image to plot**
 
 Use the third item of the menu : "**Image to plot**". <br> 
