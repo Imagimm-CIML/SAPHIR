@@ -107,7 +107,9 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 ***
 
 <br>
+
 *Zones of the plot* : 
+
 * The plot is cut in 4 zones :  R1 to R4 depending on movable horizontal and a vertical lines. You can modify the repartition by clicking on the horizontal or on the vertical line and moving them. 
 
 <img width="589" alt="interactivePlotwoutSymbol" src="https://user-images.githubusercontent.com/62395414/86773230-aae35600-c055-11ea-9a87-76ce9a939c11.png">
