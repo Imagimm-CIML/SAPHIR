@@ -60,11 +60,16 @@ Use the second item of the menu : "Plot to Image". <br>
 
 ##### *Filtering* 
 If you want to filter your ROIs with other variables like Cell area, you can use the first box on the left : "**Filtering parameters**". 
-It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. 
+It allows you to choose the type of plot and the variables to plot : if you want a histogram or a barplot, you will have to select "one" variable and if you want a scatter plot, you will have to select "two" variables. (1)
+
+<img width="603" alt="filtrage" src="https://user-images.githubusercontent.com/62395414/86748131-875fe180-c03c-11ea-856b-4a33254ab909.png">
 
 Once the plot is made, you can make a selection of points (or bars) or you can click on a point (or on a bar). The selection you made will then change colors on this plot and will be plot on the next plot which is interactive with the image. 
 
 If you want to filter on more than one selection, use the radiobuttons "**Type of selection**" and select "**Multiple selection**" : make a first selection, validate it with the button "**Validate actual selection**", make an other selection and validate it again. This button is used to validate your multiple selections. Once you made all your selections (more than one), click on the button "**Validate final selection**" to see it on the interactive plot. 
+
+<img width="588" alt="multiFiltrage" src="https://user-images.githubusercontent.com/62395414/86748142-89c23b80-c03c-11ea-8985-3384bfa562ba.png">
+
 
 ##### Interactive plot 
 *Plot variables* : 
