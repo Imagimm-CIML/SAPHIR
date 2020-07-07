@@ -29,6 +29,8 @@ To do so, you need to choose your OS and the software to use. Then, you will nee
 After that, you have to choose your macro to launch. The same principle of path saving is used. 
 You can also launch a second macro after the first one. 
 
+<img width="1439" alt="segmentationMenu" src="https://user-images.githubusercontent.com/62395414/86744728-1ae3e300-c03a-11ea-9916-acfbea91098e.png">
+
 ### First step : upload the files you want to analyse 
 Use the second item of the menu "Choose your results". 
 There is two methods to upload your files : 
@@ -39,12 +41,17 @@ There is two methods to upload your files :
 	* roiset.zip containing your ImageJ ROIs. 
 Store these files in a repository named www in your working directory and click on the button, you won't have to choose your files after, the files in the directory will be used.
 
+<img width="1203" alt="defaultFiles" src="https://user-images.githubusercontent.com/62395414/86744773-21725a80-c03a-11ea-8ed0-b035f16539e5.png">
+
 * You can also browse your different files. First, click on the top "Browse" button. Select the image you want to analyse. After, you can also choose a file containing the legends for the channel in the image. 
 Then, you need to upload your data file. You can change the type of separator in your file, if there is a header of not etc. 
 Then, upload your zip file containing the ROIs of your image. 
 
+<img width="1181" alt="selectFiles" src="https://user-images.githubusercontent.com/62395414/86744698-15869880-c03a-11ea-91e2-6350c1cd4b3e.png">
+
 * You can use multiple images of the same type and use them as an hyperstack with a z coordinate. To do so, you can use the box "Multiple images" and select how many images you want to use. Then, you have to browse your different file : one legend file and for each image : an intensity file, the image and a roi set file. When you have searched all your files, you can click on the button "Combine" to combine the images as one. 
 
+<img width="1186" alt="multiImages" src="https://user-images.githubusercontent.com/62395414/86744749-1dded380-c03a-11ea-8b70-efaff5d8e03a.png">
 
 ### Second step 
 #### **1. Plot to Image**
