@@ -126,7 +126,7 @@ ui <- dashboardPage(
                 column( width =6,
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                             title = "Parameter filtering",
+                             title = "Filtering",
                              radioButtons("plotToImgFilter_plotType", "Number of parameters you want to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
                              uiOutput("plotToImgFilter_colsX"),
                              uiOutput("plotToImgFilter_colsY"),
@@ -136,16 +136,13 @@ ui <- dashboardPage(
                              uiOutput("plotToImgFilter_validateSelection"),
                              uiOutput("plotToImgFilter_reset")
                         ),
-                        box( width = NULL,
-                             title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                        box( width = NULL, 
+                             title = "Interactive Plot", solidHeader=TRUE, status="primary",
                              helpText("Select parameters to use for the scatter plot."),
                              uiOutput("plotToImg_colsX"),
                              uiOutput("plotToImg_colsY"),
                              uiOutput("plotToImg_colShape"),
-                             uiOutput("plotToImg_shapeThreshold")
-                        ),
-                        box( width = NULL, 
-                             title = "Interactive Plot", solidHeader=TRUE, status="primary",
+                             uiOutput("plotToImg_shapeThreshold"),
                              helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
                              withSpinner(
                                plotlyOutput("plotToImg_plot", height = "600px")),
