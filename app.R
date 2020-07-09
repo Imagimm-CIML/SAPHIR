@@ -126,20 +126,19 @@ ui <- dashboardPage(
                 column( width =6,
                         # First box : Plot & Datas
                         box (width = NULL, solidHeader=TRUE, status="primary",collapsible = TRUE,
-                             title = "Parameters - Filtering",
-                             helpText("Select the variables you want to plot."),
-                             radioButtons("plotToImgFilter_plotType", "Number of parameters to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
+                             title = "Parameter filtering",
+                             radioButtons("plotToImgFilter_plotType", "Number of parameters you want to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
                              uiOutput("plotToImgFilter_colsX"),
                              uiOutput("plotToImgFilter_colsY"),
-                             radioButtons("plotToImgFilter_selectionType", "Type of selection", choices=c("One selection", "Multiple selection"), selected="One selection"),
-                             helpText("Select the cells (click or brush) to plot in the interactive Plot"),
+                             radioButtons("plotToImgFilter_selectionType", "Type of selection", choices=c("Single selection", "Multiple selection"), selected="Single selection"),
+                             helpText("Select the cells (click or brush) to analyze in the interactive Plot"),
                              plotlyOutput("plotToImgFilter_plot"),
                              uiOutput("plotToImgFilter_validateSelection"),
                              uiOutput("plotToImgFilter_reset")
                         ),
                         box( width = NULL,
                              title = "Parameters - Interactive Plot", solidHeader = TRUE, status = "primary", collapsible = TRUE,
-                             helpText("Select the columns to use for the scatter plot."),
+                             helpText("Select parameters to use for the scatter plot."),
                              uiOutput("plotToImg_colsX"),
                              uiOutput("plotToImg_colsY"),
                              uiOutput("plotToImg_colShape"),
@@ -147,26 +146,27 @@ ui <- dashboardPage(
                         ),
                         box( width = NULL, 
                              title = "Interactive Plot", solidHeader=TRUE, status="primary",
+                             helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
                              withSpinner(
                                plotlyOutput("plotToImg_plot", height = "600px")),
                              uiOutput("plotToImg_nextSel"),
                              uiOutput("plotToImg_resetAllSel"),
-                             helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
-                             checkboxInput("plotToImg_associated", "Associate with slice", value=TRUE),
-                             uiOutput("plotToImg_colorType"),
                              useShinyjs(),
                              extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
                              extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
                              radioButtons("plotToImg_selectionType", "Type of selection",
-                                          choices=c("One selection", "Multiple selection", "Select all plotted cells from a given z slice"),
-                                          selected="One selection"),
+                                          choices=c("Single selection", "Multiple selection", "Z slice"),
+                                          selected="Single selection"),
                              uiOutput("plotToImg_specificFrame"),
+                             tags$h5(tags$strong("Options")),
+                             checkboxInput("plotToImg_associated", "Associate with slice", value=TRUE),
+                             uiOutput("plotToImg_displayImg"),
+                             uiOutput("plotToImg_colorType"),
                              uiOutput("plotToImg_validateAndAnnote")
                         ),
                 ),
                 # Second box : Image displayer
                 column (width=6, 
-                        uiOutput("plotToImg_displayImg"),
                         uiOutput("plotToImg_imageDisplayers")
                 )
               ),
@@ -198,13 +198,15 @@ ui <- dashboardPage(
                 box( width = 7,
                      title = "Image display", solidHeader = TRUE, status = "primary",
                      helpText("Select channel and frame to display."),
+                     tags$h5(tags$strong("Channel legend : ")),
+                     tableOutput("imgToPlot_legend"),
                      uiOutput("imgToPlot_channel"),
                      uiOutput("imgToPlot_frame"),
                      helpText("Select the color of the ROIs."),
                      uiOutput("imgToPlot_color"),
                      checkboxInput("imgToPlot_brightnessImg", "Enhance brightness in image"),
                      uiOutput("imgToPlot_brightnessSlider"),
-                     radioButtons("imgToPlot_selectionType", "Type of selection", choices=c("One selection", "Multiple selection"), selected="One selection"),
+                     radioButtons("imgToPlot_selectionType", "Type of selection", choices=c("Single selection", "Multiple selection"), selected="Single selection"),
                      helpText("Click or select cells on the image and see their correspondance in the plot."),
                      withSpinner(plotlyOutput("imgToPlot_img", height = "600px")),
                      uiOutput("imgToPlot_validateSelection"),
@@ -735,7 +737,7 @@ server <- function(input, output, session) {
   output$plotToImgFilter_colsX <- renderUI({
     req(global$data)
     selectizeInput(inputId = "plotToImgFilter_colsX",
-                   label = "Variable to plot in X",
+                   label = "X coordinates",
                    multiple = TRUE,
                    choices = names(global$data),
                    options = list(maxItems = 1))
@@ -746,7 +748,7 @@ server <- function(input, output, session) {
     req(global$data)
     if (input$plotToImgFilter_plotType=="Two") {
       selectizeInput(inputId = "plotToImgFilter_colsY",
-                     label = "Variable to plot in Y",
+                     label = "Y coordinates",
                      multiple = TRUE,
                      choices = names(global$data),
                      options = list(maxItems = 1))
@@ -757,7 +759,7 @@ server <- function(input, output, session) {
   output$plotToImgFilter_plot <- renderPlotly({
     req(global$data, input$plotToImgFilter_colsX)
     if (input$plotToImgFilter_selectionType == "Multiple selection") { selected <- ifelse(global$data$ID %in% plotToImgFilter_multiSelect$totale, "Selected", "Not selected") }
-    else if (input$plotToImgFilter_selectionType == "One selection") { selected <- ifelse(global$data$ID %in% filterSelected(), "Selected", "Not selected") }
+    else if (input$plotToImgFilter_selectionType == "Single selection") { selected <- ifelse(global$data$ID %in% filterSelected(), "Selected", "Not selected") }
     if (input$plotToImgFilter_plotType == "One") {
       if (class(global$data[input$plotToImgFilter_colsX][,1])=="numeric" | class(global$data[input$plotToImgFilter_colsX][,1])=="integer") {
         gg <- ggplot(data=global$data, aes_string(x=input$plotToImgFilter_colsX, customdata="ID", fill="selected")) + 
@@ -841,7 +843,7 @@ server <- function(input, output, session) {
     filterSelected()
   },{
     req(global$data, input$plotToImgFilter_colsX)
-    if (input$plotToImgFilter_selectionType == "One selection") {
+    if (input$plotToImgFilter_selectionType == "Single selection") {
       plotToImg$filtered <- filterSelected()
       plotToImg$filtered <- global$data[global$data$ID %in% plotToImg$filtered,]
     }
@@ -935,7 +937,7 @@ server <- function(input, output, session) {
   output$plotToImg_colShape <- renderUI({
     req(global$data)
     selectizeInput(inputId = "plotToImg_colShape", 
-                   label = "Symbol shape change parameter (max 2)",
+                   label = "Symbol shape change parameter (up to 2)",
                    multiple = FALSE,
                    choices = c("None", names(global$data)),
                    selected = "None",
@@ -957,10 +959,10 @@ server <- function(input, output, session) {
       nbCols <- length(input$plotToImg_colShape)
       tagList(
         lapply(1:nbCols, function(i) {
-          sliderInput(inputId = paste0("plotToImg_threshold", i), label = paste("Threshold for symbol shape change depending on ", input$plotToImg_colShape[[i]]),
+          sliderInput(inputId = paste0("plotToImg_threshold", i), label = paste("Threshold for shape change (parameter ", input$plotToImg_colShape[[i]], ")"),
                       min = min(global$data[input$plotToImg_colShape[[i]]]), max = max(global$data[input$plotToImg_colShape[[i]]]), value = mean(global$data[input$plotToImg_colShape[[i]]]))
         }),
-      actionLink("plotToImg_validateThreshold", "Validate threshold"))
+      actionLink("plotToImg_validateThreshold", "Validate threshold(s)"))
     }
   })
   
@@ -1033,17 +1035,17 @@ server <- function(input, output, session) {
     req(plotToImg$subDatas)
     # Add columns "color" with position of the group the cell belong to
     if (is.null(input$plotToImg_colorType) | input$plotToImg_selectionType!="Multiple selection") {
-      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q1"
-      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q3"
-      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
-      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q1"
+      plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q3"
     }
     else if (!is.null(input$plotToImg_colorType) & input$plotToImg_selectionType=="Multiple selection") {
       if (input$plotToImg_colorType==FALSE) {
-        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q1"
-        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q3"
-        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
-        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q4"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q2"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] < plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] > plotToImg_y())] <- "Q1"
+        plotToImg$subDatas$color[(plotToImg$subDatas[input$plotToImg_colsX] > plotToImg_x()) & (plotToImg$subDatas[input$plotToImg_colsY] < plotToImg_y())] <- "Q3"
       }
       else {
         if (!"R1_multiselect" %in% unique(plotToImg$subDatas$color)) {
@@ -1061,13 +1063,13 @@ server <- function(input, output, session) {
     showModal(modalDialog(title="Download results",
                           checkboxInput("plotToImgDownload_modifyNames", "Modify the names of the subpopulations in downloaded files"),
                           uiOutput("plotToImgDownload_inputNewNames"),
-                          downloadLink("plotToImg_downloadData", "Download Groups subtables"),
+                          downloadLink("plotToImg_downloadData", "Download groups tables"),
                           tags$br(),
-                          downloadLink("plotToImg_downloadSummaryData", "Download summary of groups subtables"),
+                          downloadLink("plotToImg_downloadSummaryData", "Download summary of groups tables"),
                           tags$br(),
-                          downloadLink("plotToImg_downloadSubdata", "Download selected ROIs subtable"),
+                          downloadLink("plotToImg_downloadSubdata", "Download selected data table"),
                           tags$br(),
-                          downloadLink("plotToImg_downloadSummarySubdata", "Download summary of selected ROIs subtable"),
+                          downloadLink("plotToImg_downloadSummarySubdata", "Download summary of selected data"),
                           easyClose = FALSE
                           ))
   })
@@ -1271,8 +1273,8 @@ server <- function(input, output, session) {
   })
   
   output$plotToImg_specificFrame <- renderUI ({
-    if (input$plotToImg_selectionType=="Select all plotted cells from a given z slice" & global$nFrame > 1) {
-      numericInput("plotToImg_specificFrame", "Frame number :", value=1, min=1, max=global$nFrame, step=1)
+    if (input$plotToImg_selectionType=="Z slice" & global$nFrame > 1) {
+      numericInput("plotToImg_specificFrame", "Slice number :", value=1, min=1, max=global$nFrame, step=1)
     }
   })
 
@@ -1353,7 +1355,7 @@ server <- function(input, output, session) {
   }, handlerExpr = 
     {
       req(!is.null(global$data), !is.null(plotToImg$subDatas))
-      if (input$plotToImg_selectionType == "One selection") { # If One selection : use only the selection on the plot
+      if (input$plotToImg_selectionType == "Single selection") { # If One selection : use only the selection on the plot
         plotToImg$selected <- plotToImg_plotSelected()
         plotToImg$selected <- global$data$ID[global$data$ID %in% plotToImg$selected]
       }
@@ -1361,7 +1363,7 @@ server <- function(input, output, session) {
         plotToImg$selected <- unique(plotToImg_multiSelect$total)
         plotToImg$selected <- global$data$ID[global$data$ID %in% plotToImg$selected]
       }
-      else if (input$plotToImg_selectionType == "Select all plotted cells from a given z slice") { # If select all ROIs of a specific frame 
+      else if (input$plotToImg_selectionType == "Z slice") { # If select all ROIs of a specific frame 
         if ((global$nFrame > 1) & (!is.null(input$plotToImg_specificFrame))) { # If more than one frame : only ROIs which are on this specific frame
           plotToImg$selected <- plotToImg$subDatas$ID[plotToImg$subDatas$ID %in% global$data$ID[global$data$Slice==input$plotToImg_specificFrame]]
         }
@@ -1374,7 +1376,7 @@ server <- function(input, output, session) {
   # Validate gates and annote datas
   output$plotToImg_validateAndAnnote <- renderUI({
     req(global$data)
-    actionLink("plotToImg_validateAndAnnote", "Validate the gates and annote your datas", icon=icon("check"))
+    actionLink("plotToImg_validateAndAnnote", "Validate quadrants and annote your datas", icon=icon("check"))
   })
   
   observeEvent(input$plotToImg_validateAndAnnote,
@@ -1452,11 +1454,11 @@ server <- function(input, output, session) {
         tagList( 
              box( width=NULL, 
              title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
-             helpText("Legends of the channels : "),
+             tags$h5(tags$strong("Channel legend : ")),
              tableOutput("plotToImg_legend"),
              checkboxInput("plotToImg_overlay", "Overlay channels (up to 3)"),
              uiOutput("plotToImg_channelOverlay"),
-             helpText("Legends of the colors : "), 
+             tags$h5(tags$strong("Color legend : ")), 
              tableOutput("plotToImg_colorLegend")
         ),
         box( width=NULL, 
@@ -1496,8 +1498,8 @@ server <- function(input, output, session) {
   # Table with color legend channel 
   output$plotToImg_colorLegend <- renderTable({
     req(input$plotToImg_displayImg)
-    tableColor <- data.frame("Q1" = "Red", "Q2"="Dark blue", "Q3"= "Green", "Q4"= "Pink")
-    colnames(tableColor) <- c("Q1", "Q2", "Q3", "Q4")
+    tableColor <- data.frame("Q4" = "Red", "Q1"="Dark blue", "Q2"= "Green", "Q3"= "Pink")
+    colnames(tableColor) <- c("Q4", "Q1", "Q2", "Q3")
     tableColor
   })
   
@@ -1630,7 +1632,7 @@ server <- function(input, output, session) {
           if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) { # If this ROI is on the selected Slice
             col <- plotToImg$subDatas$color[plotToImg$subDatas$ID==i] 
             # For each ROI, switch its color (column color on colors dataframe) with a color that can be plotted
-            col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             plot(global$zip[[i]], add=TRUE, col=col) # Plot this ROI 
           }
         }
@@ -1643,7 +1645,7 @@ server <- function(input, output, session) {
             }
             else {
               col <- plotToImg$subDatas$color[plotToImg$subDatas$ID==i]
-              col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+              col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             }
             plot(global$zip[[i]], add=TRUE, col=col)
           }
@@ -1655,7 +1657,7 @@ server <- function(input, output, session) {
       if (length(plotToImg$selected)>0) {
         for (i in plotToImg$selected) {
           col <- plotToImg$subDatas$color[plotToImg$subDatas$ID==i]
-          col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+          col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           plot(global$zip[[i]], add=TRUE, col=col)
         }
       }
@@ -1666,7 +1668,7 @@ server <- function(input, output, session) {
           }
           else {
             col <- plotToImg$subDatas$color[plotToImg$subDatas$ID==i]
-            col <- switch (col, "Q1"=2,"Q3"=3,"Q2"=4, "Q4"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           }
           plot(global$zip[[i]], add=TRUE, col=col)
         }
@@ -1822,6 +1824,12 @@ server <- function(input, output, session) {
   })
   
   ## MENU IMAGE TO PLOT
+  # Legend of the channels
+  output$imgToPlot_legend <- renderTable({
+    req(global$legend)
+    global$legend
+  })
+  
   # UI to choose channel to display for the image
   output$imgToPlot_channel <- renderUI({
     req(length(global$img) != 0)
@@ -1988,7 +1996,7 @@ server <- function(input, output, session) {
     imgSelected()
   },{
     req(global$data)
-    if (input$imgToPlot_selectionType == "One selection") {
+    if (input$imgToPlot_selectionType == "Single selection") {
       imgToPlot$selected <- imgSelected()
       imgToPlot$selected <- global$data[global$data$ID %in% imgToPlot$selected,]
     }
