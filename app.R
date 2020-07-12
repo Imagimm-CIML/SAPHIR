@@ -27,7 +27,7 @@ library(shinyFiles)
 # User interface 
 ui <- dashboardPage(
   ## Title of the page
-  dashboardHeader(title = "Image Explorer"),
+  dashboardHeader(title = "S A P H I R"),
   ## Sidebar
   dashboardSidebar (
     ## Menu with 3 items
@@ -94,7 +94,6 @@ ui <- dashboardPage(
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
                      fileInput("imgFile", "Choose Image", multiple=FALSE),
-                     verbatimTextOutput("error"),
                      tags$hr(),
                      helpText("Select the file containing the legend for the channels in the image."),
                      radioButtons("sepLegend", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
@@ -571,39 +570,32 @@ server <- function(input, output, session) {
     global$zipPath
   },
   { req(global$imgPath, global$legendPath, global$dataPath, global$zipPath)
-    if (read_tags(global$imgPath)$frame1$color_space!="palette") {
-      if ((dim(read_tif(global$imgPath)))[4]==1) { # If only one frame
-        global$img <- read_tif(global$imgPath) # Image 
-        global$img <- as_EBImage(global$img)
-        global$nChan <- dim(global$img)[3] # Number of channel on the image
-        global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
-        if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
-          global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
-          global$resize <- TRUE
-          global$resolution <- global$resolution*2
-        }
-      }
-      else if ((dim(read_tif(global$imgPath)))[4] > 1)  { # If multiple frame
-        global$nFrame <- (dim(read_tif(global$imgPath)))[4] # Number of frames of the image
-        global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
-        for (i in c(1:global$nFrame)) {
-          global$img[[i]] <- read_tif(global$imgPath, frames=i)
-          global$img[[i]] <- as_EBImage(global$img[[i]])
-          if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
-            global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
-            global$resize <- TRUE
-          }
-        }
-        if (global$resize == TRUE) {
-          global$resolution <- global$resolution*2
-        }
-        global$nChan <- dim(global$img[[1]])[3] 
+    if ((dim(read_tif(global$imgPath)))[4]==1) { # If only one frame
+      global$img <- read_tif(global$imgPath) # Image 
+      global$img <- as_EBImage(global$img)
+      global$nChan <- dim(global$img)[3] # Number of channel on the image
+      global$resolution <- attr(read_tif(global$imgPath), "x_resolution")
+      if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) {
+        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2)
+        global$resize <- TRUE
+        global$resolution <- global$resolution*2
       }
     }
-    else {
-      output$error <- renderText ({ # If palette color space and multiple frame : image not read by ijtiff
-        paste("ERROR : Application can't read this image. Change LUT color for each channel in ImageJ to Grey and save the image in Tif. Reset files and try again.")
-      })
+    else if ((dim(read_tif(global$imgPath)))[4] > 1)  { # If multiple frame
+      global$nFrame <- (dim(read_tif(global$imgPath)))[4] # Number of frames of the image
+      global$resolution <- attr(read_tif(global$imgPath, frames=1), "x_resolution")
+      for (i in c(1:global$nFrame)) {
+        global$img[[i]] <- read_tif(global$imgPath, frames=i)
+        global$img[[i]] <- as_EBImage(global$img[[i]])
+        if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) {
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2)
+          global$resize <- TRUE
+        }
+      }
+      if (global$resize == TRUE) {
+        global$resolution <- global$resolution*2
+      }
+      global$nChan <- dim(global$img[[1]])[3] 
     }
     separator <- switch (input$sep, "Tab"="\t", "Comma"=",", "Semicolon"=";")
     decimal <- switch (input$dec, "Point"=".", "Comma"=",")
