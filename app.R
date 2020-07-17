@@ -288,7 +288,7 @@ server <- function(input, output, session) {
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                           nChan=1, resolution=NULL, resize = FALSE, xcenters=NULL, ycenters=NULL)
   
-  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, crops = list(), totalCrops = NULL , subData=NULL, selected=NULL, filtered=NULL)
+  plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, imgPNG2=NULL,crops = list(), totalCrops = NULL , subData=NULL, selected=NULL, filtered=NULL)
   
   imgToPlot <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, selected=NULL)
   
@@ -1693,52 +1693,50 @@ server <- function(input, output, session) {
     dev.off() # end of the modification of the png file
     out <- normalizePath(out, "/") # normalize the path of the file
     plotToImg$imgPNG <- EBImage::readImage(out) # read the image
+    plotToImg$imgPNG2 <- plotToImg$imgPNG
   }, ignoreNULL=FALSE)
   
   
   # Modification of the image when ID button checked 
   observeEvent(eventExpr = {
     input$plotToImg_ids
+    input$plotToImg_addBrightness
+    input$plotToImg_brightnessRate
     plotToImg$imgPNG
   }, handlerExpr = {
     req(plotToImg$imgPNG)
+    plotToImg$imgPNG2 <- plotToImg$imgPNG
     if (input$plotToImg_ids==TRUE) {
       if ((global$nFrame==1 | input$plotToImg_associated==FALSE) & (length(plotToImg$selected) > 0)) {
-        plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
+        plotToImg$imgPNG2 <- magick::image_read(plotToImg$imgPNG)
         for (i in plotToImg$selected) {
           coord <- paste("+", global$xcenters[i], "+", global$ycenters[i], sep="")
-          plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+          plotToImg$imgPNG2 <- magick::image_annotate(plotToImg$imgPNG2, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
         }
-        plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
+        plotToImg$imgPNG2 <- magick::as_EBImage(plotToImg$imgPNG2)
       }
       if (input$plotToImg_associated==TRUE & global$nFrame > 1 & length(plotToImg$selected) > 0 & any(global$data$Slice[global$data$ID %in% plotToImg$selected]==plotToImg$imgFrame)) {
-        plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
+        plotToImg$imgPNG2 <- magick::image_read(plotToImg$imgPNG2)
         for (i in plotToImg$selected) {
           if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) {
             coord <- paste("+", global$xcenters[i], "+", global$ycenters[i], sep="")
-            plotToImg$imgPNG <- magick::image_annotate(plotToImg$imgPNG, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
+            plotToImg$imgPNG2 <- magick::image_annotate(plotToImg$imgPNG2, paste("ID ", i, sep=""), size=12, location=coord, color="yellow")
           }
         }
-        plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
+        plotToImg$imgPNG2 <- magick::as_EBImage(plotToImg$imgPNG2)
       }
+    }
+    # Modification of the png image when brightness modified 
+    if (input$plotToImg_addBrightness==TRUE) {
+      req(input$plotToImg_brightnessRate)
+      plotToImg$imgPNG2 <- magick::image_read(plotToImg$imgPNG2)
+      plotToImg$imgPNG2 <- magick::image_modulate(plotToImg$imgPNG2,saturation=100,
+                                                  brightness = as.numeric(input$plotToImg_brightnessRate), 
+                                                  hue=100)
+      plotToImg$imgPNG2 <- magick::as_EBImage(plotToImg$imgPNG2)
     }
   }, ignoreNULL=FALSE)
   
-  # Modification of the png image when brightness modified 
-  observeEvent(eventExpr = {
-    input$plotToImg_addBrightness
-    input$plotToImg_brightnessRate
-  }, handlerExpr = {
-    req(plotToImg$imgPNG)
-    if (input$plotToImg_addBrightness==TRUE) {
-      req(input$plotToImg_brightnessRate)
-      plotToImg$imgPNG <- magick::image_read(plotToImg$imgPNG)
-      plotToImg$imgPNG <- magick::image_modulate(plotToImg$imgPNG,saturation=100,
-                                                 brightness = as.numeric(input$plotToImg_brightnessRate), 
-                                                 hue=100)
-      plotToImg$imgPNG <- magick::as_EBImage(plotToImg$imgPNG)
-    }
-  })
   
   # reactive value of the centers of each cell
   observeEvent( global$zip,
@@ -1751,8 +1749,8 @@ server <- function(input, output, session) {
   
   # Zoom displayer -> Image PNG in a displayer
   output$plotToImg_zoomImg <- EBImage::renderDisplay({
-    req(input$plotToImg_displayImg, plotToImg$imgPNG)
-    EBImage::display(plotToImg$imgPNG, method = 'browser')
+    req(input$plotToImg_displayImg, plotToImg$imgPNG2)
+    EBImage::display(plotToImg$imgPNG2, method = 'browser')
   })
   
   ## MENU IMAGE TO PLOT
