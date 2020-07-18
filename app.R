@@ -2070,7 +2070,7 @@ server <- function(input, output, session) {
   output$annote_plotType <- renderUI ({
     req(!is.null(input$annote_selectionType), !is.null(input$annote_useVariable))
     if (input$annote_selectionType == "Select ROI(s) within a plot" & input$annote_useVariable==FALSE) {
-      radioButtons("annote_plotType", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical datas)"), selected="Histogram", inline=TRUE)
+      radioButtons("annote_plotType", "Type of plot", choices=c("Histogram", "Scatterplot", "Barplot (non numerical data)"), selected="Histogram", inline=TRUE)
     }
   })
   
@@ -2108,8 +2108,8 @@ server <- function(input, output, session) {
   
   # Plot with selected variables (histogram or barplot if one variable selected, scatter plot if two)
   output$annote_plot <- renderPlotly({
-    req(global$data, input$annote_useVariable)
-    if (input$annote_useVariable == "TRUE") { # If the variable to annotate is use for the plot 
+    req(global$data, !is.null(input$annote_useVariable))
+    if (input$annote_useVariable == TRUE) { # If the variable to annotate is use for the plot 
       req(!is.null(input$annote_variable))
       if (class(global$data[input$annote_variable][,1])=="numeric" | class(global$data[input$annote_variable][,1])=="integer") { # check if it is a numerical variable or not
         gg <- ggplot(data=global$data, aes_string(x=input$annote_variable, customdata="ID")) + 
@@ -2127,8 +2127,8 @@ server <- function(input, output, session) {
           event_register("plotly_selected")
       }
     }
-    else { # If the variable to annotate is not use for the plot, check which type of plot the user wants
-      req(!is.null(input$annote_plotType), !is.null(input$annote_variableHisto))
+    else if (input$annote_useVariable == FALSE){ # If the variable to annotate is not use for the plot, check which type of plot the user wants
+      req(input$annote_plotType, input$annote_variableHisto)
       if (input$annote_plotType == "Histogram") { # if histogram, make a histogram with the choosen variable and 20 bars
         gg <- ggplot(data=global$data, aes_string(x=input$annote_variableHisto, customdata="ID")) + 
           geom_histogram(binwidth=(max(global$data[input$annote_variableHisto])-min(global$data[input$annote_variableHisto]))/20)
@@ -2145,7 +2145,7 @@ server <- function(input, output, session) {
           layout(dragmode = "select") %>%
           event_register("plotly_selected")
       }
-      else if (input$annote_plotType == "Barplot (non numerical datas)") { # if barplot, make a barplot
+      else if (input$annote_plotType == "Barplot (non numerical data)") { # if barplot, make a barplot
         gg <- ggplot(data=global$data) + geom_bar(aes_string(x=input$annote_variableHisto, customdata=input$annote_variableHisto))
         v <- ggplotly(gg, source="a")
         v %>% 
@@ -2244,7 +2244,7 @@ server <- function(input, output, session) {
             global$data[event_data("plotly_click", source="a")$customdata,]
           }
         }
-        else if (input$annote_plotType == "Barplot (non numerical datas)") {
+        else if (input$annote_plotType == "Barplot (non numerical data)") {
           if (!is.null(event_data("plotly_selected", source="a")$x)) {
             global$data[global$data[input$annote_variableHisto][,1] %in% event_data("plotly_selected", source="a")$customdata,]
           }
