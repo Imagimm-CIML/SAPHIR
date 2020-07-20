@@ -134,6 +134,8 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 *Statistic of the selections*
 <br>
 
+You can download your data and change the names of the quadrants or the regions depending on the corresponding cell type. To do so, you must click on the "Download data" button. A popup window will appear and give you the choice to modify the names or not. 
+
 ***
 
 ##### Image <br>
@@ -166,15 +168,6 @@ You can choose to display an image with channels in overlay. To do so, you have 
  <img width="586" alt="overlayChannel" src="https://user-images.githubusercontent.com/62395414/86773235-ad45b000-c055-11ea-94b5-7700123ee44e.png">
  
  *Overlay channels*
-<br>
-##### Cropped ROIs : <br>
-The ROIs selected on the plot can be displayed below the image on the "**ROIs**" box. You can modify the size of the crop with a slider (1). 
-The ROIs are displayed in the viewer with their ID to identify them. To see an other cell, click on the raw. (2)
-
-<img width="588" alt="cropRoi" src="https://user-images.githubusercontent.com/62395414/86773219-a9199280-c055-11ea-869d-e842e047501f.png">
-
-*Crop of the selected cells*
-<br>
 
 ***
 
