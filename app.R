@@ -1586,7 +1586,7 @@ server <- function(input, output, session) {
   # UI to choose slice to display
   output$plotToImg_frame <- renderUI ({
     req(input$plotToImg_displayImg, length(global$img)!=0, global$nFrame > 1)
-    radioGroupButtons(inputId = "plotToImg_frame", label = "Slice to display", choices=c(1:global$nFrale), selected=plotToImg$imgFrame, justified=TRUE)
+    radioGroupButtons(inputId = "plotToImg_frame", label = "Slice to display", choices=c(1:global$nFrame), selected=plotToImg$imgFrame, justified=TRUE)
     #sliderInput("plotToImg_frame", label = "Slice to display", min = 1, max = global$nFrame, value = plotToImg$imgFrame, step=1)
   })
   
