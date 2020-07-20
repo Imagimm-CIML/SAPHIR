@@ -112,13 +112,9 @@ If you want to filter on more than one selection, use the radiobuttons "**Type o
 
 * The plot is cut in 4 zones :  R1 to R4 depending on movable horizontal and a vertical lines. You can modify the repartition by clicking on the horizontal or on the vertical line and moving them. 
 
-<img width="589" alt="interactivePlotwoutSymbol" src="https://user-images.githubusercontent.com/62395414/86773230-aae35600-c055-11ea-9a87-76ce9a939c11.png">
+<img width="583" alt="interactivePlotwithoutSymbol" src="https://user-images.githubusercontent.com/62395414/87926877-a326a700-ca82-11ea-85cb-70f16d878ba3.png">
 
 *Interactive plot without symbol parameter*
-
-<img width="586" alt="interactivePlotWSymbol" src="https://user-images.githubusercontent.com/62395414/86773231-aae35600-c055-11ea-825b-aa6004b356b8.png">
-
-*Interactive plot with symbol parameter*
 
 * To check the datas (summary) of the subgroups, select the "**Groups**" tab in the lower box. A summary of the subgroups is printed. 
 
