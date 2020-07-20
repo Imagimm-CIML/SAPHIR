@@ -1,10 +1,10 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
-  install.packages(new.pkg)
+  install.packages(new.pkg, dependencies=TRUE)
 }
 if (!"EBImage" %in% installed.packages()) { 
   if (!requireNamespace("BiocManager", quietly = TRUE)) { 
@@ -24,6 +24,7 @@ library(RImageJROI)
 library(plotly)
 library(V8)
 library(shinyFiles)
+library(shinyWidgets)
 
 # User interface 
 ui <- dashboardPage(
@@ -628,6 +629,7 @@ server <- function(input, output, session) {
     }
   })
   
+  
   ## Multi image selectors: UI with the necessary file input for the number of images wanted
   output$multiImages_selectors <- renderUI ({
     if (input$multiImages_nb > 1) {
@@ -720,8 +722,6 @@ server <- function(input, output, session) {
       })
     }
   })
-  
-  
   
   
   ## MENU PLOT TO IMAGE
@@ -1579,13 +1579,15 @@ server <- function(input, output, session) {
   # UI to choose channel to display for the image
   output$plotToImg_channel <- renderUI({
     req(input$plotToImg_displayImg, length(global$img)!=0, input$plotToImg_overlay==FALSE)
-    sliderInput("plotToImg_channel", label="Channel to display", min=1, max= global$nChan, value=plotToImg$imgChan, step=1)
+    radioGroupButtons(inputId = "plotToImg_channel", label = "Channel to display", choices=c(1:global$nChan), selected=plotToImg$imgChan, justified=TRUE)
+    #sliderInput("plotToImg_channel", label="Channel to display", min=1, max= global$nChan, value=plotToImg$imgChan, step=1)
   })
   
   # UI to choose slice to display
   output$plotToImg_frame <- renderUI ({
     req(input$plotToImg_displayImg, length(global$img)!=0, global$nFrame > 1)
-    sliderInput("plotToImg_frame", label = "Slice to display", min = 1, max = global$nFrame, value = plotToImg$imgFrame, step=1)
+    radioGroupButtons(inputId = "plotToImg_frame", label = "Slice to display", choices=c(1:global$nFrale), selected=plotToImg$imgFrame, justified=TRUE)
+    #sliderInput("plotToImg_frame", label = "Slice to display", min = 1, max = global$nFrame, value = plotToImg$imgFrame, step=1)
   })
   
   # Modification of image read when modification of slice slider 
@@ -1593,8 +1595,8 @@ server <- function(input, output, session) {
                handlerExpr={
                  req(input$plotToImg_displayImg)
                  if (global$nFrame > 1) {
-                   plotToImg$imgFrame <- input$plotToImg_frame
-                   plotToImg$imgChan <- input$plotToImg_channel
+                   plotToImg$imgFrame <- as.numeric(input$plotToImg_frame)
+                   plotToImg$imgChan <- as.numeric(input$plotToImg_channel)
                  }
                })
   
@@ -1607,7 +1609,7 @@ server <- function(input, output, session) {
     if (length(unique(global$data$Slice[global$data$ID %in% plotToImg$selected]))==1) { 
       newFrame <- unique(global$data$Slice[global$data$ID %in% plotToImg$selected])
       plotToImg$imgFrame <- newFrame
-      plotToImg$imgChan <- input$plotToImg_channel
+      plotToImg$imgChan <- as.numeric(input$plotToImg_channel)
     }
   }, ignoreNULL=FALSE)
   
@@ -1615,7 +1617,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$plotToImg_channel,
                handlerExpr={
                  req(input$plotToImg_displayImg)
-                 plotToImg$imgChan = input$plotToImg_channel})
+                 plotToImg$imgChan = as.numeric(input$plotToImg_channel)})
   
   
   # Image PNG 
@@ -1763,27 +1765,29 @@ server <- function(input, output, session) {
   # UI to choose channel to display for the image
   output$imgToPlot_channel <- renderUI({
     req(length(global$img) != 0)
-    sliderInput("imgToPlot_channel", label="Channel to display", min=1, max= global$nChan, value=imgToPlot$imgChan, step=1)
+    radioGroupButtons(inputId = "imgToPlot_channel", label = "Channel to display", choices=c(1:global$nChan), selected=imgToPlot$imgChan, justified=TRUE)
+    #sliderInput("imgToPlot_channel", label="Channel to display", min=1, max= global$nChan, value=imgToPlot$imgChan, step=1)
   })
   
   # UI to choose slice to display
   output$imgToPlot_frame <- renderUI ({
     req(length(global$img) != 0, global$nFrame > 1)
-    sliderInput("imgToPlot_frame", label = "Slice to display", min = 1, max = global$nFrame, value = imgToPlot$imgFrame, step=1)
+    radioGroupButtons(inputId = "imgToPlot_frame", label = "Slice to display", choices=c(1:global$nFrame), selected=imgToPlot$imgFrame, justified=TRUE)
+    #sliderInput("imgToPlot_frame", label = "Slice to display", min = 1, max = global$nFrame, value = imgToPlot$imgFrame, step=1)
   })
   
   # Modification of frame when modification of frame slider 
   observeEvent(eventExpr=input$imgToPlot_frame,
                handlerExpr={
                  if (global$nFrame > 1) {
-                   imgToPlot$imgFrame <- input$imgToPlot_frame
-                   imgToPlot$imgChan <- input$imgToPlot_channel
+                   imgToPlot$imgFrame <- as.numeric(input$imgToPlot_frame)
+                   imgToPlot$imgChan <- as.numeric(input$imgToPlot_channel)
                  }
                })
   
   # Modification of channel when modification of channel slider
   observeEvent(eventExpr=input$imgToPlot_channel,
-               handlerExpr={imgToPlot$imgChan = input$imgToPlot_channel})
+               handlerExpr={imgToPlot$imgChan = as.numeric(input$imgToPlot_channel)})
   
   # UI to choose color of the cells 
   output$imgToPlot_color <- renderUI ({
@@ -1809,6 +1813,7 @@ server <- function(input, output, session) {
     imgToPlot_multiSelect$totale
     imgSelected()
     input$imgToPlot_selectionType
+    imgToPlot$actualImg
   },
   handlerExpr= {
     req(length(global$img) > 0, length(global$zip) > 0) 
@@ -2374,13 +2379,15 @@ server <- function(input, output, session) {
   # UI to choose channel to display for the image
   output$annote_channel <- renderUI({
     req(length(global$img) != 0, input$annote_overlay==FALSE)
-    sliderInput("annote_channel", label="Channel to display", min=1, max= global$nChan, value=annote$imgChan, step=1)
+    #sliderInput("annote_channel", label="Channel to display", min=1, max= global$nChan, value=annote$imgChan, step=1)
+    radioGroupButtons(inputId = "annote_channel", label = "Channel to display", choices=c(1:global$nChan), selected=annote$imgChan, justified=TRUE)
   })
   
   # UI to choose slice to display
   output$annote_frame <- renderUI ({
     req(length(global$img) != 0, global$nFrame > 1)
-    sliderInput("annote_frame", label = "Slice to display", min = 1, max = global$nFrame, value = annote$imgFrame, step=1)
+    radioGroupButtons(inputId = "annote_frame", label = "Slice to display", choices=c(1:global$nFrame), selected=annote$imgFrame, justified=TRUE)
+    #sliderInput("annote_frame", label = "Slice to display", min = 1, max = global$nFrame, value = annote$imgFrame, step=1)
   })
   
   # Size of the crop of the image
@@ -2439,14 +2446,14 @@ server <- function(input, output, session) {
   observeEvent(eventExpr=input$annote_frame,
                handlerExpr={
                  if (global$nFrame > 1) {
-                   annote$imgFrame <- input$annote_frame
-                   annote$imgChan <- input$annote_channel
+                   annote$imgFrame <- as.numeric(input$annote_frame)
+                   annote$imgChan <- as.numeric(input$annote_channel)
                  }
                })
   
   # Modification of the channel when modification of the channel slider
   observeEvent(eventExpr=input$annote_channel,
-               handlerExpr={annote$imgChan = input$annote_channel})
+               handlerExpr={annote$imgChan = as.numeric(input$annote_channel)})
   
   # Text for the value of the actual cell to annotate
   output$annote_actualValue <- renderText ({
