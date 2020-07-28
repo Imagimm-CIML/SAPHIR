@@ -1,4 +1,4 @@
-# Image Explorer
+# SAPHIR (Shiny Analytical Plot of Histological Image Results)
 
 ## Introduction 
 
