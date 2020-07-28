@@ -1546,7 +1546,8 @@ server <- function(input, output, session) {
   plotToImg_overlays <- reactiveValues(red=NULL, green=NULL, blue=NULL, redChan=NULL, blueChan=NULL, greenChan=NULL, imgOverlay=NULL)
   
   # Modify the value depending on the values of the buttons
-  observeEvent(eventExpr = {input$plotToImg_overlayApply},
+  observeEvent(eventExpr = {input$plotToImg_overlayApply
+    plotToImg$actualImg},
     handlerExpr = {
       req(input$plotToImg_displayImg, plotToImg$actualImg, !is.null(input$plotToImg_redOverlay), !is.null(input$plotToImg_greenOverlay), !is.null(input$plotToImg_blueOverlay))
         if (input$plotToImg_redOverlay!="None") {
