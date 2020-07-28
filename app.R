@@ -629,6 +629,19 @@ server <- function(input, output, session) {
     }
   })
   
+  observeEvent( {
+    plotToImg$imgFrame
+    imgToPlot$imgFrame
+    annote$imgFrame
+  }
+    ,{ 
+    req(length(global$img) > 0)
+    if (global$nFrame > 1) {
+      plotToImg$actualImg <- global$img[[plotToImg$imgFrame]]
+      imgToPlot$actualImg <- global$img[[imgToPlot$imgFrame]]
+      annote$actualImg <- global$img[[annote$imgFrame]]
+    }
+  })
   
   ## Multi image selectors: UI with the necessary file input for the number of images wanted
   output$multiImages_selectors <- renderUI ({
@@ -1816,7 +1829,7 @@ server <- function(input, output, session) {
     imgToPlot$actualImg
   },
   handlerExpr= {
-    req(length(global$img) > 0, length(global$zip) > 0) 
+    req(length(global$img) > 0, length(global$zip) > 0, imgToPlot$actualImg) 
     out <- tempfile(fileext='.png') # temporary png file 
     png(out, height=dim(imgToPlot$actualImg)[2], width=dim(imgToPlot$actualImg)[1]) # creates a png image in this temporary file with the same dimensions as the global image
     display(imgToPlot$actualImg[,,imgToPlot$imgChan,1], method="raster") # display actual image
@@ -2592,6 +2605,6 @@ server <- function(input, output, session) {
                })
   
 }
-options(shiny.maxRequestSize = 1000 * 1024 ^ 2)
+options(shiny.maxRequestSize = 10000 * 10240 ^ 2)
 shinyApp(ui=ui, server=server)
 
