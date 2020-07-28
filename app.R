@@ -2348,7 +2348,8 @@ server <- function(input, output, session) {
   annote_overlays <- reactiveValues(red=NULL, green=NULL, blue=NULL, redChan=NULL, blueChan=NULL, greenChan=NULL, imgOverlay=NULL)
   
   # Apply overlay
-  observeEvent(eventExpr = {input$annote_overlayApply},
+  observeEvent(eventExpr = {input$annote_overlayApply
+    annote$actualImg},
     handlerExpr = {
       req(annote$actualImg,!is.null(input$annote_redOverlay), !is.null(input$annote_greenOverlay), !is.null(input$annote_blueOverlay))
           if (input$annote_redOverlay!="None") {
@@ -2486,9 +2487,11 @@ server <- function(input, output, session) {
                     input$annote_overlay
                     input$annote_brightnessRate
                     input$annote_addBrightness
+                    annote$actualImg
                     }, 
                 handlerExpr = 
                   { if ((length(global$img) != 0) & (length(global$zip)>0)) {
+                    req(annote$actualImg)
                       out3 <- tempfile(fileext='.png') # temporary png file
                       png(out3, height=dim(annote$actualImg)[2], width=dim(annote$actualImg)[1]) # dimension of the png file
                       if (input$annote_overlay==TRUE & !is.null(annote_overlays$imgOverlay)) {
@@ -2519,7 +2522,7 @@ server <- function(input, output, session) {
                         annote$imgPNG <- magick::as_EBImage(annote$imgPNG)
                       }
                     }
-                    })
+                    }, ignoreNULL=FALSE)
   
   # Next button : change the actual cell to the next one to annotate
   observeEvent(eventExpr = input$annote_next,
