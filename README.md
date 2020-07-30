@@ -223,3 +223,6 @@ If you want to modify this value, click on the "Yes" button, input the new value
 <br>
 
 Once you made all the modifications you wanted, click on the "Validate modifications" (4) button. A new column called "corrected_" + the name of the variable you annotate will be add to your intensity file. You can now download it with the "Download data" button. 
+
+## Licence
+This code is distributed under a GPLv3 licence.
