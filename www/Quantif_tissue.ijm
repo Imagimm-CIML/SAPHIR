@@ -80,7 +80,7 @@ selectWindow("C4-test");
 rename(Ch4_Name);
 
 ///////////////////////
-// select first chanel =mask
+// select first channel =mask
 selectWindow("MASK");
 run("Duplicate...", "title=MASK2");
 
@@ -98,7 +98,7 @@ run("Invert LUT");
 run("Options...", "iterations=1 count=1 black pad do=Close");
 run("Watershed");
 
-// add overlay to YFP with 50 % transparency o
+// add overlay to YFP with 50 % transparency 
 run("Add Image...", "image="+Ch1_Name+" x=0 y=0 opacity=50");
 
 ID_overlay = getImageID();
@@ -139,7 +139,7 @@ run("Clear Results");
 selectWindow("TYPE1");
 roiManager("multi-measure");
 
-// get measure
+// get measurements
 Mean_TYPE1 = newArray(nb_cells);
 Mean_TYPE1_N = newArray(nb_cells);
 Mean_TYPE2 = newArray(nb_cells);
@@ -184,14 +184,14 @@ for (i=0; i < nb_cells; i++) {
 File.append( i+1 + "\t"+ Mean_TYPE1_N[i] + "\t"+ Mean_TYPE2_N[i] + "\t"+ Area[i] + "\t"+ Round[i] +  "\t"+ Solidity[i], path2);
 }
 
-// save raw intensity
+// decomment to save raw intensities
 //for (i=0; i < nb_cells; i++) {
 //path3 = dir + "raw_intensity.txt";
 //File.append( "ID" + "\t" + "Int_TYPE1" + "\t" + "Int_TYPE2"  + "\t" , path3);
 //File.append( i+1 + "\t"+ Mean_TYPE1[i] + "\t"+ Mean_TYPE2[i], path2);
 //}
 
-// export summary  fiel to quantify density
+// export summary  file to quantify cells density
 path3 = dir + "resume.txt";
 File.append( "Nb cells" + "\t"  + "\t"  + "area in um2", path3);
 File.append( nb_cells  +  "\t" + roi_area , path3);
@@ -205,6 +205,7 @@ File.append( Ch1_Name + "\t"+ Ch2_Name+ "\t"+ Ch3_Name+ "\t"+ Ch4_Name, path_);
 
 print("analysis finished");
 
+// decomment to have scatterplot
 // export scatterplot
 //scatter_plot();
 //selectWindow("ScatterPlot");
