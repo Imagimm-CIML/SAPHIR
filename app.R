@@ -202,6 +202,8 @@ ui <- dashboardPage(
                      uiOutput("imgToPlot_frame"),
                      helpText("Select the color of the ROIs."),
                      uiOutput("imgToPlot_color"),
+                     checkboxInput("imgToPlot_modifyThickness", "Modify thickness of cell's highlight"),
+                     uiOutput("imgToPlot_thicknessSlider"),
                      checkboxInput("imgToPlot_brightnessImg", "Enhance brightness in image"),
                      uiOutput("imgToPlot_brightnessSlider"),
                      radioButtons("imgToPlot_selectionType", "Type of selection", choices=c("Single selection", "Multiple selection"), selected="Single selection"),
@@ -253,6 +255,8 @@ ui <- dashboardPage(
                              checkboxInput("annote_overlay", "Overlay channels (up to 3)"),
                              checkboxInput("annote_addBrightness", "Enhance brightness in image", value=FALSE),
                              uiOutput("annote_brightnessSlider"),
+                             checkboxInput("annote_modifyThickness", "Modify cell's highlight thickness", value=FALSE),
+                             uiOutput("annote_thicknessSlider"),
                              uiOutput("annote_channelOverlay"),
                              withSpinner(EBImage::displayOutput("annote_cropImg")),
                              verbatimTextOutput("annote_actualValue"),
@@ -1872,6 +1876,13 @@ server <- function(input, output, session) {
     }
   })
   
+  # Thickness slider
+  output$imgToPlot_thicknessSlider <- renderUI ({
+    if (input$imgToPlot_modifyThickness) {
+      sliderInput("imgToPlot_thicknessRate", "Thickness of cell's highlight", min=1, max=10, value=1)
+    }
+  })
+  
   # PNG Image with all the cells plotted on it 
   observeEvent(eventExpr= {
     input$imgToPlot_channel
@@ -1884,33 +1895,39 @@ server <- function(input, output, session) {
     imgSelected()
     input$imgToPlot_selectionType
     imgToPlot$actualImg
+    input$imgToPlot_thicknessRate
+    input$imgToPlot_modifyThickness
   },
   handlerExpr= {
     req(length(global$img) > 0, length(global$zip) > 0, imgToPlot$actualImg) 
     out <- tempfile(fileext='.png') # temporary png file 
     png(out, height=dim(imgToPlot$actualImg)[2], width=dim(imgToPlot$actualImg)[1]) # creates a png image in this temporary file with the same dimensions as the global image
     display(imgToPlot$actualImg[,,imgToPlot$imgChan,1], method="raster") # display actual image
+    width = 1
+    if (input$imgToPlot_modifyThickness == TRUE) {
+      width = input$imgToPlot_thicknessRate
+    }
     for (i in global$data$ID) { # for each cell of the file
       if (global$nFrame == 1) { # if there is only one frame, plot it in the choosen color
-        plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color)
+        plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color, lwd = width)
         if (i %in% imgSelected()) { # if this cell is selected, plot it in yellow
-          plot(global$zip[[i]], add=TRUE , col="yellow")
+          plot(global$zip[[i]], add=TRUE , col="yellow", lwd = width)
         }
         if (input$imgToPlot_selectionType=="Multiple selection") { # if multiple selection and selected cell, plot it in orange (total selection)
           if (i %in% imgToPlot_multiSelect$totale) {
-            plot(global$zip[[i]], add=TRUE , col="orange")
+            plot(global$zip[[i]], add=TRUE , col="orange", lwd = width)
           }
         }
       }
       else if (global$nFrame > 1) { # if more than one frame, same process but association with slice
         if (global$data$Slice[global$data$ID==i]==imgToPlot$imgFrame) {
-          plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color)
+          plot(global$zip[[i]], add=TRUE , col=input$imgToPlot_color, lwd = width)
           if (i %in% imgSelected()) {
-            plot(global$zip[[i]], add=TRUE , col="yellow")
+            plot(global$zip[[i]], add=TRUE , col="yellow", lwd = width)
           }
           if (input$imgToPlot_selectionType=="Multiple selection") {
             if (i %in% imgToPlot_multiSelect$totale) {
-              plot(global$zip[[i]], add=TRUE , col="orange")
+              plot(global$zip[[i]], add=TRUE , col="orange", lwd = width)
             }
           }
         }
@@ -2478,6 +2495,13 @@ server <- function(input, output, session) {
     }
   })
   
+  # Thickness slider
+  output$annote_thicknessSlider <- renderUI ({
+    if (input$annote_modifyThickness) {
+      sliderInput("annote_thicknessRate", "Thickness of cell's highlight", min=1, max=10, value=1)
+    }
+  })
+  
   # Displayer of the crop of the image corresponding to the actual cell to annotate
   observeEvent ( eventExpr = 
                    {annote$imgPNG},
@@ -2544,6 +2568,8 @@ server <- function(input, output, session) {
                     input$annote_brightnessRate
                     input$annote_addBrightness
                     annote$actualImg
+                    input$annote_thicknessRate
+                    input$annote_modifyThickness
                     }, 
                 handlerExpr = 
                   { if ((length(global$img) != 0) & (length(global$zip)>0)) {
@@ -2557,12 +2583,16 @@ server <- function(input, output, session) {
                         display(annote$actualImg[,,annote$imgChan,1], method="raster") # else display normal image
                       }
                       if (!is.null(annote$actualID)) {
+                        width = 1
+                        if (input$annote_modifyThickness) {
+                          width = input$annote_thicknessRate
+                        }
                         if (global$nFrame == 1 | (global$nFrame > 1 & input$annote_associate==FALSE)) {
-                          plot(global$zip[[annote$actualID]], add=TRUE, col="yellow") # if only one frame or no association with slice, no need to check if the actual frame is the cells one
+                          plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) # if only one frame or no association with slice, no need to check if the actual frame is the cells one
                         }
                         else if (global$nFrame > 1 & input$annote_associate==TRUE) { # if more than one frame and association with slice, check if the cell is on the actual frame or not
                           if (global$data$Slice[global$data$ID==annote$actualID]==annote$imgFrame) {
-                            plot(global$zip[[annote$actualID]], add=TRUE, col="yellow") 
+                            plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) 
                           }
                         }
                       }
