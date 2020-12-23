@@ -531,21 +531,21 @@ server <- function(input, output, session) {
   
   # Use www files -> search if there is one file of each type in the repository
   observeEvent(eventExpr=input$default, handlerExpr = {
-    if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))==1 &
-        length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))==1) {
-      global$imgPath <- dir(path = getwd(), pattern = "*.tif$", recursive=TRUE)
-      global$dataPath <- dir(path = getwd(), pattern = "*.txt$", recursive=TRUE)
-      global$zipPath <- dir(path = getwd(), pattern = "*.zip$", recursive=TRUE)
-      global$legendPath <- dir(path = getwd(), pattern = "*.csv$", recursive=TRUE)
+    if (length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.zip$", recursive=TRUE))==1 & length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.tif$", recursive=TRUE))==1 &
+        length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.txt$", recursive=TRUE))==1 & length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.csv$", recursive=TRUE))==1) {
+      global$imgPath <- paste("www/", dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.tif$", recursive=TRUE), sep="")
+      global$dataPath <- paste("www/", dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.txt$", recursive=TRUE), sep="")
+      global$zipPath <- paste("www/", dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.zip$", recursive=TRUE), sep="")
+      global$legendPath <- paste("www/", dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.csv$", recursive=TRUE), sep="")
     } # If yes, store the path in variables
     else {
       output$errorDefaultFiles <- renderPrint ({
-        if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))>1 | length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))>1 |
-            length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))>1 | length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))>1) {
+        if (length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.zip$", recursive=TRUE))>1 | length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.tif$", recursive=TRUE))>1 |
+            length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.txt$", recursive=TRUE))>1 | length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.csv$", recursive=TRUE))>1) {
           paste0("ERROR : Multiple files with the same extension. Please read prerequisites. ")
         }
-        else if (length(dir(path = getwd(), pattern = "*.zip$", recursive=TRUE))==0 | length(dir(path = getwd(), pattern = "*.tif$", recursive=TRUE))==0 |
-                 length(dir(path = getwd(), pattern = "*.txt$", recursive=TRUE))==0 | length(dir(path = getwd(), pattern = "*.csv$", recursive=TRUE))==0) {
+        else if (length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.zip$", recursive=TRUE))==0 | length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.tif$", recursive=TRUE))==0 |
+                 length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.txt$", recursive=TRUE))==0 | length(dir(path = paste(getwd(), "/www/", sep=""), pattern = "*.csv$", recursive=TRUE))==0) {
           paste0("ERROR : Missing files. Please read prerequisites. ")
         }
       })
@@ -1501,7 +1501,9 @@ server <- function(input, output, session) {
              uiOutput("plotToImg_channel"),
              uiOutput("plotToImg_frame"),
              checkboxInput("plotToImg_addBrightness", "Enhance brightness in image"),
-             uiOutput("plotToImg_brightnessSlider")
+             uiOutput("plotToImg_brightnessSlider"),
+             checkboxInput("plotToImg_modifyThickness", "Increase thickness of contours"), 
+             uiOutput("plotToImg_thicknessSlider")
         ))
       } 
     }
@@ -1511,6 +1513,12 @@ server <- function(input, output, session) {
   output$plotToImg_brightnessSlider <- renderUI ({
     if (input$plotToImg_addBrightness) {
       sliderInput("plotToImg_brightnessRate", "% of initial brightness", min=100, max=500, value=100)
+    }
+  })
+  
+  output$plotToImg_thicknessSlider <- renderUI ({
+    if (input$plotToImg_modifyThickness) {
+      sliderInput("plotToImg_thicknessRate", "Size of cells contours", min=1, max=10, value=1)
     }
   })
   
@@ -1646,6 +1654,8 @@ server <- function(input, output, session) {
     plotToImg_multiSelect$indiv
     plotToImg_overlays$imgOverlay
     input$plotToImg_overlay
+    input$plotToImg_modifyThickness
+    input$plotToImg_thicknessRate
   },
   handlerExpr= {
     req(input$plotToImg_displayImg, length(global$img) > 0, length(global$zip) > 0)
@@ -1662,9 +1672,13 @@ server <- function(input, output, session) {
         for (i in plotToImg$selected) { # for each cell selected
           if (global$data$Slice[global$data$ID==i]==plotToImg$imgFrame) { # If this cell is on the selected Slice
             col <- plotToImg$subData$color[plotToImg$subData$ID==i] 
+            width = 1
+            if (input$plotToImg_modifyThickness==TRUE) {
+              width = input$plotToImg_thicknessRate
+            }
             # For each cell, switch its color (column color on subdata dataframe) with a color that can be plotted
             col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
-            plot(global$zip[[i]], add=TRUE, col=col) # Plot this cell coordinates on the image 
+            plot(global$zip[[i]], add=TRUE, col=col, lwd = width) # Plot this cell coordinates on the image 
           }
         }
       }
@@ -1679,7 +1693,11 @@ server <- function(input, output, session) {
               col <- plotToImg$subData$color[plotToImg$subData$ID==i]
               col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
             } # plot it in the color of its quadrants
-            plot(global$zip[[i]], add=TRUE, col=col)
+            width = 1
+            if (input$plotToImg_modifyThickness==TRUE) {
+              width = input$plotToImg_thicknessRate
+            }
+            plot(global$zip[[i]], add=TRUE, col=col, lwd=width)
           }
         }
       }
@@ -1690,7 +1708,11 @@ server <- function(input, output, session) {
         for (i in plotToImg$selected) {
           col <- plotToImg$subData$color[plotToImg$subData$ID==i]
           col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
-          plot(global$zip[[i]], add=TRUE, col=col)
+          width = 1
+          if (input$plotToImg_modifyThickness==TRUE) {
+            width = input$plotToImg_thicknessRate
+          }
+          plot(global$zip[[i]], add=TRUE, col=col, lwd=width)
         }
       }
       if (input$plotToImg_selectionType=="Multiple selection" & length(plotToImg_multiSelect$indiv)>0 & !is.null(input$plotToImg_colorType)) {
@@ -1702,7 +1724,11 @@ server <- function(input, output, session) {
             col <- plotToImg$subData$color[plotToImg$subData$ID==i]
             col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
           }
-          plot(global$zip[[i]], add=TRUE, col=col)
+          width = 1
+          if (input$plotToImg_modifyThickness==TRUE) {
+            width = input$plotToImg_thicknessRate
+          }
+          plot(global$zip[[i]], add=TRUE, col=col, lwd=width)
         }
       }
     } 
