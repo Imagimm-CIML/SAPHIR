@@ -1490,7 +1490,9 @@ server <- function(input, output, session) {
              checkboxInput("plotToImg_overlay", "Overlay channels (up to 3)"),
              uiOutput("plotToImg_channelOverlay"),
              tags$h5(tags$strong("Color legend : ")), 
-             tableOutput("plotToImg_colorLegend")
+             tableOutput("plotToImg_colorLegend"),
+             actionButton("plotToImg_modifyColorLegend", "Modify color legend"),
+             uiOutput("plotToImg_colorLegendChoice")
         ),
         box( width=NULL, 
              title = "Image display", solidHeader= TRUE, status = "primary",
@@ -1509,6 +1511,33 @@ server <- function(input, output, session) {
     }
   )
   
+  observeEvent(eventExpr = input$plotToImg_modifyColorLegend,
+               handlerExpr = {
+                 req(input$plotToImg_displayImg)
+                 output$plotToImg_colorLegendChoice <- renderUI ({
+                   tagList(
+                     radioButtons("plotToImg_colorSelectionChoice1", "Color legend for first selection (or Q4)", choiceNames=c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), choiceValues = c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), inline=TRUE),
+                     radioButtons("plotToImg_colorSelectionChoice2", "Color legend for second selection (or Q1)", choiceNames=c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), choiceValues = c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), inline=TRUE),
+                     radioButtons("plotToImg_colorSelectionChoice3", "Color legend for third selection (or Q2)", choiceNames=c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), choiceValues = c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), inline=TRUE),
+                     radioButtons("plotToImg_colorSelectionChoice4", "Color legend for fourth selection (or Q3)", choiceNames=c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), choiceValues = c("white", "yellow", "green", "red", "blue", "cyan", "magenta"), inline=TRUE),
+                     actionLink("plotToImg_colorSelectionApply", "Apply"),
+                     tags$br()
+                   )
+                 })
+               })
+  
+  plotToImg_selectionColor <- reactiveValues(color1 = "yellow", color2 = "blue", color3 = "green", color4 = "magenta")
+  
+  observeEvent(eventExpr = input$plotToImg_colorSelectionApply,
+               handlerExpr = {
+                 req(input$plotToImg_displayImg)
+                 plotToImg_selectionColor$color1 <- input$plotToImg_colorSelectionChoice1
+                 plotToImg_selectionColor$color2 <- input$plotToImg_colorSelectionChoice2
+                 plotToImg_selectionColor$color3 <- input$plotToImg_colorSelectionChoice3
+                 plotToImg_selectionColor$color4 <- input$plotToImg_colorSelectionChoice4
+                 removeUI(selector = "#plotToImg_colorLegendChoice")
+               })
+  
   # Slider to modify the brightness of the image
   output$plotToImg_brightnessSlider <- renderUI ({
     if (input$plotToImg_addBrightness) {
@@ -1516,6 +1545,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Slider to modify the thickness of the image
   output$plotToImg_thicknessSlider <- renderUI ({
     if (input$plotToImg_modifyThickness) {
       sliderInput("plotToImg_thicknessRate", "Size of cells contours", min=1, max=10, value=1)
@@ -1531,8 +1561,8 @@ server <- function(input, output, session) {
   # Table with color legend channel 
   output$plotToImg_colorLegend <- renderTable({
     req(input$plotToImg_displayImg)
-    tableColor <- data.frame("Q4" = "Red", "Q1"="Dark blue", "Q2"= "Green", "Q3"= "Pink")
-    colnames(tableColor) <- c("Q4", "Q1", "Q2", "Q3")
+    tableColor <- data.frame("Q4" = plotToImg_selectionColor$color1, "Q1"=plotToImg_selectionColor$color2, "Q2"= plotToImg_selectionColor$color3, "Q3"= plotToImg_selectionColor$color4)
+    colnames(tableColor) <- c("Q4/Selection n°1", "Q1/Selection n°2", "Q2/Selection n°3", "Q3/Selection n°4")
     tableColor
   })
   
@@ -1677,7 +1707,7 @@ server <- function(input, output, session) {
               width = input$plotToImg_thicknessRate
             }
             # For each cell, switch its color (column color on subdata dataframe) with a color that can be plotted
-            col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q4"=plotToImg_selectionColor$color1,"Q1"=plotToImg_selectionColor$color2,"Q2"=plotToImg_selectionColor$color3, "Q3"=plotToImg_selectionColor$color4, "R1_multiselect"=plotToImg_selectionColor$color1, "R2_multiselect"=plotToImg_selectionColor$color2, "R3_multiselect"=plotToImg_selectionColor$color3, "R4_multiselect"=4)
             plot(global$zip[[i]], add=TRUE, col=col, lwd = width) # Plot this cell coordinates on the image 
           }
         }
@@ -1691,7 +1721,7 @@ server <- function(input, output, session) {
             }
             else { # if no association
               col <- plotToImg$subData$color[plotToImg$subData$ID==i]
-              col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+              col <- switch (col, "Q4"=plotToImg_selectionColor$color1,"Q1"=plotToImg_selectionColor$color2,"Q2"=plotToImg_selectionColor$color3, "Q3"=plotToImg_selectionColor$color4, "R1_multiselect"=plotToImg_selectionColor$color1, "R2_multiselect"=plotToImg_selectionColor$color2, "R3_multiselect"=plotToImg_selectionColor$color3, "R4_multiselect"=4)
             } # plot it in the color of its quadrants
             width = 1
             if (input$plotToImg_modifyThickness==TRUE) {
@@ -1707,7 +1737,7 @@ server <- function(input, output, session) {
       if (length(plotToImg$selected)>0) {
         for (i in plotToImg$selected) {
           col <- plotToImg$subData$color[plotToImg$subData$ID==i]
-          col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+          col <- switch (col, "Q4"=plotToImg_selectionColor$color1,"Q1"=plotToImg_selectionColor$color2,"Q2"=plotToImg_selectionColor$color3, "Q3"=plotToImg_selectionColor$color4, "R1_multiselect"=plotToImg_selectionColor$color1, "R2_multiselect"=plotToImg_selectionColor$color2, "R3_multiselect"=plotToImg_selectionColor$color3, "R4_multiselect"=4)
           width = 1
           if (input$plotToImg_modifyThickness==TRUE) {
             width = input$plotToImg_thicknessRate
@@ -1722,7 +1752,7 @@ server <- function(input, output, session) {
           }
           else {
             col <- plotToImg$subData$color[plotToImg$subData$ID==i]
-            col <- switch (col, "Q4"=2,"Q2"=3,"Q1"=4, "Q3"=6, "R1_multiselect"=2, "R2_multiselect"=4, "R3_multiselect"=3, "R4_multiselect"=6)
+            col <- switch (col, "Q4"=plotToImg_selectionColor$color1,"Q1"=plotToImg_selectionColor$color2,"Q2"=plotToImg_selectionColor$color3, "Q3"=plotToImg_selectionColor$color4, "R1_multiselect"=plotToImg_selectionColor$color1, "R2_multiselect"=plotToImg_selectionColor$color2, "R3_multiselect"=plotToImg_selectionColor$color3, "R4_multiselect"=4)
           }
           width = 1
           if (input$plotToImg_modifyThickness==TRUE) {
