@@ -131,6 +131,8 @@ ui <- dashboardPage(
                              radioButtons("plotToImgFilter_plotType", "Number of parameters you want to filter", choices=c("One", "Two"), selected="One", inline=TRUE),
                              uiOutput("plotToImgFilter_colsX"),
                              uiOutput("plotToImgFilter_colsY"),
+                             uiOutput("plotToImgFilter_pointSize"), 
+                             uiOutput("plotToImgFilter_choosePointSize"),
                              radioButtons("plotToImgFilter_selectionType", "Type of selection", choices=c("Single selection", "Multiple selection"), selected="Single selection"),
                              helpText("Select the cells (click or brush) to analyze in the interactive Plot"),
                              plotlyOutput("plotToImgFilter_plot"),
@@ -142,6 +144,10 @@ ui <- dashboardPage(
                              helpText("Select parameters to use for the scatter plot."),
                              uiOutput("plotToImg_colsX"),
                              uiOutput("plotToImg_colsY"),
+                             checkboxInput(inputId = "plotToImg_modifyPointSize", 
+                                           label = "Modify point size on scatter plot", 
+                                           value = FALSE),
+                             uiOutput("plotToImg_choosePointSize"),
                              uiOutput("plotToImg_colShape"),
                              uiOutput("plotToImg_shapeThreshold"),
                              helpText("Select cell(s), obtain statistics and visualize selected subsets in the image (option below)"),
@@ -218,6 +224,10 @@ ui <- dashboardPage(
                      helpText("Select the columns to use on the scatter plot."),
                      uiOutput("imgToPlot_colsX"),
                      uiOutput("imgToPlot_colsY"),
+                     checkboxInput(inputId = "imgToPlot_modifyPointSize", 
+                                   label = "Modify point size on scatter plot", 
+                                   value = FALSE),
+                     uiOutput("imgToPlot_choosePointSize"),
                      plotOutput("imgToPlot_plot"))
               )
       ),
@@ -766,6 +776,36 @@ server <- function(input, output, session) {
     }
   })
   
+  # Possibility to modify the size of the points if scatter plot 
+  output$plotToImgFilter_pointSize <- renderUI ({
+    req(global$data)
+    if (input$plotToImgFilter_plotType == "Two") {
+      checkboxInput(inputId = "plotToImgFilter_modifyPointSize", 
+                    label = "Modify point size on scatter plot", 
+                    value = FALSE)
+    }
+  })
+  
+  output$plotToImgFilter_choosePointSize <- renderUI ({
+    req(global$data)
+    req(input$plotToImgFilter_modifyPointSize)
+    if (input$plotToImgFilter_modifyPointSize == TRUE) {
+      sliderInput(inputId = "plotToImgFilter_sliderPointSize", label = "Choose the size of the points",
+                  min = 1, max = 5, value = 1)
+    }
+  })
+  
+  plotToImgFilter_size <- reactive({
+    if (input$plotToImgFilter_modifyPointSize == TRUE) {
+      req(input$plotToImgFilter_sliderPointSize)
+      input$plotToImgFilter_sliderPointSize
+    }
+    else {
+      1
+    }
+    })
+  
+  
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
   output$plotToImgFilter_plot <- renderPlotly({
     req(global$data, input$plotToImgFilter_colsX)
@@ -794,7 +834,7 @@ server <- function(input, output, session) {
     }
     else if (input$plotToImgFilter_plotType == "Two") { # scatterplot
       req(input$plotToImgFilter_colsY)
-      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$plotToImgFilter_colsX, y=input$plotToImgFilter_colsY, customdata="ID", color="selected"))
+      gg <- ggplot(data=global$data) + geom_point(aes_string(x=input$plotToImgFilter_colsX, y=input$plotToImgFilter_colsY, customdata="ID", color="selected"), size=plotToImgFilter_size())
       v <- ggplotly(gg, source="v")
       v %>% 
         layout(dragmode = "select") %>%
@@ -948,6 +988,26 @@ server <- function(input, output, session) {
                    choices = names(global$data),
                    selected = names(global$data)[2],
                    options = list(maxItems = 1))
+  })
+  
+  # Possibility to modify the size of the points if scatter plot 
+  output$plotToImg_choosePointSize <- renderUI ({
+    req(global$data)
+    req(input$plotToImg_modifyPointSize)
+    if (input$plotToImg_modifyPointSize == TRUE) {
+      sliderInput(inputId = "plotToImg_sliderPointSize", label = "Choose the size of the points",
+                  min = 5, max = 45, value = 10)
+    }
+  })
+  
+  plotToImg_size <- reactive({
+    if (input$plotToImg_modifyPointSize == TRUE) {
+      req(input$plotToImg_sliderPointSize)
+      input$plotToImg_sliderPointSize
+    }
+    else {
+      10
+    }
   })
 
   
@@ -1203,6 +1263,7 @@ server <- function(input, output, session) {
     input$plotToImg_colorType
     input$plotToImg_colShape
     input$plotToImg_shapeThreshold
+    plotToImg_size()
   },
   handlerExpr= {
     output$plotToImg_plot <- renderPlotly({
@@ -1211,7 +1272,7 @@ server <- function(input, output, session) {
         p <- plot_ly(data=plotToImg$subData, x=plotToImg$subData[,input$plotToImg_colsX], 
                      y=plotToImg$subData[,input$plotToImg_colsY],customdata=plotToImg$subData[,"ID"], 
                      text=~paste("ID :", plotToImg$subData[,"ID"]), 
-                     color=plotToImg$subData[,"color"], source="p", type="scatter", mode="markers") # Scatterplot with only x, y and colors (customdata is used for selection, text for hover)
+                     color=plotToImg$subData[,"color"], source="p", type="scatter", mode="markers", size = I(plotToImg_size())) # Scatterplot with only x, y and colors (customdata is used for selection, text for hover)
         p %>% 
           layout(legend = list(orientation="h", x=0.2, y=-0.2)) %>%
           layout(dragmode = "select") %>%
@@ -2109,7 +2170,7 @@ server <- function(input, output, session) {
   output$imgToPlot_plot <- renderPlot({
     req(!is.null(imgToPlot$selected), length(global$img) != 0, global$data, length(global$zip)>0)
     ggplot(data=imgToPlot$selected) + 
-      geom_point(aes_string(x=input$imgToPlot_colsX, y=input$imgToPlot_colsY)) + 
+      geom_point(aes_string(x=input$imgToPlot_colsX, y=input$imgToPlot_colsY), size = imgToPlot_size()) + 
       labs(x=input$imgToPlot_colsX, y=input$imgToPlot_colsY) + xlim(0,255) +ylim(0,255) + theme(legend.position="top")
   })
   
@@ -2131,6 +2192,26 @@ server <- function(input, output, session) {
                    choices = names(global$data),
                    selected = names(global$data)[2],
                    options = list(maxItems = 1))
+  })
+  
+  # Possibility to modify the size of the points if scatter plot 
+  output$imgToPlot_choosePointSize <- renderUI ({
+    req(global$data)
+    req(input$imgToPlot_modifyPointSize)
+    if (input$imgToPlot_modifyPointSize == TRUE) {
+      sliderInput(inputId = "imgToPlot_sliderPointSize", label = "Choose the size of the points",
+                  min = 1, max = 5, value = 1)
+    }
+  })
+  
+  imgToPlot_size <- reactive({
+    if (input$imgToPlot_modifyPointSize == TRUE) {
+      req(input$imgToPlot_sliderPointSize)
+      input$imgToPlot_sliderPointSize
+    }
+    else {
+      1
+    }
   })
 
   
