@@ -46,7 +46,7 @@ ui <- dashboardPage(
     ## Hide disabled elements
     tags$head(tags$style(HTML("input[type='search']:disabled {visibility:hidden}"))),
     shinyjs::useShinyjs(),
-    shinyjs::extendShinyjs(text = "shinyjs.refresh = function() { location.reload(); }"),
+    shinyjs::extendShinyjs(text = "shinyjs.refresh = function() { location.reload(); }", functions = c()),
     # FIRST ITEM : Choose image to analyse & select values to remove
     tabItems(
       tabItem(tabName = "segmentation",
@@ -150,8 +150,8 @@ ui <- dashboardPage(
                              uiOutput("plotToImg_nextSel"),
                              uiOutput("plotToImg_resetAllSel"),
                              useShinyjs(),
-                             extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }"),
-                             extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }"),
+                             extendShinyjs(text = "shinyjs.resetSelect = function() { Shiny.onInputChange('.clientValue-plotly_selected', 'null'); }", functions=c()),
+                             extendShinyjs(text = "shinyjs.resetClick = function() { Shiny.onInputChange('.clientValue-plotly_click', 'null'); }", functions=c()),
                              radioButtons("plotToImg_selectionType", "Type of selection",
                                           choices=c("Single selection", "Multiple selection", "Z slice"),
                                           selected="Single selection"),
