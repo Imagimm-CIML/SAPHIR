@@ -590,6 +590,7 @@ server <- function(input, output, session) {
     if ((dim(read_tif(global$imgPath)))[4]==1) { # If only one frame
       global$img <- read_tif(global$imgPath) # store the image in a single variable
       global$img <- as_EBImage(global$img) # transform the image in a EBImage object
+      EBImage::colorMode(global$img) <- "Grayscale"
       global$nChan <- dim(global$img)[3] # number of channel on the image
       global$resolution <- attr(read_tif(global$imgPath), "x_resolution") # resolution of the image (number of microns corresponding to 1 pixel)
       if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) { # if the image is too big (more than 1200*1200), resize it with a factor 2
@@ -604,6 +605,7 @@ server <- function(input, output, session) {
       for (i in c(1:global$nFrame)) { # for any frame of the image
         global$img[[i]] <- read_tif(global$imgPath, frames=i) # store each frame as an element of a list
         global$img[[i]] <- as_EBImage(global$img[[i]]) # and transform it in a EBImage object
+        EBImage::colorMode(global$img[[i]]) <- "Grayscale"
         if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) { # if the image is too big (more than 1200*1200), resize it with a factor 2
           global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2) # resize the image
           global$resize <- TRUE
@@ -1298,7 +1300,7 @@ server <- function(input, output, session) {
       }
       else if (input$plotToImg_colShape != "None" & "shape" %in% names(plotToImg$subData)) { # Modification of the shape of the points
         p <- plot_ly(data=plotToImg$subData, x=plotToImg$subData[,input$plotToImg_colsX], y=plotToImg$subData[,input$plotToImg_colsY], color=plotToImg$subData$color, symbol=plotToImg$subData$shape,
-                     customdata=plotToImg$subData[,"ID"], text=~paste("ID :", plotToImg$subData[,"ID"]), source="p", type="scatter", mode="markers")
+                     customdata=plotToImg$subData[,"ID"], text=~paste("ID :", plotToImg$subData[,"ID"]), source="p", type="scatter", mode="markers", size = I(plotToImg_size()))
         # plot with x, y, colors and symbol
         p %>% 
           layout(legend = list(orientation="h", x=0.0, y=-0.1)) %>% # modification of the legend -> horizontal 
