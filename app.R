@@ -13,6 +13,7 @@ if (!"EBImage" %in% installed.packages()) {
   BiocManager::install("EBImage") # Specific installation for EBImage
 }
 library(readtext)
+library(EBImage)
 library(shinyjs)
 library(shiny)
 library(ggplot2)
@@ -1753,16 +1754,36 @@ server <- function(input, output, session) {
     input$plotToImg_overlay
     input$plotToImg_modifyThickness
     input$plotToImg_thicknessRate
+    input$plotToImg_addBrightness
+    input$plotToImg_brightnessRate
   },
   handlerExpr= {
     req(input$plotToImg_displayImg, length(global$img) > 0, length(global$zip) > 0)
     out <- tempfile(fileext='.png')
     png(out, height=dim(plotToImg$actualImg)[2], width=dim(plotToImg$actualImg)[1]) # create a png image 
     if (input$plotToImg_overlay==TRUE & !is.null(plotToImg_overlays$imgOverlay)) { # If input overlay -> display overlayed image
-      display(plotToImg_overlays$imgOverlay, method="raster")
+      plotToImg$prevImg <- plotToImg_overlays$imgOverlay
+      if (input$plotToImg_addBrightness==TRUE) {
+        req(input$plotToImg_brightnessRate)
+        plotToImg$prevImg <- magick::image_read(plotToImg$actualImg[,,plotToImg$imgChan,1])
+        plotToImg$prevImg <- magick::image_modulate(plotToImg$prevImg,saturation=100,
+                                                    brightness = as.numeric(input$plotToImg_brightnessRate), 
+                                                    hue=100)
+        plotToImg$prevImg <- magick::as_EBImage(plotToImg$prevImg)
+      }
+      display(plotToImg$prevImg, method="raster")
     }
     else { # Else if no overlay -> display normal image
-      display(plotToImg$actualImg[,,plotToImg$imgChan,1], method="raster")
+      plotToImg$prevImg <- plotToImg$actualImg[,,plotToImg$imgChan,1]
+      if (input$plotToImg_addBrightness==TRUE) {
+        req(input$plotToImg_brightnessRate)
+        plotToImg$prevImg <- magick::image_read(plotToImg$actualImg[,,plotToImg$imgChan,1])
+        plotToImg$prevImg <- magick::image_modulate(plotToImg$prevImg,saturation=100,
+                                                    brightness = as.numeric(input$plotToImg_brightnessRate), 
+                                                    hue=100)
+        plotToImg$prevImg <- magick::as_EBImage(plotToImg$prevImg)
+      }
+      display(plotToImg$prevImg, method="raster")
     }
     if (input$plotToImg_associated == TRUE & global$nFrame > 1) { # If more than one frame and cells associated with their original frame
       if (length(plotToImg$selected)>0) { # If there is at least one cell selected on the plot
@@ -1839,8 +1860,6 @@ server <- function(input, output, session) {
   # Modification of the image when ID button checked 
   observeEvent(eventExpr = {
     input$plotToImg_ids
-    input$plotToImg_addBrightness
-    input$plotToImg_brightnessRate
     plotToImg$imgPNG
   }, handlerExpr = {
     req(plotToImg$imgPNG)
@@ -1864,15 +1883,6 @@ server <- function(input, output, session) {
         }
         plotToImg$imgPNG2 <- magick::as_EBImage(plotToImg$imgPNG2)
       }
-    }
-    # Modification of the png image when brightness modified 
-    if (input$plotToImg_addBrightness==TRUE) {
-      req(input$plotToImg_brightnessRate)
-      plotToImg$imgPNG2 <- magick::image_read(plotToImg$imgPNG2)
-      plotToImg$imgPNG2 <- magick::image_modulate(plotToImg$imgPNG2,saturation=100,
-                                                  brightness = as.numeric(input$plotToImg_brightnessRate), 
-                                                  hue=100)
-      plotToImg$imgPNG2 <- magick::as_EBImage(plotToImg$imgPNG2)
     }
   }, ignoreNULL=FALSE)
   
@@ -1954,6 +1964,7 @@ server <- function(input, output, session) {
     imgToPlot$imgChan
     input$imgToPlot_color
     input$imgToPlot_brightnessRate
+    input$imgToPlot_brightnessImg
     imgToPlot_multiSelect$totale
     imgSelected()
     input$imgToPlot_selectionType
@@ -1965,7 +1976,16 @@ server <- function(input, output, session) {
     req(length(global$img) > 0, length(global$zip) > 0, imgToPlot$actualImg) 
     out <- tempfile(fileext='.png') # temporary png file 
     png(out, height=dim(imgToPlot$actualImg)[2], width=dim(imgToPlot$actualImg)[1]) # creates a png image in this temporary file with the same dimensions as the global image
-    display(imgToPlot$actualImg[,,imgToPlot$imgChan,1], method="raster") # display actual image
+    imgToPlot$prevImg <- imgToPlot$actualImg[,,imgToPlot$imgChan,1]
+    if (input$imgToPlot_brightnessImg==TRUE) {
+      req(input$imgToPlot_brightnessRate)
+      imgToPlot$prevImg <- magick::image_read(imgToPlot$actualImg[,,imgToPlot$imgChan,1])
+      imgToPlot$prevImg <- magick::image_modulate(imgToPlot$prevImg,saturation=100,
+                                                  brightness = as.numeric(input$imgToPlot_brightnessRate), 
+                                                  hue=100)
+      imgToPlot$prevImg <- magick::as_EBImage(imgToPlot$prevImg)
+    }
+    display(imgToPlot$prevImg, method="raster") # display actual image
     width = 1
     if (input$imgToPlot_modifyThickness == TRUE) {
       width = input$imgToPlot_thicknessRate
@@ -1999,12 +2019,6 @@ server <- function(input, output, session) {
     dev.off() # end modification of the png file
     out <- normalizePath(out, "/") # normalize path
     imgToPlot$imgPNG <- png::readPNG(out) # read the PNG image 
-    if (input$imgToPlot_brightnessImg==TRUE) { # add brightness if wanted
-      req(input$imgToPlot_brightnessRate)
-      imgToPlot$imgPNG <- magick::image_read(imgToPlot$imgPNG)
-      imgToPlot$imgPNG <- magick::image_modulate(imgToPlot$imgPNG,saturation=100,brightness = as.numeric(input$imgToPlot_brightnessRate), hue=100)
-      imgToPlot$imgPNG <- magick::as_EBImage(imgToPlot$imgPNG)
-    }
   }, ignoreNULL=FALSE)
   
   # Plot with the image and all ROIs 
@@ -2660,11 +2674,20 @@ server <- function(input, output, session) {
                       out3 <- tempfile(fileext='.png') # temporary png file
                       png(out3, height=dim(annote$actualImg)[2], width=dim(annote$actualImg)[1]) # dimension of the png file
                       if (input$annote_overlay==TRUE & !is.null(annote_overlays$imgOverlay)) {
-                        display(annote_overlays$imgOverlay, method="raster") # if overlay image, display the rgb image
+                        annote$prevImg <- annote_overlays$imgOverlay
                       }
                       else {
-                        display(annote$actualImg[,,annote$imgChan,1], method="raster") # else display normal image
+                        annote$prevImg <- annote$actualImg[,,annote$imgChan,1]
                       }
+                      if (input$annote_addBrightness==TRUE) {
+                        req(input$annote_brightnessRate)
+                        annote$prevImg <- magick::image_read(annote$actualImg[,,annote$imgChan,1])
+                        annote$prevImg <- magick::image_modulate(annote$prevImg,saturation=100,
+                                                                    brightness = as.numeric(input$annote_brightnessRate), 
+                                                                    hue=100)
+                        annote$prevImg <- magick::as_EBImage(annote$prevImg)
+                      }
+                      display(annote$prevImg, method = "raster")
                       if (!is.null(annote$actualID)) {
                         width = 1
                         if (input$annote_modifyThickness) {
@@ -2682,14 +2705,6 @@ server <- function(input, output, session) {
                       dev.off()
                       out3 <- normalizePath(out3, "/")
                       annote$imgPNG <- EBImage::readImage(out3)
-                      if (input$annote_addBrightness==TRUE) { # add brightness
-                        req(input$annote_brightnessRate)
-                        annote$imgPNG <- magick::image_read(annote$imgPNG)
-                        annote$imgPNG <- magick::image_modulate(annote$imgPNG,saturation=100,
-                                                                   brightness = as.numeric(input$annote_brightnessRate), 
-                                                                   hue=100)
-                        annote$imgPNG <- magick::as_EBImage(annote$imgPNG)
-                      }
                     }
                     }, ignoreNULL=FALSE)
   
