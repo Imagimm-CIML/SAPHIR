@@ -1566,7 +1566,7 @@ server <- function(input, output, session) {
              title = "Image display", solidHeader= TRUE, status = "primary",
              checkboxInput("plotToImg_ids", "Display IDs"),
              withSpinner(
-               EBImage::displayOutput("plotToImg_zoomImg")
+               EBImage::displayOutput("plotToImg_zoomImg", width = "100%", height = "800px")
              ),
              uiOutput("plotToImg_channel"),
              uiOutput("plotToImg_frame"),
@@ -1616,7 +1616,7 @@ server <- function(input, output, session) {
   # Slider to modify the thickness of the image
   output$plotToImg_thicknessSlider <- renderUI ({
     if (input$plotToImg_modifyThickness) {
-      sliderInput("plotToImg_thicknessRate", "Size of cells contours", min=1, max=10, value=1)
+      sliderInput("plotToImg_thicknessRate", "Cells contours thickness", min=1, max=10, value=1)
     }
   })
   
