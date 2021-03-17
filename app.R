@@ -1592,7 +1592,7 @@ server <- function(input, output, session) {
                      tags$br()
                    )
                  })
-               })
+               },  once = FALSE)
   
   plotToImg_selectionColor <- reactiveValues(color1 = "yellow", color2 = "blue", color3 = "green", color4 = "magenta")
   
@@ -1604,7 +1604,7 @@ server <- function(input, output, session) {
                  plotToImg_selectionColor$color3 <- input$plotToImg_colorSelectionChoice3
                  plotToImg_selectionColor$color4 <- input$plotToImg_colorSelectionChoice4
                  removeUI(selector = "#plotToImg_colorLegendChoice")
-               })
+               }, once = FALSE)
   
   # Slider to modify the brightness of the image
   output$plotToImg_brightnessSlider <- renderUI ({
@@ -1756,6 +1756,7 @@ server <- function(input, output, session) {
     input$plotToImg_thicknessRate
     input$plotToImg_addBrightness
     input$plotToImg_brightnessRate
+    input$plotToImg_colorSelectionApply
   },
   handlerExpr= {
     req(input$plotToImg_displayImg, length(global$img) > 0, length(global$zip) > 0)
