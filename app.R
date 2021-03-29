@@ -434,13 +434,13 @@ server <- function(input, output, session) {
       cat(segmentation$macroPath, file = f)
       close(f)
       if (" " %in% str_split(segmentation$macroPath, "")[[1]]) {
-        segmentation$macroPath <- str_replace(segmentation$macroPath, " ", "\" \"")
+        segmentation$macroPath <- str_replace_all(segmentation$macroPath, " ", "\" \"")
       }
       if (" " %in% str_split(segmentation$ijPath, "")[[1]]) {
-        segmentation$ijPath <- str_replace(segmentation$ijPath, " ", "\" \"")
+        segmentation$ijPath <- str_replace_all(segmentation$ijPath, " ", "\" \"")
       }
       if (" " %in% str_split(segmentation$fijiPath, "")[[1]]) {
-        segmentation$fijiPath <- str_replace(segmentation$fijiPath, " ", "\" \"")
+        segmentation$fijiPath <- str_replace_all(segmentation$fijiPath, " ", "\" \"")
       }
       if (input$os == "MacOs") {
         if (input$software=="ImageJ") {
