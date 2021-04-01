@@ -302,7 +302,7 @@ server <- function(input, output, session) {
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
-                          nChan=1, resolution=NULL, resize = FALSE, xcenters=NULL, ycenters=NULL)
+                          nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
   
   plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, imgPNG2=NULL,crops = list(), totalCrops = NULL , subData=NULL, selected=NULL, filtered=NULL)
   
@@ -594,10 +594,11 @@ server <- function(input, output, session) {
       EBImage::colorMode(global$img) <- "Grayscale"
       global$nChan <- dim(global$img)[3] # number of channel on the image
       global$resolution <- attr(read_tif(global$imgPath), "x_resolution") # resolution of the image (number of microns corresponding to 1 pixel)
-      if (dim(global$img)[1] > 1200 & dim(global$img)[2] > 1200) { # if the image is too big (more than 1200*1200), resize it with a factor 2
-        global$img <- EBImage::resize(global$img, dim(global$img)[1]/2, dim(global$img)[2]/2) # resize the image
+      if (dim(global$img)[1] > 1024 | dim(global$img)[2] > 1024) { # if the image is too big (more than 1024*1024), resize it proportionaly 
+        global$coeff_prop <- 1024/max(dim(global$img)[1], dim(global$img)[2])  # the highest dimension is resized to 1024
+        global$img <- EBImage::resize(global$img, dim(global$img)[1] * global$coeff_prop, dim(global$img)[2]*global$coeff_prop) # resize the image
         global$resize <- TRUE
-        global$resolution <- global$resolution*2 # adapt the resolution
+        global$resolution <- global$resolution*global$coeff_prop # adapt the resolution
       }
     }
     else if ((dim(read_tif(global$imgPath)))[4] > 1)  { # If multiple frame
@@ -607,13 +608,14 @@ server <- function(input, output, session) {
         global$img[[i]] <- read_tif(global$imgPath, frames=i) # store each frame as an element of a list
         global$img[[i]] <- as_EBImage(global$img[[i]]) # and transform it in a EBImage object
         EBImage::colorMode(global$img[[i]]) <- "Grayscale"
-        if (dim(global$img[[i]])[1] > 1200 & dim(global$img[[i]])[2] > 1200) { # if the image is too big (more than 1200*1200), resize it with a factor 2
-          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]/2, dim(global$img[[i]])[2]/2) # resize the image
+        if (dim(global$img[[i]])[1] > 1024 | dim(global$img[[i]])[2] > 1024) { # if the image is too big (more than 1024*1024), resize it proportionaly
+          global$coeff_prop <- 1024/max(dim(global$img[[i]])[1], dim(global$img[[i]])[2]) # the highest dimension is resized to 1024
+          global$img[[i]] <- EBImage::resize(global$img[[i]], dim(global$img[[i]])[1]* global$coeff_prop, dim(global$img[[i]])[2]*global$coeff_prop) # resize the image
           global$resize <- TRUE
         }
       }
       if (global$resize == TRUE) {
-        global$resolution <- global$resolution*2 # adapt the global resolution of the image
+        global$resolution <- global$resolution*global$coeff_prop # adapt the global resolution of the image
       }
       global$nChan <- dim(global$img[[1]])[3] # number of channel on the image
     }
@@ -623,7 +625,7 @@ server <- function(input, output, session) {
     global$zip <- read.ijzip(global$zipPath) # read roi.zip file
     if (global$resize == TRUE) { # if resize of the image, modify the coordinates of the ROIs 
       for (i in c(1:length(global$zip))) {
-        global$zip[[i]]$coords <- global$zip[[i]]$coords/2
+        global$zip[[i]]$coords <- global$zip[[i]]$coords/global$coeff_prop
       } 
     }
     sepLegend <- switch( input$sepLegend, "Tab"="\t", "Comma"=",", "Semicolon"=";")
