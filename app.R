@@ -40,7 +40,8 @@ ui <- dashboardPage(
       menuItem("Select your results", tabName = "image", icon=icon("file-import")),
       menuItem("Plot to image", tabName = "plotToImage", icon = icon("poll")),
       menuItem("Image to plot", tabName = "imageToPlot", icon = icon("image")),
-      menuItem("Annotate your data", tabName = "annotation", icon = icon("edit"))
+      menuItem("Annotate your data", tabName = "annotation", icon = icon("edit")),
+      menuItem("Spacial mapping", tabName = "mapping", icon = icon("arrows-h"))
     )
   ),
   dashboardBody(
@@ -285,7 +286,13 @@ ui <- dashboardPage(
                         )
                 )
               )
-      )
+      ),
+      tabItem(tabName = "mapping",
+              fluidRow(
+                box(width =  12, solidHeader = TRUE, status = "primary",
+                    title = "Spacial mapping with Dbscan")
+              ))
+      
     ) 
   )
 )
