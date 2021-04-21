@@ -92,21 +92,33 @@ def make_3canals(num_cells, shape, dtype, seed=0):
     # apply threshold
     thresh = threshold_otsu(canal0)
     bw = canal0 > thresh
-    canal2 = label(bw).astype(dtype)  # max 255 cells !!
-    return np.stack([canal0, canal1, canal2])  #
-
+    #print(bw)
+    #bw = bw[:, :, :].astype(bool)
+    # canal2 = label(bw).astype(dtype) # max 255 cells !!
+    
+    canal2 = watershed(bw)
+    #print(canal2)
+        
+    return np.stack([canal0, canal1, canal2]) # 
 
 num_cells = 2
-shape = (20, 20, 1)
-canal2 = make_3canals(num_cells, shape, np.uint8)[2]
-print(canal2)
+shape = (100,100,2)
+stack0,stack1 = generate_blobs(num_cells, shape,np.uint8 , seed=42)
+thresh = threshold_otsu(stack0)
+bw = stack0 > thresh
+bw = bw[0, : ,:]
+#print(bw.shape)
+seg = watershed(bw,shape)
 
-# watershed segmentation canal2
-distance = ndimage.distance_transform_edt(canal2)
-local_maxi = peak_local_max(distance, indices=False, footprint=shape, labels=canal2)
-markers = ndimage.label(local_maxi)[0]
-labels = watershed(-distance, markers, mask=canal2)
 
+
+#watershed segmentation 
+def watershed(mask, shape):
+    distance = ndimage.distance_transform_edt(mask)
+    local_maxi = peak_local_max(distance, indices=False, footprint=shape, labels=mask)
+    markers = ndimage.label(local_maxi)[0]
+    labels = watershed(-distance, markers, mask=mask)
+    return labels
 
 def create_tiff(fname, num_cells, shape, dtype=np.uint8):
     """Creates an image with make_3canals and saves it to fname
