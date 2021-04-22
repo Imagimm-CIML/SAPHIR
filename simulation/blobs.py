@@ -86,26 +86,50 @@ def generate_blobs(num_cells, shape, dtype, seed=0):
     return stack0, stack1
 
 
+#watershed segmentation 
+def segmentation(mask,canal):
+    distance = ndimage.distance_transform_edt(mask)
+    local_maxi = peak_local_max(distance, indices=False, labels=mask)
+    markers = ndimage.label(local_maxi, structure=np.ones((3,3,3)))[0]
+    labels = watershed(-distance, markers, mask=canal)
+    return labels
+
 def make_3canals(num_cells, shape, dtype, seed=0):
     """ Creates a 3 canals stack with the blobs, a transformed value
     (as a way to add diversity) and the labels from a simple thresholding
     """
-    canal0, canal1 = generate_blobs(num_cells, shape, dtype, seed=seed)
+    canal0, canal1 = generate_blobs(num_cells, shape, dtype, seed=seed)    
     # apply threshold
     thresh = threshold_otsu(canal0)
     bw = canal0 > thresh
-    # print(bw)
-    # bw = bw[:, :, :].astype(bool)
+
+    #bw = bw[:, :, :].astype(bool)
     # canal2 = label(bw).astype(dtype) # max 255 cells !!
+    
+    canal2 = segmentation(bw, canal0)
+        
+    return np.stack([canal0, canal1, canal2]) 
 
-    canal2 = watershed(bw)
-    # print(canal2)
 
-    return np.stack([canal0, canal1, canal2])  #
+def generate_results(num_cells, shape, dtype=np.uint8, seed=0):
+    canal0, canal1 = generate_blobs(num_cells, shape, np.uint8)
+    thresh = threshold_otsu(canal0)
+    bw = canal0 > thresh
+    mask0 = segmentation(bw, canal0)
+    mask1 = segmentation(bw, canal1)
+    region0=skimage.measure.regionprops(mask0, intensity_image=canal0)
+    regions1=skimage.measure.regionprops(mask1, intensity_image=canal1)
+    
+        
+    return int0,int1
 
-## segmentation 2D image
+num_cells = 9
+shape = (100,100,3)
+test = generate_results(num_cells, shape, np.uint8)
+
+# segmentation 2D image
 # num_cells = 9
-#
+# 
 # shape = (100, 100, 2)
 # stack0, stack1 = generate_blobs(num_cells, shape, np.uint8, seed=42)
 # stack0 = stack0[0, :, :]
@@ -113,36 +137,25 @@ def make_3canals(num_cells, shape, dtype, seed=0):
 # bw = stack0 > thresh
 # mask = bw[:, :]
 # # print(bw.shape)
-#
+# 
 # distance = ndimage.distance_transform_edt(mask)
-# print(distance.shape)
 # local_maxi = peak_local_max(distance, indices=False, labels=mask)
-#
+# 
 # markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
 # labels = watershed(-distance, markers, mask=mask)
-# region
-# s = skimage.measure.regionprops(labels, intensity_image=stack0)
-#
+# regions = skimage.measure.regionprops(labels, intensity_image=stack0)
+# 
 # plt.figure(figsize=(10, 10))
 # plt.subplot(131)
-# plt.imshow(mask1, cmap='gray', interpolation='nearest')
+# plt.imshow(mask, cmap='gray', interpolation='nearest')
 # plt.subplot(132)
 # plt.imshow(-distance, interpolation='nearest')
 # plt.subplot(133)
 # plt.imshow(labels, cmap='nipy_spectral', interpolation='nearest')
 # plt.axis('off')
-# print(regions[6].intensity_image)
-
-# watershed segmentation
-def watershed(mask):
-    distance = ndimage.distance_transform_edt(mask)
-    local_maxi = peak_local_max(distance, indices=False, labels=mask)
-
-    markers = ndimage.label(local_maxi, structure=np.ones((3, 3, 3)))[0]
-    labels = watershed(-distance, markers, mask=mask)
-    #print(labels.shape)
-    return seg([labels, markers, distance])
-
+# 
+# print(regions[7].intensity_image)
+# print(len(regions))
 
 def create_tiff(fname, num_cells, shape, dtype=np.uint8):
     """Creates an image with make_3canals and saves it to fname
