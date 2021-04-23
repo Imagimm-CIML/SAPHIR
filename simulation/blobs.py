@@ -87,11 +87,11 @@ def generate_blobs(num_cells, shape, dtype, seed=0):
 
 
 #watershed segmentation 
-def segmentation(mask,canal):
+def segmentation(mask):
     distance = ndimage.distance_transform_edt(mask)
-    local_maxi = peak_local_max(distance, indices=False, labels=mask)
+    local_maxi = peak_local_max(distance, indices=False,labels = mask, exclude_border=False)
     markers = ndimage.label(local_maxi, structure=np.ones((3,3,3)))[0]
-    labels = watershed(-distance, markers, mask=canal)
+    labels = watershed(-distance, markers, mask=mask)
     return labels
 
 def make_3canals(num_cells, shape, dtype, seed=0):
@@ -106,7 +106,7 @@ def make_3canals(num_cells, shape, dtype, seed=0):
     #bw = bw[:, :, :].astype(bool)
     # canal2 = label(bw).astype(dtype) # max 255 cells !!
     
-    canal2 = segmentation(bw, canal0)
+    canal2 = segmentation(bw)
         
     return np.stack([canal0, canal1, canal2]) 
 
@@ -115,17 +115,26 @@ def generate_results(num_cells, shape, dtype=np.uint8, seed=0):
     canal0, canal1 = generate_blobs(num_cells, shape, np.uint8)
     thresh = threshold_otsu(canal0)
     bw = canal0 > thresh
-    mask0 = segmentation(bw, canal0)
-    mask1 = segmentation(bw, canal1)
-    region0=skimage.measure.regionprops(mask0, intensity_image=canal0)
-    regions1=skimage.measure.regionprops(mask1, intensity_image=canal1)
-    
-        
-    return int0,int1
+    mask = segmentation(bw)
+    region0=skimage.measure.regionprops_table(mask, intensity_image=canal0, properties=['label','mean_intensity'])
+    region1=skimage.measure.regionprops_table(mask, intensity_image=canal1, properties=['label','mean_intensity'])
+    ID = list(region0['label'])
+    intensity0 = list(region0['mean_intensity'])
+    intensity1 = list(region1['mean_intensity'])
 
-num_cells = 9
-shape = (100,100,3)
-test = generate_results(num_cells, shape, np.uint8)
+    df = pd.DataFrame({'ID': ID, 'Int0': intensity0, 'Int1': intensity1})#, 'Circularity': [], 'size': []})
+    result = np.savetxt('result.csv', df, fmt = ('%d','%.4f','%.4f'), header = "Int0 Int1")    
+    return bw
+
+
+num_cells = 100
+shape = (1024,1024,3)
+
+mask0 = make_3canals(num_cells,shape,np.uint8)
+#napari.view_image(mask0, channel_axis=0)
+res = generate_results(num_cells, shape, np.uint8)
+res
+#print(res)
 
 # segmentation 2D image
 # num_cells = 9
