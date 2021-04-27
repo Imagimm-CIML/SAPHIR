@@ -127,44 +127,73 @@ def generate_results(num_cells, shape, dtype=np.uint8, seed=0):
     return bw
 
 
+#num_cells = 100
+#shape = (1024,1024,3)
+
+
+### image 2D
+import matplotlib.pyplot as plt
+import roifile
+from roifile import ImagejRoi 
+
 num_cells = 100
-shape = (1024,1024,3)
+shape = (1024, 1024, 1)
+stack0, stack1 = generate_blobs(num_cells, shape, np.uint8, seed=42)
+stack0 = stack0[0, :, :]
+stack1 = stack1[0, :, :]
+thresh = threshold_otsu(stack0)
+bw = stack0 > thresh
+mask = bw[:, :]
 
-mask0 = make_3canals(num_cells,shape,np.uint8)
-#napari.view_image(mask0, channel_axis=0)
-res = generate_results(num_cells, shape, np.uint8)
-res
-#print(res)
+##segmentation watershed
+distance = ndimage.distance_transform_edt(mask)
+local_maxi = peak_local_max(distance, indices=False, labels=mask)
+markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
+labels = watershed(-distance, markers, mask=mask)
 
-# segmentation 2D image
-# num_cells = 9
-# 
-# shape = (100, 100, 2)
-# stack0, stack1 = generate_blobs(num_cells, shape, np.uint8, seed=42)
-# stack0 = stack0[0, :, :]
-# thresh = threshold_otsu(stack0)
-# bw = stack0 > thresh
-# mask = bw[:, :]
-# # print(bw.shape)
-# 
-# distance = ndimage.distance_transform_edt(mask)
-# local_maxi = peak_local_max(distance, indices=False, labels=mask)
-# 
-# markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
-# labels = watershed(-distance, markers, mask=mask)
-# regions = skimage.measure.regionprops(labels, intensity_image=stack0)
-# 
-# plt.figure(figsize=(10, 10))
-# plt.subplot(131)
-# plt.imshow(mask, cmap='gray', interpolation='nearest')
-# plt.subplot(132)
-# plt.imshow(-distance, interpolation='nearest')
-# plt.subplot(133)
-# plt.imshow(labels, cmap='nipy_spectral', interpolation='nearest')
-# plt.axis('off')
-# 
-# print(regions[7].intensity_image)
-# print(len(regions))
+## view on matplotlib
+#plt.figure(figsize=(10, 10))
+#plt.subplot(131)
+#plt.imshow(mask, cmap='gray', interpolation='nearest')
+#plt.savefig('test0.tif')
+#plt.subplot(132)
+#plt.imshow(-distance, interpolation='nearest')
+#plt.subplot(133)
+#plt.imshow(labels, cmap='nipy_spectral', interpolation='nearest')
+#plt.axis('off')
+#plt.savefig('test0.tif')
+
+## view on napari
+stack = np.stack([stack0, stack1, bw])
+#napari.view_image(stack, channel_axis=0)
+
+## save image as .tif
+imsave("test0.tif", stack, plugin="tifffile", metadata={'axes': 'CZYX'})
+
+region0=skimage.measure.regionprops_table(labels, intensity_image=stack0, properties=['label','mean_intensity'])
+region1=skimage.measure.regionprops_table(labels, intensity_image=stack1, properties=['label','mean_intensity'])
+region1['mean_intensity1'] =  region1.pop('mean_intensity')
+region0.update(region1) 
+df = pd.DataFrame(region0) #, 'Circularity': [], 'size': []})
+## generate .cvs file with intensities
+result = df.to_csv("result.csv",float_format='%.4f', header = ["ID", "Int0", "Int1"], index = False, sep = " ")       
+print(df)
+
+
+r = skimage.measure.regionprops(labels)
+
+roicordinates= r[0].coords
+
+## generate .roi files 
+roifile = []
+for i in range (0, len(r)):
+    roicordinates = r[i].coords
+    roix = ImagejRoi.frompoints(roicordinates)   
+    roifile.append(roix)
+    generate = roix.tofile("C" + str(i+1) + ".roi")
+    generate
+
+    
 
 def create_tiff(fname, num_cells, shape, dtype=np.uint8):
     """Creates an image with make_3canals and saves it to fname
