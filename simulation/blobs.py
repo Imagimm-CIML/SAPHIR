@@ -61,7 +61,9 @@ def generate_blobs(num_cells, shape, dtype, seed=0):
     max_int = 100
     max_int_std = 30
 
-    centers = rng.integers(low=np.zeros(3), high=shape, size=(num_cells, 3))
+    #centers = rng.integers(low=np.zeros(3), high=shape, size=(num_cells, 3))
+    centers = np.int_(rng.normal(loc =512, scale=300, size=(num_cells, 3)))
+    centers[:, 2] = 0
 
     sizes = rng.normal(loc=cell_size, scale=cell_size_std, size=(num_cells, 3))
 
@@ -86,7 +88,7 @@ def generate_blobs(num_cells, shape, dtype, seed=0):
     return stack0, stack1
 
 
-#watershed segmentation 
+#watershed segmentation 3D 
 def segmentation(mask):
     distance = ndimage.distance_transform_edt(mask)
     local_maxi = peak_local_max(distance, indices=False,labels = mask, exclude_border=False)
@@ -102,98 +104,11 @@ def make_3canals(num_cells, shape, dtype, seed=0):
     # apply threshold
     thresh = threshold_otsu(canal0)
     bw = canal0 > thresh
-
     #bw = bw[:, :, :].astype(bool)
-    # canal2 = label(bw).astype(dtype) # max 255 cells !!
-    
-    canal2 = segmentation(bw)
-        
-    return np.stack([canal0, canal1, canal2]) 
+    # canal2 = label(bw).astype(dtype) # max 255 cells !    
+    canal2 = segmentation(bw)    
+    return np.stack([canal0, canal1, canal2])
 
-
-def generate_results(num_cells, shape, dtype=np.uint8, seed=0):
-    canal0, canal1 = generate_blobs(num_cells, shape, np.uint8)
-    thresh = threshold_otsu(canal0)
-    bw = canal0 > thresh
-    mask = segmentation(bw)
-    region0=skimage.measure.regionprops_table(mask, intensity_image=canal0, properties=['label','mean_intensity'])
-    region1=skimage.measure.regionprops_table(mask, intensity_image=canal1, properties=['label','mean_intensity'])
-    ID = list(region0['label'])
-    intensity0 = list(region0['mean_intensity'])
-    intensity1 = list(region1['mean_intensity'])
-
-    df = pd.DataFrame({'ID': ID, 'Int0': intensity0, 'Int1': intensity1})#, 'Circularity': [], 'size': []})
-    result = np.savetxt('result.csv', df, fmt = ('%d','%.4f','%.4f'), header = "Int0 Int1")    
-    return bw
-
-
-#num_cells = 100
-#shape = (1024,1024,3)
-
-
-### image 2D
-import matplotlib.pyplot as plt
-import roifile
-from roifile import ImagejRoi 
-
-num_cells = 100
-shape = (1024, 1024, 1)
-stack0, stack1 = generate_blobs(num_cells, shape, np.uint8, seed=42)
-stack0 = stack0[0, :, :]
-stack1 = stack1[0, :, :]
-thresh = threshold_otsu(stack0)
-bw = stack0 > thresh
-mask = bw[:, :]
-
-##segmentation watershed
-distance = ndimage.distance_transform_edt(mask)
-local_maxi = peak_local_max(distance, indices=False, labels=mask)
-markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
-labels = watershed(-distance, markers, mask=mask)
-
-## view on matplotlib
-#plt.figure(figsize=(10, 10))
-#plt.subplot(131)
-#plt.imshow(mask, cmap='gray', interpolation='nearest')
-#plt.savefig('test0.tif')
-#plt.subplot(132)
-#plt.imshow(-distance, interpolation='nearest')
-#plt.subplot(133)
-#plt.imshow(labels, cmap='nipy_spectral', interpolation='nearest')
-#plt.axis('off')
-#plt.savefig('test0.tif')
-
-## view on napari
-stack = np.stack([stack0, stack1, bw])
-#napari.view_image(stack, channel_axis=0)
-
-## save image as .tif
-imsave("test0.tif", stack, plugin="tifffile", metadata={'axes': 'CZYX'})
-
-region0=skimage.measure.regionprops_table(labels, intensity_image=stack0, properties=['label','mean_intensity'])
-region1=skimage.measure.regionprops_table(labels, intensity_image=stack1, properties=['label','mean_intensity'])
-region1['mean_intensity1'] =  region1.pop('mean_intensity')
-region0.update(region1) 
-df = pd.DataFrame(region0) #, 'Circularity': [], 'size': []})
-## generate .cvs file with intensities
-result = df.to_csv("result.csv",float_format='%.4f', header = ["ID", "Int0", "Int1"], index = False, sep = " ")       
-print(df)
-
-
-r = skimage.measure.regionprops(labels)
-
-roicordinates= r[0].coords
-
-## generate .roi files 
-roifile = []
-for i in range (0, len(r)):
-    roicordinates = r[i].coords
-    roix = ImagejRoi.frompoints(roicordinates)   
-    roifile.append(roix)
-    generate = roix.tofile("C" + str(i+1) + ".roi")
-    generate
-
-    
 
 def create_tiff(fname, num_cells, shape, dtype=np.uint8):
     """Creates an image with make_3canals and saves it to fname
@@ -243,3 +158,92 @@ def chunked(shape, n_cells, chunk_size=100, dtype=np.uint16):
 # napari.view_image(stack, channel_axis=0)
 # imsave("test.tif", stack, plugin="tifffile", metadata={'axes': 'CZYX'})
 
+
+##### 2D 
+
+import matplotlib.pyplot as plt
+import roifile
+from roifile import ImagejRoi
+from shutil import make_archive
+from pathlib import Path
+
+
+num_cells = 100
+shape = (1024, 1024, 1)
+
+def make_3canals(num_cells, shape, dtype = np.uint8, seed=0):
+    stack0, stack1 = generate_blobs(num_cells, shape, np.uint8, seed=42)
+    # z, y, x
+    stack0 = stack0[0, :, :]
+    stack1 = stack1[0, :, :]
+    stack1 = stack0.swapaxes(0, 1)
+    stack0 = stack0.swapaxes(0, 1)
+
+    thresh = threshold_otsu(stack0)
+    bw = stack0 > thresh
+    mask = bw
+    return np.stack([stack0, stack1, mask])
+
+
+
+# segmentation
+mask = make_3canals(num_cells,shape)[2]
+distance = ndimage.distance_transform_edt(mask)
+local_maxi = peak_local_max(distance, indices=False, labels=mask)
+markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
+labels = watershed(-distance, markers, mask=mask)
+    
+# view on matplotlib
+#plt.figure(figsize=(10, 10))
+#plt.subplot(131)
+#plt.imshow(mask, cmap='gray', interpolation='nearest')
+#plt.subplot(132)
+#plt.imshow(-distance, interpolation='nearest')
+#plt.subplot(133)
+#plt.imshow(labels, cmap='nipy_spectral', interpolation='nearest')
+#plt.axis('off')
+
+## view on napari
+stack = make_3canals(num_cells, shape, np.uint8)
+#print(stack.dtype)
+#napari.view_image(stack, channel_axis=0)
+
+## save image as .tif
+#imsave("blobs2D.tif", stack, plugin="tifffile", metadata={'axes': 'CYX'})
+
+stack0 = make_3canals(num_cells,shape)[0]
+stack1 = make_3canals(num_cells,shape)[1]
+region0=skimage.measure.regionprops_table(labels, intensity_image=stack0, properties=['label','mean_intensity'])
+region1=skimage.measure.regionprops_table(labels, intensity_image=stack1, properties=['label','mean_intensity'])
+region1['mean_intensity1'] =  region1.pop('mean_intensity')
+region0.update(region1) 
+df = pd.DataFrame(region0) #, 'Circularity': [], 'size': []})
+print(df)
+
+## generate .cvs file with intensities
+result = df.to_csv("result.csv",float_format='%.4f', header = ["ID", "Int0", "Int1"], index = False, sep = "\t")       
+
+
+contours = find_contours(labels, level = 0) # array list, 1 array = 1 contour
+
+def get_roi(contour, level) :
+    return ImagejRoi.frompoints(contour[level])
+
+def generate_zip(racine_zip : str) : 
+    directory = racine_zip
+    path = Path(directory)
+    pathROIset = path/"ROIset"
+    pathROIset.mkdir(parents=True, exist_ok=False)
+
+    for i, level in enumerate(contours) : 
+        roi = get_roi(contours,i)
+        roi.tofile(f'roi_{i:04d}.roi')
+        filepath = str(path/f"roi_{i:04d}.roi")
+        shutil.move(filepath,p)
+      
+    shutil.make_archive('ROIset', 'zip', 'ROIset' )    
+
+## generate ROIset.zip at racine
+racine = 'C:\\Users\\jouan\\Documents\\cours\\M1\\stage\\python'
+#generate_zip(racine)
+  
