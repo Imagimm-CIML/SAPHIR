@@ -1,13 +1,18 @@
 import numpy as np
 from skimage.filters import threshold_otsu
-from skimage.measure import label
+from skimage.measure import label, find_contours
 import skimage.measure
 from skimage.io import imsave, imread
 import napari
 from skimage.morphology import watershed
 from skimage.feature import peak_local_max
 from scipy import ndimage
+import pandas as pd
 import roifile
+from roifile import ImagejRoi
+import matplotlib.pyplot as plt
+from shutil import make_archive
+from pathlib import Path
 
 
 #% gui qt
@@ -160,13 +165,6 @@ def chunked(shape, n_cells, chunk_size=100, dtype=np.uint16):
 
 
 ##### 2D 
-
-import matplotlib.pyplot as plt
-import roifile
-from roifile import ImagejRoi
-from shutil import make_archive
-from pathlib import Path
-
 
 num_cells = 100
 shape = (1024, 1024, 1)
