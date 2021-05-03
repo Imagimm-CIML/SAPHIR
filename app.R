@@ -1,6 +1,6 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -26,6 +26,7 @@ library(plotly)
 library(V8)
 library(shinyFiles)
 library(shinyWidgets)
+library(fpc)
 
 # User interface 
 ui <- dashboardPage(
@@ -41,7 +42,7 @@ ui <- dashboardPage(
       menuItem("Plot to image", tabName = "plotToImage", icon = icon("poll")),
       menuItem("Image to plot", tabName = "imageToPlot", icon = icon("image")),
       menuItem("Annotate your data", tabName = "annotation", icon = icon("edit")),
-      menuItem("Spacial mapping", tabName = "mapping", icon = icon("arrows-h"))
+      menuItem("Clustering", tabName = "clustering", icon = icon("arrows-h"))
     )
   ),
   dashboardBody(
@@ -287,10 +288,18 @@ ui <- dashboardPage(
                 )
               )
       ),
-      tabItem(tabName = "mapping",
+      tabItem(tabName = "clustering",
               fluidRow(
-                box(width =  12, solidHeader = TRUE, status = "primary",
-                    title = "Spacial mapping with Dbscan")
+                column(width =  6,
+                  box(width =  NULL, solidHeader = TRUE, status = "primary",
+                    title = "DBSCAN clustering", 
+                    helpText("Select DBSCAN parameters : "),
+                    sliderInput("eps", "Epsilon :", value = 10, min = 1, max = 200, step = 1),
+                    sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
+                    actionButton("godbs", "Run DBSCAN"), 
+                    plotOutput("clustering_plot")
+                    )
+              )
               ))
       
     ) 
@@ -316,6 +325,8 @@ server <- function(input, output, session) {
   imgToPlot <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, selected=NULL)
   
   annote <- reactiveValues(selected = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL, ID=NULL)
+  
+  clustering <- reactiveValues(imgFrame = 1, imgChan = 1, actualImg = NULL, imgPNG = NULL)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -2801,6 +2812,16 @@ server <- function(input, output, session) {
                  )
                  
                })
+  
+  ### MENU CLUSTERING
+  dbs <- eventReactive(input$godbs,{
+    fpc::dbscan(as.matrix(global$zip[[i]]),eps = input$eps, minPts = input$mp)$cluster
+  })
+  output$dbsres <- renderPlot({
+    dbr <-dbs()
+    plot(global$zip[[i]], add = TRUE , col = factor(dbr), main = "Scatterplot of color coded clusters")
+  })
+  
   
 }
 options(shiny.maxRequestSize = 10000 * 10240 ^ 2)
