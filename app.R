@@ -2815,11 +2815,15 @@ server <- function(input, output, session) {
   
   ### MENU CLUSTERING
   dbs <- eventReactive(input$godbs,{
-    fpc::dbscan(as.matrix(global$zip[[i]]),eps = input$eps, minPts = input$mp)$cluster
+    fpc::dbscan(as.matrix(global$data),eps = input$eps, minPts = input$mp)$cluster
   })
-  output$dbsres <- renderPlot({
+  output$clustering_plot <- renderPlot({
+    req(global$data)
     dbr <-dbs()
-    plot(global$zip[[i]], add = TRUE , col = factor(dbr), main = "Scatterplot of color coded clusters")
+    plot(data = global$data, col = factor(dbr),main="Scatterplot of Color Coded Clusters")
+    #ggplot(data = global$data) +
+      #geom_point(aes(col = factor(dbr)) +
+      #labs(tittle = "Scatterplot of color coded clusters"))
   })
   
   
