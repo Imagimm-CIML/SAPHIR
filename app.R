@@ -297,6 +297,7 @@ ui <- dashboardPage(
                     sliderInput("eps", "Epsilon :", value = 10, min = 1, max = 200, step = 1),
                     sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
                     actionButton("godbs", "Run DBSCAN"), 
+                    verbatimTextOutput("data"),
                     plotOutput("clustering_plot")
                     )
               )
@@ -2814,14 +2815,16 @@ server <- function(input, output, session) {
                })
   
   ### MENU CLUSTERING
+  
   dbs <- eventReactive(input$godbs,{
-    fpc::dbscan(as.matrix(global$data),eps = input$eps, minPts = input$mp)$cluster
+    fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps, MinPts = input$mp)$cluster
   })
+  
   output$clustering_plot <- renderPlot({
-    req(global$data)
     dbr <-dbs()
-    plot(data = global$data, col = factor(dbr),main="Scatterplot of Color Coded Clusters")
-    #ggplot(data = global$data) +
+    
+    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main="Scatterplot of Color Coded Clusters", frame = FALSE)
+    #ggplot(data = dbr) +
       #geom_point(aes(col = factor(dbr)) +
       #labs(tittle = "Scatterplot of color coded clusters"))
   })
