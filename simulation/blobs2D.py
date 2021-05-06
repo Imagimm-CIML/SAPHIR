@@ -163,11 +163,8 @@ print(df)
 #result = df.to_csv("result1.csv",float_format='%.4f', header = ["ID", "Int0", "Int1"], index = False, sep = "\t")       
 
 
-contours = find_contours(mask , level = 0, fully_connected = 'high', positive_orientation = 'high') # array list, 1 array = 1 contour
-print(len(contours))
-
-def get_roi(contour, level) :
-    return ImagejRoi.frompoints(contour[level])
+def get_roi(contour) :
+    return ImagejRoi.frompoints(contour)
 
 def generate_zip(racine_zip : str) : 
     directory = racine
@@ -175,8 +172,9 @@ def generate_zip(racine_zip : str) :
     pathROIset = path/"ROIset1"
     pathROIset.mkdir(parents=True, exist_ok=False)
 
-    for i, level in enumerate(contours) : 
-        roi = get_roi(contours,i)
+    for i in region0['label'] :
+        contour = find_contours(labels==i, level = 0) 
+        roi = get_roi(contour[0])
         roi.tofile(f'roi_{i:04d}.roi')
         filepath = str(path/f'roi_{i:04d}.roi')
         shutil.move(filepath,pathROIset)
@@ -186,6 +184,7 @@ def generate_zip(racine_zip : str) :
 ## generate ROIset.zip at racine
 racine = 'C:\\Users\\jouan\\Documents\\cours\\M1\\stage\\python'
 #generate_zip(racine)
+
 
 
   
