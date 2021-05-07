@@ -2823,7 +2823,7 @@ server <- function(input, output, session) {
   output$clustering_plot <- renderPlot({
     dbr <-dbs()
     
-    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main="Scatterplot of Color Coded Clusters of the ROIs", xlab= "X centers",ylab = "Y centers",frame = FALSE)
+    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main="Scatterplot of Color Coded Clusters", xlab= "X centers",ylab = "Y centers",frame = FALSE)
     #ggplot(data = dbr) +
       #geom_point(aes(col = factor(dbr)) +
       #labs(tittle = "Scatterplot of color coded clusters"))
