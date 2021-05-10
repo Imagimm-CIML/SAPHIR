@@ -1,6 +1,6 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc","dbscan") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -27,6 +27,7 @@ library(V8)
 library(shinyFiles)
 library(shinyWidgets)
 library(fpc)
+library(dbscan)
 
 # User interface 
 ui <- dashboardPage(
@@ -294,10 +295,10 @@ ui <- dashboardPage(
                   box(width =  NULL, solidHeader = TRUE, status = "primary",
                     title = "DBSCAN clustering", 
                     helpText("Select DBSCAN parameters : "),
-                    sliderInput("eps", "Epsilon :", value = 10, min = 1, max = 200, step = 1),
+                    sliderInput("eps", "Epsilon :", value = "10", min = -2, max = 200, step = 0.1),
                     sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
                     actionButton("godbs", "Run DBSCAN"), 
-                    verbatimTextOutput("data"),
+                    verbatimTextOutput("epsilon_advise"),
                     plotOutput("clustering_plot")
                     )
               )
@@ -2816,18 +2817,26 @@ server <- function(input, output, session) {
   
   ### MENU CLUSTERING
   
+  
   dbs <- eventReactive(input$godbs,{
     fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps, MinPts = input$mp)$cluster
   })
   
   output$clustering_plot <- renderPlot({
     dbr <-dbs()
-    
-    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main="Scatterplot of Color Coded Clusters", xlab= "X centers",ylab = "Y centers",frame = FALSE)
+    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main ="Scatterplot of Color Coded Clusters", xlab= "X centers",ylab = "Y centers",frame = FALSE)
     #ggplot(data = dbr) +
       #geom_point(aes(col = factor(dbr)) +
       #labs(tittle = "Scatterplot of color coded clusters"))
   })
+  
+  output$epsilon_advise <- renderPrint({
+    df = data.frame(global$xcenters,global$ycenters)
+    d = dbscan::kNNdist(df, k = 3)
+    E = mean(d) - sd(d) 
+    print(paste0(" Advise epsilon :" , E, mean(d), sd(d)))
+  })
+
   
   
 }
