@@ -295,7 +295,7 @@ ui <- dashboardPage(
                   box(width =  NULL, solidHeader = TRUE, status = "primary",
                     title = "DBSCAN clustering", 
                     helpText("Select DBSCAN parameters : "),
-                    sliderInput("eps", "Epsilon :", value = "10", min = -2, max = 200, step = 0.1),
+                    sliderInput("eps", "Epsilon :", value = "10", min = 0, max = 200, step = 0.1),
                     sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
                     actionButton("godbs", "Run DBSCAN"), 
                     verbatimTextOutput("epsilon_advise"),
@@ -2832,9 +2832,9 @@ server <- function(input, output, session) {
   
   output$epsilon_advise <- renderPrint({
     df = data.frame(global$xcenters,global$ycenters)
-    d = dbscan::kNNdist(df, k = 3)
-    E = mean(d) - sd(d) 
-    print(paste0(" Advise epsilon :" , E, mean(d), sd(d)))
+    d = dbscan::kNNdist(df, k = 4)
+    E = mean(d) -sd(d)
+    print(paste0(" Advise epsilon : " , E," moy ", mean(d)," sd " ,sd(d)))
   })
 
   
