@@ -2832,8 +2832,8 @@ server <- function(input, output, session) {
   
   output$epsilon_advise <- renderPrint({
     df = data.frame(global$xcenters,global$ycenters)
-    d = dbscan::kNNdist(df, k = 4)
-    E = mean(d) -sd(d)
+    d = dbscan::kNNdist(df, k = 4, all = TRUE)
+    E = mean(d) - sd(d)
     print(paste0(" Advise epsilon : " , E," moy ", mean(d)," sd " ,sd(d)))
   })
 
