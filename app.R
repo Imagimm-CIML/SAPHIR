@@ -257,7 +257,7 @@ ui <- dashboardPage(
                              uiOutput("annote_validateSelection"),
                              tags$br(),
                              verbatimTextOutput("annote_selection")
-                        )
+                             )
                 ),
                 column( width = 6,
                         box (width = NULL, solidHeader=TRUE, status="primary", collapsible = TRUE,
@@ -292,21 +292,31 @@ ui <- dashboardPage(
       tabItem(tabName = "clustering",
               fluidRow(
                 column(width =  6,
-                  box(width =  NULL, solidHeader = TRUE, status = "primary",
-                    title = "DBSCAN clustering", 
-                    helpText("Select DBSCAN parameters : "),
-                    sliderInput("eps", "Epsilon :", value = "10", min = 0, max = 200, step = 0.1),
-                    sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
-                    actionButton("godbs", "Run DBSCAN"), 
-                    verbatimTextOutput("epsilon_advise"),
-                    plotOutput("clustering_plot")
-                    )
-              )
-              ))
+                       box(width =  NULL, solidHeader = TRUE, status = "primary",
+                           title = "DBSCAN clustering", 
+                           helpText("Select DBSCAN parameters : "),
+                           sliderInput("eps", "Epsilon :", value = "10", min = 0, max = 200, step = 0.1),
+                           sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
+                           actionButton("godbs", "Run DBSCAN"), 
+                           verbatimTextOutput("epsilon_advise"),
+                           plotlyOutput("clustering_plot")
+                           )
+                       ),
+                column(width=6,
+                       box(width = NULL, solidHeader = TRUE, status = "primary",
+                           title = "View results",
+                           downloadLink('downloadClusterDataUI','Download'),
+                           tableOutput('clustering_table')
+                          )
+                      )
+                ))
       
     ) 
   )
 )
+
+ 
+
 
 
 server <- function(input, output, session) {
@@ -2822,23 +2832,35 @@ server <- function(input, output, session) {
     fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps, MinPts = input$mp)$cluster
   })
   
-  output$clustering_plot <- renderPlot({
+  output$clustering_plot <- renderPlotly({
     dbr <-dbs()
-    plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main ="Scatterplot of Color Coded Clusters", xlab= "X centers",ylab = "Y centers",frame = FALSE)
-    #ggplot(data = dbr) +
-      #geom_point(aes(col = factor(dbr)) +
-      #labs(tittle = "Scatterplot of color coded clusters"))
+    #plot(x = global$xcenters, y = global$ycenters, col = factor(dbr),main ="Scatterplot of Color Coded Clusters", xlab= "X centers",ylab = "Y centers",frame = FALSE)
+    gg <- ggplot(data=global$data) + geom_point(aes_string(x=global$xcenters, y = global$ycenters, customdata = "ID", color = factor(dbr)))
   })
+    
+    #df = data.frame(global$xcenters,global$ycenters)
+    #d = dbscan::kNNdist(df, k = 3, all = TRUE)
+    #E = mean(d) - sd(d)
+    #print(paste0(global$data))
   
-  output$epsilon_advise <- renderPrint({
-    df = data.frame(global$xcenters,global$ycenters)
-    d = dbscan::kNNdist(df, k = 3, all = TRUE)
-    E = mean(d) - sd(d)
-    print(paste0(global$data))
-  })
 
-  
-  
+  observeEvent(eventExpr = input$godbs,
+               handlerExpr = {
+                 Cluster <- as.integer(fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps, MinPts = input$mp)$cluster)
+                 cluster_data <- cbind(global$data,Cluster)
+                 
+                 #Link to download data with the new corrected column
+                 output$downloadClusterDataUI <- downloadHandler(
+                   filename = function() {
+                     paste("data_cluster_", Sys.Date(), ".txt", sep="")
+                   },
+                   content = function(file) {
+                     write.table(cluster_data, file, row.names = FALSE)
+                   }
+                   )
+                 
+                 output$clustering_table <- renderTable({cluster_data})
+            })
 }
 options(shiny.maxRequestSize = 10000 * 10240 ^ 2)
 shinyApp(ui=ui, server=server)
