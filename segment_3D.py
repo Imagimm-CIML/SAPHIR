@@ -58,13 +58,19 @@ def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float
     return labels
 
 
-def segment_nuclei_cellpose(img_path: str):
-    """ filter and get labeled 3D mask with cellpose
+def segment_cellpose(img, mode: str = 'cyto', do_3D: bool = True):
+    """ filter and get labeled 2D or 3D mask with cellpose
 
     Parameter
     ---------
-    img_path : str
-    path of the image, image should be of shape Z*Y*X
+    img : ndarray
+    image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
+
+    mode : str (defaut = 'cyto')
+    Run either 'cyto' segmentation or 'nuclei' segmentation
+
+    do_3D : bool (defaut = True)
+    specify if the segmentation is done in 3D or in 2D
 
     Return
     ---------
@@ -73,64 +79,84 @@ def segment_nuclei_cellpose(img_path: str):
 
     """
 
-    img3d = imread(img_path, plugin='tifffile')  # read image
-
-    model = models.Cellpose(gpu=False, model_type='cyto', torch=True)
+    model = models.Cellpose(gpu=False, model_type=mode, torch=True)
     channels = [0, 0]
-    masks, flows, styles, diams = model.eval(img3d, diameter=None, channels=channels, do_3D=True, z_axis=0)
+    masks, flows, styles, diams = model.eval(img, diameter=None, channels=channels, do_3D=do_3D)
 
     return masks
 
 
-def rois_archive(img_label, rois_path: str, filename: str = 'ROIset'):
+def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: bool = True):
     """ save ROIs archive, ROIs are recovered from their most representative Z (plane)
 
     saved to filename + '.zip'
 
-    Parameters
+    Parameter
     ---------
-    img_label : 3D array with labeled objects, image should be of shape Z*Y*X
+    img_label : 2D or 3D array with labeled objects, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
     rois_path : str
     where the archive will be saved
 
     filename : str (optional, defaut = 'ROIset')
     name of archive
+
+    do_3D : bool (defaut = True)
+    specify if img_label is 3D or 2D array
+
     """
 
-    """ find areas of each label for every Z """
-    dico = {}
-    for z in range(0, img_label.shape[0]):
-        props = regionprops(img_label[z, :, :])
-        for obj in props:
-            if obj.label not in dico:
-                dico[obj.label] = {}
-            dico[obj.label][z] = obj.area
-    dico = sorted(dico.items(), key=lambda t: t[0])
+    """ find areas of each label for every Z if 3D array"""
+    if do_3D == True:
+        dico = {}
+        for z in range(0, img_label.shape[0]):
+            props = regionprops(img_label[z, :, :])
+            for obj in props:
+                if obj.label not in dico:
+                    dico[obj.label] = {}
+                dico[obj.label][z] = obj.area
+        dico = sorted(dico.items(), key=lambda t: t[0])
 
-    """ find the most representative Z for each label """
-    typical_z = []
-    for label in dico:
-        maxi = max(label[1].items(), key=operator.itemgetter(1))[0]
-        typical_z.append(maxi)
+        """ find the most representative Z for each label """
+        typicalZ = []
+        for label in dico:
+            maxi = max(label[1].items(), key=operator.itemgetter(1))[0]
+            typicalZ.append(maxi)
 
-    labels_mask = np.swapaxes(img_label, 1, 2)
+        labels_mask = np.swapaxes(img_label, 1, 2)
 
-    """ save filename.zip at rois_path """
-    directory = rois_path
-    path = Path(directory)
-    path_roi_set = path / filename
-    path_roi_set.mkdir(parents=True, exist_ok=False)
+        """ save filename.zip at rois_path """
+        directory = rois_path
+        path = Path(directory)
+        pathROIset = path / filename
+        pathROIset.mkdir(parents=True, exist_ok=False)
 
-    for i, value in enumerate(typical_z, np.unique(labels_mask)[1]):
-        contour = find_contours(labels_mask[value, :, :] == i, level=0)
-        roi = ImagejRoi.frompoints(contour[0])
-        roi.tofile(f'roi_{i:04d}.roi')
-        filepath = str(path / f'roi_{i:04d}.roi')
-        shutil.move(filepath, path_roi_set)
+        for i, value in enumerate(typicalZ, np.unique(labels_mask)[1]):
+            contour = find_contours(labels_mask[value, :, :] == i, level=0)
+            roi = ImagejRoi.frompoints(contour[0])
+            roi.tofile(f'roi_{i:04d}.roi')
+            filepath = str(path / f'roi_{i:04d}.roi')
+            shutil.move(filepath, pathROIset)
 
-    shutil.make_archive(filename, 'zip', filename)
-    shutil.rmtree(path / filename)
+        shutil.make_archive(filename, 'zip', filename)
+        shutil.rmtree(path / filename)
+
+    else:
+        labels_mask = np.swapaxes(img_label, 0, 1)
+        directory = rois_path
+        path = Path(directory)
+        pathROIset = path / filename
+        pathROIset.mkdir(parents=True, exist_ok=False)
+
+        for i in np.unique(labels_mask)[1:]:
+            contour = find_contours(labels_mask == i, level=0)
+            roi = ImagejRoi.frompoints(contour[0])
+            roi.tofile(f'roi_{i:04d}.roi')
+            filepath = str(path / f'roi_{i:04d}.roi')
+            shutil.move(filepath, pathROIset)
+
+        shutil.make_archive(filename, 'zip', filename)
+        shutil.rmtree(path / filename)
 
 
 def result_file(img_label, channel0, channel1, result_path: str, filename: str = 'result'):
@@ -166,25 +192,4 @@ def result_file(img_label, channel0, channel1, result_path: str, filename: str =
               header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
 
 
-img_path = 'mask-19juil05a_12Z.tif'
-res_watershed = segment_nuclei_watershed(img_path)
-print(len(np.unique(res_watershed)))
-print(res_watershed.shape)
 
-img_path = 'mask-19juil05a_12Z.tif'
-res_cellpose = segment_nuclei_cellpose(img_path)
-print(len(np.unique(res_cellpose)))
-print(res_cellpose.shape)
-
-img_path = 'mask-19juil05a_12Z.tif'
-res_cellpose = segment_nuclei_cellpose(img_path)  # 25 min
-print(len(np.unique(res_cellpose)))
-print(res_cellpose.shape)
-
-img = imread('C3-19juil05a_12Z.tif', as_gray=False, plugin='tifffile')
-img_label = res_cellpose
-channel0 = img[:, :, :, 0]  # Z Y X C
-channel1 = img[:, :, :, 1]
-result_path = ''
-filename = 'result_cellpose'
-res_result = result_file(img_label, channel0, channel1, result_path, filename)

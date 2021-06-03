@@ -1,6 +1,6 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc","dbscan") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc","dbscan","reticulate") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -28,6 +28,18 @@ library(shinyFiles)
 library(shinyWidgets)
 library(fpc)
 library(dbscan)
+library(reticulate)
+
+
+# environnment to use
+reticulate::use_condaenv("envStageM1", required = TRUE)
+
+#see python versions and environments
+#reticulate::py_config()
+
+# path to the python script
+reticulate::source_python('/home/anna/Documents/cours/M1/Stage/SAPHIR/segment_3D.py', convert = FALSE)
+
 
 # User interface 
 ui <- dashboardPage(
@@ -130,19 +142,29 @@ ui <- dashboardPage(
       ## Tab Segmentation
       tabItem(tabName = "seg",
               fluidRow(
-                box(width = 6, solidHeader = TRUE, status = "primary", title = "Parameters",
-                    helpText("Select the image you want to analyse. (Format .tif)"),
-                    fileInput("seg_imgFile", "Choose Image", multiple = FALSE),
-                    uiOutput("seg_channel"),
-                    uiOutput("seg_frame"),
-                    checkboxInput("seg_brightnessImg", "Enhance brightness in image"),
-                    uiOutput("seg_brightnessSlider"),
-                    withSpinner(EBImage::displayOutput("seg_img")),
-                    radioButtons("seg_algo", "Choose segmentation algorithm : ", choices = c("Watershed", "Cellpose"), selected = "Watershed"),
-                    uiOutput("seg_ws"),
-                    uiOutput("seg_cp"))
-              )
-      ),
+                column(width = 6,
+                       box(width = NULL, solidHeader = TRUE, status = "primary", title = "Parameters",
+                           helpText("Select the image you want to analyse. (Format .tif)"),
+                           fileInput("seg_imgFile", "Choose Image", multiple = FALSE),
+                           verbatimTextOutput("test"),
+                           uiOutput("seg_channel"),
+                           uiOutput("seg_frame"),
+                           checkboxInput("seg_brightnessImg", "Enhance brightness in image"),
+                           uiOutput("seg_brightnessSlider"),
+                           withSpinner(EBImage::displayOutput("seg_img")),
+                           tags$br(),
+                           radioButtons("seg_algo", "Choose segmentation algorithm : ", choices = c("Watershed", "Cellpose"), selected = "Watershed")
+                                  )
+                              ),
+                column (width=6,
+                        uiOutput("seg_algo_para"),
+                       
+                        box(width = NULL, solidHeader = TRUE, status = "primary", title = "View segmentation",
+                            uiOutput("seg_ws_display"),
+                            uiOutput("seg_cp_display"))
+                        )
+                )
+              ),
       ## Tab Clustering
       tabItem(tabName = "clustering",
               fluidRow(
@@ -165,6 +187,7 @@ ui <- dashboardPage(
                            tableOutput('clustering_table')
                        )
                 )
+              )
               ),
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
@@ -329,15 +352,11 @@ ui <- dashboardPage(
                         )
                 )
               )
-      ),
+      )
       )
       
     ) 
   )
-)
-
-
-
 
 
 server <- function(input, output, session) {
@@ -351,7 +370,7 @@ server <- function(input, output, session) {
   # Reactive variables
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
-  seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL)
+  seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL, mask_cp=NULL, mask_ws= NULL)
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
@@ -946,6 +965,82 @@ server <- function(input, output, session) {
                  })
                })
   
+  observe({req(seg$actualImg)
+    if (input$seg_algo== "Watershed"){
+      output$seg_algo_para <- renderUI(
+        tagList(
+          box(width= NULL,solidHeader = TRUE, status = "primary", title = "Watershed segmentation parameters",
+              sliderInput("seg_sigma", "Standard deviation for gaussian filter : ", value = 2, min = 0, max = 20, step = 0.1),
+              sliderInput("seg_threshold","Threshold : ", value = 25, min = 0, max = 100, step = 0.1 ),
+              sliderInput("seg_min_size","Size of the smallest allowable object : ", value = 45, min = 0, max = 200, step = 0.1 ),
+              actionButton("seg_ws","Run segmentation")
+          )
+
+      )
+      )
+    }
+    else {
+      output$seg_algo_para <- renderUI(
+        tagList(
+          box(width = NULL, solidHeader = TRUE, status = "primary", title = "Cellpose segmentation parameter",
+          selectInput("seg_cp_mode","Select cellpose model : ", choices = list("nuclei segmentation" = 'nuclei', "cytoplasm segmentation" = 'cyto'), selected = 'cyto'),
+          actionButton("seg_cp","Run segmentation")
+        )
+        )
+      )
+    }
+    })
+
+  observeEvent(eventExpr = input$seg_imgFile,
+               handlerExpr = output$test <- renderText(paste(as.character(dim(seg$imgToSegment))))
+               )
+
+
+  observeEvent(eventExpr= {
+    input$seg_imgFile
+    input$seg_channel_in
+    input$seg_frame_in
+    seg$imgFrame
+    seg$imgChan
+    #seg$img
+  },
+  handlerExpr={
+    req(seg$imgPath, seg$imgChan, seg$nFrame)
+    if(seg$nFrame > 1) {
+      img <- read_tif(seg$imgPath)
+      mask <- aperm(img, c(3,4,2,1))
+      seg$imgToSegment <- mask[seg$imgChan,,,] # Z Y X
+    }
+    else if (seg$nFrame==1){
+      img <- read_tif(seg$imgPath)
+      mask <- aperm(img, c(3,4,2,1))
+      seg$imgToSegment <- img[1,seg$imgChan,,] # Y X
+    }
+    }
+  )
+
+  observeEvent(eventExpr = {input$seg_cp},
+               handlerExpr = {req(input$seg_cp,input$seg_cp_mode)
+                 if (seg$nFrame == 1){
+                 mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
+                 rois_cp <- ROIS_archive()
+                 }
+                 else {mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
+                 }
+                 }
+               )
+  
+  
+  observeEvent(eventExpr =  )
+  # 
+  # observeEvent(eventExpr = {input$seg_ws},
+  #              handlerExpr = {req(input$seg_ws,input$seg_sigma,input$seg_threshold,input$seg_min_size)
+  #                mask_ws <- segment_watershed(seg$imgPNG,input$seg_sigma,input$seg_threshold,input$seg_min_size)
+  #              })
+  
+
+
+  
   #=============================================================================
   
   ### MENU CLUSTERING
@@ -984,6 +1079,7 @@ server <- function(input, output, session) {
                  
                  output$clustering_table <- renderTable({cluster_data})
                })
+  
   
   #=============================================================================
   
