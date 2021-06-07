@@ -29,7 +29,7 @@ library(shinyWidgets)
 library(fpc)
 library(dbscan)
 library(reticulate)
-
+np <- import("numpy", convert=FALSE)
 
 # environnment to use
 reticulate::use_condaenv("envStageM1", required = TRUE)
@@ -153,18 +153,15 @@ ui <- dashboardPage(
                            uiOutput("seg_brightnessSlider"),
                            withSpinner(EBImage::displayOutput("seg_img")),
                            tags$br(),
-                           radioButtons("seg_algo", "Choose segmentation algorithm : ", choices = c("Watershed", "Cellpose"), selected = "Watershed")
+                           radioButtons("seg_algo", "Choose segmentation algorithm : ", choices = c("Cellpose","Watershed"), selected = "Cellpose")
                                   )
                               ),
                 column (width=6,
                         uiOutput("seg_algo_para"),
-                       
-                        box(width = NULL, solidHeader = TRUE, status = "primary", title = "View segmentation",
-                            uiOutput("seg_ws_display"),
-                            uiOutput("seg_cp_display"))
+                        uiOutput("seg_mask_display"),
+                        uiOutput("seg_load_files"))
                         )
-                )
-              ),
+                ),
       ## Tab Clustering
       tabItem(tabName = "clustering",
               fluidRow(
@@ -370,7 +367,8 @@ server <- function(input, output, session) {
   # Reactive variables
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
-  seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL, mask_cp=NULL, mask_ws= NULL)
+  seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
+                        maskFrame =1, maskToDisplay =NULL)
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
@@ -870,8 +868,8 @@ server <- function(input, output, session) {
                    seg$nChan <- dim(seg$img[[1]])[3] # number of channel on the image
                  }
                })
-  # Observer which modify the actual image of each menu depending on the actual frame selected
   
+  # Observer which modify the actual image of each menu depending on the actual frame selected
   observe({req(input$seg_imgFile)
     if (seg$nFrame > 1) {
       seg$actualImg <- seg$img[[seg$imgFrame]]
@@ -897,7 +895,7 @@ server <- function(input, output, session) {
     radioGroupButtons(inputId = "seg_channel_in", label = "Channel to segment", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE)
   })
   
-  # # Modification of channel when modification of channel slider
+  # Modification of channel when modification of channel slider
   observeEvent(eventExpr=input$seg_channel_in,
                handlerExpr={seg$imgChan = as.numeric(input$seg_channel_in)})
   
@@ -956,6 +954,7 @@ server <- function(input, output, session) {
       seg$imgPNG <- EBImage::readImage(out) # read the PNG image
     }}, ignoreNULL=FALSE)
   
+  # display image
   observeEvent(eventExpr =
                  {seg$imgPNG},
                handlerExpr = {
@@ -965,6 +964,7 @@ server <- function(input, output, session) {
                  })
                })
   
+  # define watershed and cellpose parameters
   observe({req(seg$actualImg)
     if (input$seg_algo== "Watershed"){
       output$seg_algo_para <- renderUI(
@@ -991,21 +991,26 @@ server <- function(input, output, session) {
     }
     })
 
-  observeEvent(eventExpr = input$seg_imgFile,
-               handlerExpr = output$test <- renderText(paste(as.character(dim(seg$imgToSegment))))
-               )
+  observeEvent(eventExpr = {seg$imgFrame
+    input$seg_channel_in
+    seg$imgChan
+    input$seg_cp
+    seg$maskFrame
+    },
+    handlerExpr = output$test <- renderText(paste(dim(seg$maskToDisplay)))
+  )
 
-
+  # resize matrix for python
   observeEvent(eventExpr= {
     input$seg_imgFile
     input$seg_channel_in
     input$seg_frame_in
     seg$imgFrame
     seg$imgChan
-    #seg$img
+    seg$img
   },
   handlerExpr={
-    req(seg$imgPath, seg$imgChan, seg$nFrame)
+    req(seg$imgPath, seg$imgChan, seg$nFrame, seg$imgChan)
     if(seg$nFrame > 1) {
       img <- read_tif(seg$imgPath)
       mask <- aperm(img, c(3,4,2,1))
@@ -1013,32 +1018,94 @@ server <- function(input, output, session) {
     }
     else if (seg$nFrame==1){
       img <- read_tif(seg$imgPath)
-      mask <- aperm(img, c(3,4,2,1))
-      seg$imgToSegment <- img[1,seg$imgChan,,] # Y X
+      mask <- img[,,seg$imgChan,1]
+      seg$imgToSegment <- aperm(mask, c(2,1))# Y X
     }
     }
   )
-
+  
+  # run segmentation
   observeEvent(eventExpr = {input$seg_cp},
-               handlerExpr = {req(input$seg_cp,input$seg_cp_mode)
+               handlerExpr = {req(input$seg_cp,input$seg_cp_mode, seg$maskFrame)
                  if (seg$nFrame == 1){
-                 mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
-                 rois_cp <- ROIS_archive()
+                   # seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
+                   seg$mask_cp <- np$load('data.npy')
+                   maskTo = py_to_r(seg$mask_cp)
                  }
-                 else {mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
+                 else {
+                   #seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
+                   seg$mask_cp <- np$load("data3D.npy")
+                   maskTo = py_to_r(seg$mask_cp)
                  }
-                 }
+                 
+               }
+  )
+
+  # Modification of frame when modification of frame slider (mask)
+  observeEvent(eventExpr={input$seg_mask_frame_UI},
+    handlerExpr={
+      if (seg$nFrame > 1) {
+        seg$maskFrame <- as.numeric(input$seg_mask_frame_UI)
+                 }}
                )
   
-  
-  observeEvent(eventExpr =  )
-  # 
-  # observeEvent(eventExpr = {input$seg_ws},
-  #              handlerExpr = {req(input$seg_ws,input$seg_sigma,input$seg_threshold,input$seg_min_size)
-  #                mask_ws <- segment_watershed(seg$imgPNG,input$seg_sigma,input$seg_threshold,input$seg_min_size)
-  #              })
+  observeEvent(eventExpr = {!is.null(seg$maskToDisplay)},
+    handlerExpr = {req(seg$nFrame,input$seg_algo)
+    if (input$seg_algo== "Cellpose"){
+      if(seg$nFrame ==1){
+      output$seg_mask_display <- renderUI(
+        tagList(
+          box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
+           withSpinner(EBImage::displayOutput("mask_cp_2D"))))
+      )}
+      else {
+        output$seg_mask_display <- renderUI(
+          tagList(
+            box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
+              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE),
+              withSpinner(EBImage::displayOutput("mask_cp_3D")))))
+      }
+    }
+    if (input$seg_algo== "Watershed"){
+      if(seg$nFrame ==1){
+        output$seg_mask_display <- renderUI(
+          tagList(
+            box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
+              withSpinner(EBImage::displayOutput("mask_ws_2D")))))
+      }
+      else {
+        output$seg_mask_display <- renderUI(
+          tagList(
+            box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
+              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE),
+              withSpinner(EBImage::displayOutput("mask_ws_3D")))))
+      }
+    }
+  })
   
 
+  observeEvent(eventExpr = {input$seg_cp
+    input$seg_ws
+    seg$maskToDisplay
+    seg$maskFrame
+    input$seg_mask_frame_UI},
+               handlerExpr = {req(seg$maskToDisplay, seg$nFrame)
+                 if (seg$nFrame == 1) {
+                   seg$maskToDisplay <- colorLabels(maskTo)
+                   output$mask_cp_2D <- EBImage::renderDisplay({
+                     req(!is.null(seg$maskToDisplay))
+                     EBImage::display(seg$maskToDisplay, method ='browser')
+                   })
+                 }
+                 else {
+                   seg$maskToDisplay <- colorLabels(maskTo[seg$maskFrame,,])
+                   output$mask_cp_3D <- EBImage::renderDisplay({
+                     req(!is.null(seg$maskToDisplay))
+                     EBImage::display(seg$maskToDisplay, method ='browser')
+                   })
+                 }
+               }
+  )
 
   
   #=============================================================================

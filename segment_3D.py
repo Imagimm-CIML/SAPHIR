@@ -1,6 +1,7 @@
 import operator
 import shutil
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import skimage.filters
@@ -79,7 +80,7 @@ def segment_cellpose(img, mode: str = 'cyto', do_3D: bool = True):
 
     """
 
-    model = models.Cellpose(gpu=False, model_type=mode, torch=True)
+    model = models.Cellpose(gpu=False, model_type=mode, torch = True)
     channels = [0, 0]
     masks, flows, styles, diams = model.eval(img, diameter=None, channels=channels, do_3D=do_3D)
 
@@ -190,6 +191,3 @@ def result_file(img_label, channel0, channel1, result_path: str, filename: str =
     df = pd.DataFrame(region0)
     df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
               header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
-
-
-
