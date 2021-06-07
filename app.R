@@ -32,7 +32,7 @@ library(reticulate)
 np <- import("numpy", convert=FALSE)
 
 # environnment to use
-reticulate::use_condaenv("envStageM1", required = TRUE)
+reticulate::use_condaenv("envStageM1", required = FALSE)
 
 #see python versions and environments
 #reticulate::py_config()
@@ -368,7 +368,7 @@ server <- function(input, output, session) {
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
   seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
-                        maskFrame =1, maskToDisplay =NULL)
+                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL)
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
@@ -973,7 +973,7 @@ server <- function(input, output, session) {
               sliderInput("seg_sigma", "Standard deviation for gaussian filter : ", value = 2, min = 0, max = 20, step = 0.1),
               sliderInput("seg_threshold","Threshold : ", value = 25, min = 0, max = 100, step = 0.1 ),
               sliderInput("seg_min_size","Size of the smallest allowable object : ", value = 45, min = 0, max = 200, step = 0.1 ),
-              actionButton("seg_ws","Run segmentation")
+              actionButton("seg_run","Run segmentation")
           )
 
       )
@@ -984,20 +984,17 @@ server <- function(input, output, session) {
         tagList(
           box(width = NULL, solidHeader = TRUE, status = "primary", title = "Cellpose segmentation parameter",
           selectInput("seg_cp_mode","Select cellpose model : ", choices = list("nuclei segmentation" = 'nuclei', "cytoplasm segmentation" = 'cyto'), selected = 'cyto'),
-          actionButton("seg_cp","Run segmentation")
+          actionButton("seg_run","Run segmentation")
         )
         )
       )
     }
     })
 
-  observeEvent(eventExpr = {seg$imgFrame
-    input$seg_channel_in
-    seg$imgChan
+  observeEvent(eventExpr = {
     input$seg_cp
-    seg$maskFrame
     },
-    handlerExpr = output$test <- renderText(paste(dim(seg$maskToDisplay)))
+    handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
   )
 
   # resize matrix for python
@@ -1025,17 +1022,15 @@ server <- function(input, output, session) {
   )
   
   # run segmentation
-  observeEvent(eventExpr = {input$seg_cp},
-               handlerExpr = {req(input$seg_cp,input$seg_cp_mode, seg$maskFrame)
+  observeEvent(eventExpr = {input$seg_run},
+               handlerExpr = {req(input$seg_cp_mode, seg$maskFrame, !is.null(seg$imgToSegment))
                  if (seg$nFrame == 1){
                    # seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
                    seg$mask_cp <- np$load('data.npy')
-                   maskTo = py_to_r(seg$mask_cp)
                  }
                  else {
                    #seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
                    seg$mask_cp <- np$load("data3D.npy")
-                   maskTo = py_to_r(seg$mask_cp)
                  }
                  
                }
@@ -1049,10 +1044,11 @@ server <- function(input, output, session) {
                  }}
                )
   
-  observeEvent(eventExpr = {!is.null(seg$maskToDisplay)},
+  # what to dispay depending on the segmentation algorithm and the number of frame
+  observeEvent(eventExpr = {input$seg_run},
     handlerExpr = {req(seg$nFrame,input$seg_algo)
     if (input$seg_algo== "Cellpose"){
-      if(seg$nFrame ==1){
+      if(seg$nFrame == 1){
       output$seg_mask_display <- renderUI(
         tagList(
           box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
@@ -1062,12 +1058,12 @@ server <- function(input, output, session) {
         output$seg_mask_display <- renderUI(
           tagList(
             box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
-              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE),
+              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$maskFrame, justified=TRUE),
               withSpinner(EBImage::displayOutput("mask_cp_3D")))))
       }
     }
     if (input$seg_algo== "Watershed"){
-      if(seg$nFrame ==1){
+      if(seg$nFrame == 1){
         output$seg_mask_display <- renderUI(
           tagList(
             box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
@@ -1077,37 +1073,70 @@ server <- function(input, output, session) {
         output$seg_mask_display <- renderUI(
           tagList(
             box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
-              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE),
+              radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$maskFrame, justified=TRUE),
               withSpinner(EBImage::displayOutput("mask_ws_3D")))))
       }
     }
   })
   
-
-  observeEvent(eventExpr = {input$seg_cp
-    input$seg_ws
-    seg$maskToDisplay
+  observeEvent( {
     seg$maskFrame
-    input$seg_mask_frame_UI},
-               handlerExpr = {req(seg$maskToDisplay, seg$nFrame)
+  }
+  ,{
+    if (seg$nFrame > 1) {
+      seg$maskToDisplay <- colorLabels(seg$maskTo[seg$maskFrame,,])
+    }
+  })
+  
+  # display the segmented mask
+  # rajouter if avec si seg_run ws
+  observeEvent(eventExpr = {input$seg_run
+    
+    #seg$maskFrame
+    # input$seg_mask_frame_UI
+    },
+               handlerExpr = {req( seg$nFrame)
                  if (seg$nFrame == 1) {
-                   seg$maskToDisplay <- colorLabels(maskTo)
+                   seg$maskTo = py_to_r(seg$mask_cp)
+                   seg$maskToDisplay <- colorLabels(seg$maskTo)
                    output$mask_cp_2D <- EBImage::renderDisplay({
-                     req(!is.null(seg$maskToDisplay))
+                     #req(!is.null(seg$maskToDisplay))
                      EBImage::display(seg$maskToDisplay, method ='browser')
                    })
                  }
                  else {
-                   seg$maskToDisplay <- colorLabels(maskTo[seg$maskFrame,,])
+                   seg$maskTo = py_to_r(seg$mask_cp)
+                   seg$maskToDisplay <- colorLabels(seg$maskTo[seg$maskFrame,,])
                    output$mask_cp_3D <- EBImage::renderDisplay({
-                     req(!is.null(seg$maskToDisplay))
+                     req(seg$maskFrame)
                      EBImage::display(seg$maskToDisplay, method ='browser')
                    })
                  }
                }
   )
 
+  observe({
+    req(input$seg_run)
+    output$seg_load_files <- renderUI(
+      tagList(
+        box(width = NULL,  solidHeader = TRUE, status = "primary", title = "SAPHIR files",
+            textInput("seg_rois_filename", "Name your ROIset archive :", value='ROIset'),
+            actionButton('seg_download_rois', 'Save ROIset'),
+            
+            radioGroupButtons("seg_channel1", "Choose first channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
+            radioGroupButtons("seg_channel2", "Choose second channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
+            actionButton('seg_download_result', 'Save result file')
+            )))
+  })
   
+  observeEvent(eventExpr = input$seg_download_rois,
+               handlerExpr = {
+                 if (seg$nFrame == 1){
+                   ROIs_archive(seg$mask_cp, '/home/anna/Documents/cours/M1/Stage/python', input$seg_rois_filename,do_3D=FALSE)
+                 }
+
+               })
+
   #=============================================================================
   
   ### MENU CLUSTERING
