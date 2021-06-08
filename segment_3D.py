@@ -1,7 +1,6 @@
 import operator
 import shutil
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import skimage.filters
@@ -39,14 +38,14 @@ def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float
 
     """
 
-    img3d = imread(img_path, plugin='tifffile')  # read image
+    img3d = imread(img_path, plugin='tifffile')
 
-    img_filter = skimage.filters.gaussian(img3d, sigma, preserve_range=True, multichannel=False)  # gaussian filter
+    img_filter = skimage.filters.gaussian(img3d, sigma, preserve_range=True, multichannel=False)
 
     masks = []
     for z in range(0, img_filter.shape[0]):
-        mask = img_filter[z, :, :] > threshold  # apply threshold to create 3D mask
-        mask = ndimage.binary_fill_holes(mask)  # fill holes
+        mask = img_filter[z, :, :] > threshold  # 3D binary boolean mask
+        mask = ndimage.binary_fill_holes(mask)
         mask = remove_small_objects(mask.astype(bool), min_size)  # remove small objects
         masks.append(mask)
     mask3d = np.stack(masks)
@@ -59,19 +58,13 @@ def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float
     return labels
 
 
-def segment_cellpose(img, mode: str = 'cyto', do_3D: bool = True):
-    """ filter and get labeled 2D or 3D mask with cellpose
+def segment_nuclei_cellpose(img_path: str):
+    """ filter and get labeled 3D mask with cellpose
 
     Parameter
     ---------
-    img : ndarray
-    image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
-
-    mode : str (defaut = 'cyto')
-    Run either 'cyto' segmentation or 'nuclei' segmentation
-
-    do_3D : bool (defaut = True)
-    specify if the segmentation is done in 3D or in 2D
+    img_path : str
+    path of the image, image should be of shape Z*Y*X
 
     Return
     ---------
@@ -80,9 +73,11 @@ def segment_cellpose(img, mode: str = 'cyto', do_3D: bool = True):
 
     """
 
-    model = models.Cellpose(gpu=False, model_type=mode, torch = True)
+    img3d = imread(img_path, plugin='tifffile')
+
+    model = models.Cellpose(gpu=False, model_type='cyto', torch=True)
     channels = [0, 0]
-    masks, flows, styles, diams = model.eval(img, diameter=None, channels=channels, do_3D=do_3D)
+    masks, flows, styles, diams = model.eval(img3d, diameter=None, channels=channels, do_3D=True, z_axis=0)
 
     return masks
 
@@ -111,7 +106,7 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: boo
     if do_3D == True:
         dico = {}
         for z in range(0, img_label.shape[0]):
-            props = regionprops(img_label[z, :, :])
+            props = regionprops(img_label[z, :, :].astype(int))
             for obj in props:
                 if obj.label not in dico:
                     dico[obj.label] = {}
@@ -132,15 +127,15 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: boo
         pathROIset = path / filename
         pathROIset.mkdir(parents=True, exist_ok=False)
 
-        for i, value in enumerate(typicalZ, np.unique(labels_mask)[1]):
+        for i, value in enumerate(typicalZ, np.unique(labels_mask.astype(int))[1]):
             contour = find_contours(labels_mask[value, :, :] == i, level=0)
             roi = ImagejRoi.frompoints(contour[0])
-            roi.tofile(f'roi_{i:04d}.roi')
+            roi.tofile(str(path) + '/' + f'roi_{i:04d}.roi')
             filepath = str(path / f'roi_{i:04d}.roi')
             shutil.move(filepath, pathROIset)
 
-        shutil.make_archive(filename, 'zip', filename)
-        shutil.rmtree(path / filename)
+        shutil.make_archive(str(path) + '/' + filename, 'zip', str(path) + '/' + filename)
+        shutil.rmtree(str(path) + '/' + filename)
 
     else:
         labels_mask = np.swapaxes(img_label, 0, 1)
@@ -152,12 +147,12 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: boo
         for i in np.unique(labels_mask)[1:]:
             contour = find_contours(labels_mask == i, level=0)
             roi = ImagejRoi.frompoints(contour[0])
-            roi.tofile(f'roi_{i:04d}.roi')
+            roi.tofile(str(path) + '/' + f'roi_{i:04d}.roi')
             filepath = str(path / f'roi_{i:04d}.roi')
             shutil.move(filepath, pathROIset)
 
-        shutil.make_archive(filename, 'zip', filename)
-        shutil.rmtree(path / filename)
+        shutil.make_archive(str(path) + '/' + filename, 'zip', str(path) + '/' + filename)
+        shutil.rmtree(str(path) + '/' + filename)
 
 
 def result_file(img_label, channel0, channel1, result_path: str, filename: str = 'result'):
@@ -191,3 +186,27 @@ def result_file(img_label, channel0, channel1, result_path: str, filename: str =
     df = pd.DataFrame(region0)
     df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
               header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
+
+
+# img_path = 'mask-19juil05a_12Z.tif'
+# res_watershed = segment_nuclei_watershed(img_path)
+# print(len(np.unique(res_watershed)))
+# print(res_watershed.shape)
+#
+# img_path = 'mask-19juil05a_12Z.tif'
+# res_cellpose = segment_nuclei_cellpose(img_path)
+# print(len(np.unique(res_cellpose)))
+# print(res_cellpose.shape)
+#
+# img_path = 'mask-19juil05a_12Z.tif'
+# #res_cellpose = segment_nuclei_cellpose(img_path)  # 25 min
+# print(len(np.unique(res_cellpose)))
+# print(res_cellpose.shape)
+#
+# img = imread('C3-19juil05a_12Z.tif', as_gray=False, plugin='tifffile')
+# img_label = res_cellpose
+# channel0 = img[:, :, :, 0]  # Z Y X C
+# channel1 = img[:, :, :, 1]
+# result_path = ''
+# filename = 'result_cellpose'
+# res_result = result_file(img_label, channel0, channel1, result_path, filename)

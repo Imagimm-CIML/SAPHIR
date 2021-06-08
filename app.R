@@ -29,6 +29,7 @@ library(shinyWidgets)
 library(fpc)
 library(dbscan)
 library(reticulate)
+library()
 np <- import("numpy", convert=FALSE)
 
 # environnment to use
@@ -38,7 +39,7 @@ reticulate::use_condaenv("envStageM1", required = FALSE)
 #reticulate::py_config()
 
 # path to the python script
-reticulate::source_python('/home/anna/Documents/cours/M1/Stage/SAPHIR/segment_3D.py', convert = FALSE)
+reticulate::source_python('segment_3D.py', convert = FALSE)
 
 
 # User interface 
@@ -368,7 +369,7 @@ server <- function(input, output, session) {
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
   seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
-                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL)
+                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, roisPath= "", resPath= "")
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
@@ -1120,23 +1121,71 @@ server <- function(input, output, session) {
     output$seg_load_files <- renderUI(
       tagList(
         box(width = NULL,  solidHeader = TRUE, status = "primary", title = "SAPHIR files",
-            textInput("seg_rois_filename", "Name your ROIset archive :", value='ROIset'),
+            # ROIs archive UI
+            helpText('Choose directory where you want to save the ROIs archive'),
+            shinyDirButton('seg_rois_dir', 'Upload directory', title = 'Choose directory where you want to save the ROIs archive'),
+            textOutput("seg_rois_path"),
+            tags$br(),
+            textInput("seg_rois_filename", "Name your ROIs archive :", value='ROIset'),
             actionButton('seg_download_rois', 'Save ROIset'),
-            
+            tags$hr(),
+            # result file UI
+            helpText('Choose directory where you want to save the result file'),
+            shinyDirButton('seg_res_dir', 'Upload directory', title = 'Choose directory where you want to save the result file'),
+            textOutput("seg_res_path"),
+            tags$br(),
             radioGroupButtons("seg_channel1", "Choose first channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
             radioGroupButtons("seg_channel2", "Choose second channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
-            actionButton('seg_download_result', 'Save result file')
+            textInput("seg_res_filename", "Name your result file :", value='result'),
+            actionButton('seg_download_res', 'Save result file')
             )))
   })
+
+  if (.Platform$OS.type=="unix") {
+    roots = c(home='/')
+  }
+  else if (.Platform$OS.type=="windows") {
+    roots = c(home='C:')
+  }
+  
+  shinyDirChoose(input, 'seg_rois_dir', roots=roots)
+  shinyDirChoose(input, 'seg_res_dir', roots=roots)
+  
+  observeEvent(eventExpr=input$seg_rois_dir, 
+               handlerExpr={
+                 seg$roisPath <- normalizePath(parseDirPath(roots, input$seg_rois_dir), winslash="/")
+                 output$seg_rois_path <- renderText({
+                     paste("You are going to download ROIs archive at : ", seg$roisPath,"/", sep="")
+                   })
+               }, ignoreNULL=FALSE)
   
   observeEvent(eventExpr = input$seg_download_rois,
                handlerExpr = {
                  if (seg$nFrame == 1){
-                   ROIs_archive(seg$mask_cp, '/home/anna/Documents/cours/M1/Stage/python', input$seg_rois_filename,do_3D=FALSE)
+                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=FALSE)
                  }
+                 if (seg$nFrame >1){
+                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
+                 }
+                 })
 
-               })
-
+  # observeEvent(eventExpr=input$seg_res_dir, 
+  #              handlerExpr={
+  #                seg$resPath <- normalizePath(parseDirPath(roots, input$seg_res_dir), winslash="/")
+  #                output$seg_res_path <- renderText({
+  #                  paste("You are going to download result file at : ", seg$resPath,"/", sep="")
+  #                })
+  #              }, ignoreNULL=FALSE)
+  # 
+  # observeEvent(eventExpr = input$seg_download_res,
+  #              handlerExpr = {
+  #                if (seg$nFrame == 1){
+  #                  result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
+  #                }
+  #                if (seg$nFrame >1){
+  #                  ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
+  #                }
+  #              })
   #=============================================================================
   
   ### MENU CLUSTERING
