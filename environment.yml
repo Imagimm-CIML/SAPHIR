@@ -3,13 +3,14 @@ channels:
   - pytorch
   - conda-forge
   - anaconda
-  - python
   - defaults
 dependencies:
   - numpy
   - scipy
   - pandas
-  - skimage
+  - python
+  - scikit-learn
+  - pip
   - pip:
     - cellpose
     - path
