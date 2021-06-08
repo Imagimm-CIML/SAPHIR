@@ -8,18 +8,17 @@ from cellpose import models
 from roifile import ImagejRoi
 from scipy import ndimage
 from skimage.feature import peak_local_max
-from skimage.io import imread
 from skimage.measure import find_contours, regionprops
 from skimage.morphology import watershed, remove_small_objects
 
 
-def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float = 25.0, min_size: float = 45.0):
+def segment_watershed(img, sigma: float = 2.0, threshold: float = 25.0, min_size: float = 45.0, do_3d: bool = True):
     """ filter and get labeled 3D mask with a watershed segmentation
 
     Parameters
     ---------
-    img_path : str
-    path of the image, image should be of shape Z*Y*X
+    img : ndarray
+    image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
     sigma : float (optional, defaut = 2.0)
     standard deviation for gaussian filtering
@@ -30,6 +29,8 @@ def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float
     min_size : float (optional, defaut = 45.0)
     the smallest allowable object size
 
+    do_3d : bool (defaut =True)
+    specify if the segmentation is done in 3D or in 2D
 
     Return
     ---------
@@ -37,34 +38,51 @@ def segment_nuclei_watershed(img_path: str, sigma: float = 2.0, threshold: float
     0 = no masks // 1,2,... = mask labels
 
     """
+    if do_3d:
+        img_filter = skimage.filters.gaussian(img, sigma, preserve_range=True, multichannel=False)  # gaussian filter
 
-    img3d = imread(img_path, plugin='tifffile')
+        masks = []
+        for z in range(0, img_filter.shape[0]):
+            mask = img_filter[z, :, :] > threshold
+            mask = ndimage.binary_fill_holes(mask)
+            mask = remove_small_objects(mask.astype(bool), min_size)
+            masks.append(mask)
+        mask3d = np.stack(masks)
 
-    img_filter = skimage.filters.gaussian(img3d, sigma, preserve_range=True, multichannel=False)
+        # watershed segmentation
+        distance = ndimage.distance_transform_edt(mask3d)
+        local_maxi = peak_local_max(distance, indices=False, labels=mask3d)
+        markers = ndimage.label(local_maxi, structure=np.ones((3, 3, 3)))[0]
+        labels = watershed(-distance, markers, mask=mask3d)
 
-    masks = []
-    for z in range(0, img_filter.shape[0]):
-        mask = img_filter[z, :, :] > threshold  # 3D binary boolean mask
+    else:
+        img_filter = skimage.filters.gaussian(img, sigma, preserve_range=True, multichannel=False)
+        mask = img_filter > threshold
         mask = ndimage.binary_fill_holes(mask)
-        mask = remove_small_objects(mask.astype(bool), min_size)  # remove small objects
-        masks.append(mask)
-    mask3d = np.stack(masks)
+        mask = remove_small_objects(mask.astype(bool), min_size)
 
-    # watershed segmentation
-    distance = ndimage.distance_transform_edt(mask3d)
-    local_maxi = peak_local_max(distance, indices=False, labels=mask3d)
-    markers = ndimage.label(local_maxi, structure=np.ones((3, 3, 3)))[0]
-    labels = watershed(-distance, markers, mask=mask3d)
+        # watershed segmentation
+        distance = ndimage.distance_transform_edt(mask)
+        local_maxi = peak_local_max(distance, indices=False, labels=mask)
+        markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
+        labels = watershed(-distance, markers, mask=mask)
+
     return labels
 
 
-def segment_nuclei_cellpose(img_path: str):
-    """ filter and get labeled 3D mask with cellpose
+def segment_cellpose(img, mode: str = 'cyto', do_3d: bool = True):
+    """ filter and get labeled 2D or 3D mask with cellpose
 
     Parameter
     ---------
-    img_path : str
-    path of the image, image should be of shape Z*Y*X
+    img : ndarray
+    image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
+
+    mode : str (defaut = 'cyto')
+    Run either 'cyto' segmentation or 'nuclei' segmentation
+
+    do_3d : bool (defaut =True)
+    specify if the segmentation is done in 3D or in 2D
 
     Return
     ---------
@@ -73,16 +91,14 @@ def segment_nuclei_cellpose(img_path: str):
 
     """
 
-    img3d = imread(img_path, plugin='tifffile')
-
-    model = models.Cellpose(gpu=False, model_type='cyto', torch=True)
+    model = models.Cellpose(gpu=False, model_type=mode, torch=True)
     channels = [0, 0]
-    masks, flows, styles, diams = model.eval(img3d, diameter=None, channels=channels, do_3D=True, z_axis=0)
+    masks, flows, styles, diams = model.eval(img, diameter=None, channels=channels, do_3D=do_3d, z_axis=0)
 
     return masks
 
 
-def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: bool = True):
+def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3d: bool = True):
     """ save ROIs archive, ROIs are recovered from their most representative Z (plane)
 
     saved to filename + '.zip'
@@ -97,13 +113,13 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3D: boo
     filename : str (optional, defaut = 'ROIset')
     name of archive
 
-    do_3D : bool (defaut = True)
+    do_3d : bool (defaut = True)
     specify if img_label is 3D or 2D array
 
     """
 
     """ find areas of each label for every Z if 3D array"""
-    if do_3D == True:
+    if do_3d:
         dico = {}
         for z in range(0, img_label.shape[0]):
             props = regionprops(img_label[z, :, :].astype(int))
@@ -186,7 +202,6 @@ def result_file(img_label, channel0, channel1, result_path: str, filename: str =
     df = pd.DataFrame(region0)
     df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
               header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
-
 
 # img_path = 'mask-19juil05a_12Z.tif'
 # res_watershed = segment_nuclei_watershed(img_path)

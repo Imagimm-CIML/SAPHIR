@@ -1,6 +1,7 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc","dbscan","reticulate") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc",
+         "dbscan","reticulate","htmltools","rlang") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -29,7 +30,8 @@ library(shinyWidgets)
 library(fpc)
 library(dbscan)
 library(reticulate)
-library()
+library(htmltools)
+library(rlang)
 np <- import("numpy", convert=FALSE)
 
 # environnment to use
@@ -1024,6 +1026,7 @@ server <- function(input, output, session) {
   
   # run segmentation
   observeEvent(eventExpr = {input$seg_run},
+               if(input$seg_algo=="Cellpose"){
                handlerExpr = {req(input$seg_cp_mode, seg$maskFrame, !is.null(seg$imgToSegment))
                  if (seg$nFrame == 1){
                    # seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
@@ -1033,7 +1036,16 @@ server <- function(input, output, session) {
                    #seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
                    seg$mask_cp <- np$load("data3D.npy")
                  }
-                 
+               }}
+               if (input$seg_algo =="Watershed"){
+                 handlerExpr = {req(input$seg_sigma, input$seg_threshold, input$seg_min_size, seg$maskFrame, !is.null(seg$imgToSegment))
+                   if (seg$nFrame == 1){
+                     seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_sigma, input$seg_threshold, input$seg_min_size)
+                   }
+                   else {
+                     seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_cp_mode)
+                   }
+                 }
                }
   )
 
@@ -1045,7 +1057,7 @@ server <- function(input, output, session) {
                  }}
                )
   
-  # what to dispay depending on the segmentation algorithm and the number of frame
+  # what to display depending on the segmentation algorithm and the number of frame
   observeEvent(eventExpr = {input$seg_run},
     handlerExpr = {req(seg$nFrame,input$seg_algo)
     if (input$seg_algo== "Cellpose"){
@@ -1090,13 +1102,9 @@ server <- function(input, output, session) {
   })
   
   # display the segmented mask
-  # rajouter if avec si seg_run ws
-  observeEvent(eventExpr = {input$seg_run
-    
-    #seg$maskFrame
-    # input$seg_mask_frame_UI
-    },
-               handlerExpr = {req( seg$nFrame)
+  observeEvent(eventExpr = {input$seg_run},
+               handlerExpr = {req( seg$nFrame, input$seg_algo)
+                 if (input$seg_algo == "Cellpose"){
                  if (seg$nFrame == 1) {
                    seg$maskTo = py_to_r(seg$mask_cp)
                    seg$maskToDisplay <- colorLabels(seg$maskTo)
@@ -1112,9 +1120,25 @@ server <- function(input, output, session) {
                      req(seg$maskFrame)
                      EBImage::display(seg$maskToDisplay, method ='browser')
                    })
-                 }
-               }
-  )
+                 }}
+                 if(input$seg_algo=="Watershed"){
+                   if (seg$nFrame == 1) {
+                     seg$maskTo = py_to_r(seg$mask_ws)
+                     seg$maskToDisplay <- colorLabels(seg$maskTo)
+                     output$mask_ws_2D <- EBImage::renderDisplay({
+                       #req(!is.null(seg$maskToDisplay))
+                       EBImage::display(seg$maskToDisplay, method ='browser')
+                     })
+                   }
+                   else {
+                     seg$maskTo = py_to_r(seg$mask_ws)
+                     seg$maskToDisplay <- colorLabels(seg$maskTo[seg$maskFrame,,])
+                     output$mask_ws_3D <- EBImage::renderDisplay({
+                       req(seg$maskFrame)
+                       EBImage::display(seg$maskToDisplay, method ='browser')
+                     })
+                   }}
+                 })
 
   observe({
     req(input$seg_run)
@@ -1169,23 +1193,25 @@ server <- function(input, output, session) {
                  }
                  })
 
-  # observeEvent(eventExpr=input$seg_res_dir, 
-  #              handlerExpr={
-  #                seg$resPath <- normalizePath(parseDirPath(roots, input$seg_res_dir), winslash="/")
-  #                output$seg_res_path <- renderText({
-  #                  paste("You are going to download result file at : ", seg$resPath,"/", sep="")
-  #                })
-  #              }, ignoreNULL=FALSE)
-  # 
-  # observeEvent(eventExpr = input$seg_download_res,
-  #              handlerExpr = {
-  #                if (seg$nFrame == 1){
-  #                  result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
-  #                }
-  #                if (seg$nFrame >1){
-  #                  ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
-  #                }
-  #              })
+  observeEvent(eventExpr=input$seg_res_dir,
+               handlerExpr={
+                 seg$resPath <- normalizePath(parseDirPath(roots, input$seg_res_dir), winslash="/")
+                 output$seg_res_path <- renderText({
+                   paste("You are going to download result file at : ", seg$resPath,"/", sep="")
+                 })
+               }, ignoreNULL=FALSE)
+
+  observeEvent(eventExpr = input$seg_download_res,
+               handlerExpr = {
+                 if (seg$nFrame == 1){
+                   result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
+                 }
+                 if (seg$nFrame >1){
+                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
+                 }
+               })
+  
+  
   #=============================================================================
   
   ### MENU CLUSTERING

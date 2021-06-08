@@ -1,0 +1,28 @@
+name: saphir_env
+channels:
+  - pytorch
+  - conda-forge
+  - anaconda
+  - python
+  - defaults
+dependencies:
+  - numpy
+  - scipy
+  - pandas
+  - skimage
+  - pip:
+    - cellpose
+    - path
+    - pip
+    - torch
+    - roifile
+    - Pyqt5
+    - PyQt5.sip
+    - numba
+    - opencv-python-headless
+    - pyqtgraph
+    - natsort
+    - google-cloud-storage
+    - tqdm
+    - tifffile
+    
