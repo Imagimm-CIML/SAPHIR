@@ -35,7 +35,7 @@ library(rlang)
 np <- import("numpy", convert=FALSE)
 
 # environnment to use
-reticulate::use_condaenv("envStageM1", required = FALSE)
+reticulate::use_condaenv("saphir_env", required = FALSE)
 
 #see python versions and environments
 #reticulate::py_config()
@@ -371,7 +371,7 @@ server <- function(input, output, session) {
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
   seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
-                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, roisPath= "", resPath= "")
+                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, roisPath= "", resPath= "", algo= "")
   
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
@@ -976,7 +976,7 @@ server <- function(input, output, session) {
               sliderInput("seg_sigma", "Standard deviation for gaussian filter : ", value = 2, min = 0, max = 20, step = 0.1),
               sliderInput("seg_threshold","Threshold : ", value = 25, min = 0, max = 100, step = 0.1 ),
               sliderInput("seg_min_size","Size of the smallest allowable object : ", value = 45, min = 0, max = 200, step = 0.1 ),
-              actionButton("seg_run","Run segmentation")
+              actionButton("seg_ws","Run segmentation")
           )
 
       )
@@ -987,18 +987,13 @@ server <- function(input, output, session) {
         tagList(
           box(width = NULL, solidHeader = TRUE, status = "primary", title = "Cellpose segmentation parameter",
           selectInput("seg_cp_mode","Select cellpose model : ", choices = list("nuclei segmentation" = 'nuclei', "cytoplasm segmentation" = 'cyto'), selected = 'cyto'),
-          actionButton("seg_run","Run segmentation")
+          actionButton("seg_cp","Run segmentation")
         )
         )
       )
     }
     })
 
-  observeEvent(eventExpr = {
-    input$seg_cp
-    },
-    handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
-  )
 
   # resize matrix for python
   observeEvent(eventExpr= {
@@ -1024,9 +1019,9 @@ server <- function(input, output, session) {
     }
   )
   
-  # run segmentation
-  observeEvent(eventExpr = {input$seg_run},
-               if(input$seg_algo=="Cellpose"){
+  
+  # run cellpose segmentation
+  observeEvent(eventExpr = {input$seg_cp},
                handlerExpr = {req(input$seg_cp_mode, seg$maskFrame, !is.null(seg$imgToSegment))
                  if (seg$nFrame == 1){
                    # seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
@@ -1036,18 +1031,19 @@ server <- function(input, output, session) {
                    #seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
                    seg$mask_cp <- np$load("data3D.npy")
                  }
-               }}
-               if (input$seg_algo =="Watershed"){
-                 handlerExpr = {req(input$seg_sigma, input$seg_threshold, input$seg_min_size, seg$maskFrame, !is.null(seg$imgToSegment))
-                   if (seg$nFrame == 1){
-                     seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_sigma, input$seg_threshold, input$seg_min_size)
-                   }
-                   else {
-                     seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_cp_mode)
-                   }
+               })
+  
+  # run watershed segmentation
+  observeEvent(eventExpr = {input$seg_ws},
+               handlerExpr = {req(input$seg_sigma, input$seg_threshold, input$seg_min_size, seg$maskFrame, !is.null(seg$imgToSegment))
+                 if (seg$nFrame == 1){
+                   seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_sigma, input$seg_threshold, input$seg_min_size, do_3d = FALSE)
                  }
-               }
-  )
+                 else {
+                   seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_sigma, input$seg_threshold, input$seg_min_size, do_3d = TRUE)}
+               })
+                   
+           
 
   # Modification of frame when modification of frame slider (mask)
   observeEvent(eventExpr={input$seg_mask_frame_UI},
@@ -1058,9 +1054,8 @@ server <- function(input, output, session) {
                )
   
   # what to display depending on the segmentation algorithm and the number of frame
-  observeEvent(eventExpr = {input$seg_run},
+  observeEvent(eventExpr = {input$seg_cp},
     handlerExpr = {req(seg$nFrame,input$seg_algo)
-    if (input$seg_algo== "Cellpose"){
       if(seg$nFrame == 1){
       output$seg_mask_display <- renderUI(
         tagList(
@@ -1073,9 +1068,10 @@ server <- function(input, output, session) {
             box(width = NULL,  solidHeader = TRUE, status = "primary", title = "Mask displayer",
               radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$maskFrame, justified=TRUE),
               withSpinner(EBImage::displayOutput("mask_cp_3D")))))
-      }
-    }
-    if (input$seg_algo== "Watershed"){
+      }})
+    
+  observeEvent(eventExpr = {input$seg_ws},
+    handlerExpr = {req(seg$nFrame,input$seg_algo)     
       if(seg$nFrame == 1){
         output$seg_mask_display <- renderUI(
           tagList(
@@ -1089,8 +1085,7 @@ server <- function(input, output, session) {
               radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$maskFrame, justified=TRUE),
               withSpinner(EBImage::displayOutput("mask_ws_3D")))))
       }
-    }
-  })
+    })
   
   observeEvent( {
     seg$maskFrame
@@ -1101,10 +1096,10 @@ server <- function(input, output, session) {
     }
   })
   
+  
   # display the segmented mask
-  observeEvent(eventExpr = {input$seg_run},
-               handlerExpr = {req( seg$nFrame, input$seg_algo)
-                 if (input$seg_algo == "Cellpose"){
+  observeEvent(eventExpr = {input$seg_cp},
+               handlerExpr = {req( seg$nFrame)
                  if (seg$nFrame == 1) {
                    seg$maskTo = py_to_r(seg$mask_cp)
                    seg$maskToDisplay <- colorLabels(seg$maskTo)
@@ -1120,16 +1115,17 @@ server <- function(input, output, session) {
                      req(seg$maskFrame)
                      EBImage::display(seg$maskToDisplay, method ='browser')
                    })
-                 }}
-                 if(input$seg_algo=="Watershed"){
+                 }})
+
+  observeEvent(eventExpr = {input$seg_ws},
+               handlerExpr = {req(seg$nFrame)
                    if (seg$nFrame == 1) {
                      seg$maskTo = py_to_r(seg$mask_ws)
                      seg$maskToDisplay <- colorLabels(seg$maskTo)
                      output$mask_ws_2D <- EBImage::renderDisplay({
                        #req(!is.null(seg$maskToDisplay))
                        EBImage::display(seg$maskToDisplay, method ='browser')
-                     })
-                   }
+                     })}
                    else {
                      seg$maskTo = py_to_r(seg$mask_ws)
                      seg$maskToDisplay <- colorLabels(seg$maskTo[seg$maskFrame,,])
@@ -1137,11 +1133,9 @@ server <- function(input, output, session) {
                        req(seg$maskFrame)
                        EBImage::display(seg$maskToDisplay, method ='browser')
                      })
-                   }}
-                 })
+                   }})
 
-  observe({
-    req(input$seg_run)
+  observe({req(!is.null(seg$maskToDisplay))
     output$seg_load_files <- renderUI(
       tagList(
         box(width = NULL,  solidHeader = TRUE, status = "primary", title = "SAPHIR files",
@@ -1160,7 +1154,7 @@ server <- function(input, output, session) {
             tags$br(),
             radioGroupButtons("seg_channel1", "Choose first channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
             radioGroupButtons("seg_channel2", "Choose second channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
-            textInput("seg_res_filename", "Name your result file :", value='result'),
+            textInput("seg_res_filename", "Name your result file :", value='Result'),
             actionButton('seg_download_res', 'Save result file')
             )))
   })
@@ -1185,13 +1179,28 @@ server <- function(input, output, session) {
   
   observeEvent(eventExpr = input$seg_download_rois,
                handlerExpr = {
+                 if(input$seg_algo== "Cellpose"){
                  if (seg$nFrame == 1){
-                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=FALSE)
+                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3d=FALSE)
                  }
                  if (seg$nFrame >1){
-                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
-                 }
+                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3d=TRUE)
+                 }}
+                 if(input$seg_algo== "Watershed"){
+                   if (seg$nFrame == 1){
+                     ROIs_archive(seg$mask_ws, seg$roisPath, input$seg_rois_filename,do_3d=FALSE)
+                   }
+                   if (seg$nFrame >1){
+                     ROIs_archive(seg$mask_ws, seg$roisPath, input$seg_rois_filename,do_3d=TRUE)
+                   }}
                  })
+  
+  
+  observeEvent(eventExpr = {
+    input$seg_cp
+  },
+  handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
+  )
 
   observeEvent(eventExpr=input$seg_res_dir,
                handlerExpr={
@@ -1201,16 +1210,15 @@ server <- function(input, output, session) {
                  })
                }, ignoreNULL=FALSE)
 
-  observeEvent(eventExpr = input$seg_download_res,
-               handlerExpr = {
-                 if (seg$nFrame == 1){
-                   result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
-                 }
-                 if (seg$nFrame >1){
-                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3D=TRUE)
-                 }
-               })
-  
+  # observeEvent(eventExpr = input$seg_download_res,
+  #              handlerExpr = {
+  #                if (seg$nFrame == 1){
+  #                  result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
+  #                }
+  #                if (seg$nFrame >1){
+  #                }
+  #              })
+  # 
   
   #=============================================================================
   
