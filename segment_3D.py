@@ -17,19 +17,19 @@ def segment_watershed(img, sigma: float = 2.0, threshold: float = 25.0, min_size
 
     Parameters
     ---------
-    img : ndarray
+    img : array
     image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
-    sigma : float (optional, defaut = 2.0)
+    sigma : float (optional, default = 2.0)
     standard deviation for gaussian filtering
 
-    threshold : float (optional, defaut = 25.0)
+    threshold : float (optional, default = 25.0)
     value of pixel intensity to create a binary image
 
-    min_size : float (optional, defaut = 45.0)
+    min_size : float (optional, default = 45.0)
     the smallest allowable object size
 
-    do_3d : bool (defaut =True)
+    do_3d : bool (default =True)
     specify if the segmentation is done in 3D or in 2D
 
     Return
@@ -75,13 +75,13 @@ def segment_cellpose(img, mode: str = 'cyto', do_3d: bool = True):
 
     Parameter
     ---------
-    img : ndarray
+    img : array
     image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
-    mode : str (defaut = 'cyto')
+    mode : str (default = 'cyto')
     Run either 'cyto' segmentation or 'nuclei' segmentation
 
-    do_3d : bool (defaut =True)
+    do_3d : bool (default =True)
     specify if the segmentation is done in 3D or in 2D
 
     Return
@@ -105,15 +105,16 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3d: boo
 
     Parameter
     ---------
-    img_label : 2D or 3D array with labeled objects, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
+    img_label : array
+    2D or 3D array with labeled objects, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
     rois_path : str
     where the archive will be saved
 
-    filename : str (optional, defaut = 'ROIset')
+    filename : str (optional, default = 'ROIset')
     name of archive
 
-    do_3d : bool (defaut = True)
+    do_3d : bool (default = True)
     specify if img_label is 3D or 2D array
 
     """
@@ -171,37 +172,69 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3d: boo
         shutil.rmtree(str(path) + '/' + filename)
 
 
-def result_file(img_label, channel0, channel1, result_path: str, filename: str = 'result'):
+def result_file(img, mask_label, channel0: int = 0, channel1: int = 1, result_path: str = "", filename: str = 'result',
+                do_3d: bool = True):
     """ save ROIs archive, ROIs are recovered from their most representative Z (plane)
 
     saved to filename + '.csv'
 
     Parameters
     ---------
-    img_label : 3D array with labeled objects, image should be of shape Z*Y*X
+    img : array
+    2D or 3D image with at least 3 channels, image should be of shape Y*X*C*Z (if 3D) or Y*X*C (if 2D)
 
-    channel0 : first channel to measure area and mean intensity
+    mask_label : array
+    2D or 3D array with labeled objects, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
-    channel1 : second channel to measure area and mean intensity
+    channel0 : int (default = 0)
+    first channel to measure area and mean intensity
 
-    result_path : str (optional, defaut = 'result')
+    channel1 : int (default=1)
+    second channel to measure area and mean intensity
 
-    filename : str (optional, defaut = 'ROIset')
+    result_path : str (optional, default = 'result')
+
+    filename : str (optional, default = 'ROIset')
     name of file
+
+    do_3d : bool (default = True)
+    specify if img_label is 3D or 2D array
 
     """
 
-    # Generate .csv file with intensities of 2 channels
-    region0 = skimage.measure.regionprops_table(img_label, intensity_image=channel0,
-                                                properties=['label', 'mean_intensity', 'area'])
-    region1 = skimage.measure.regionprops_table(img_label, intensity_image=channel1,
-                                                properties=['label', 'mean_intensity', 'area'])
-    region1['mean_intensity1'] = region1.pop('mean_intensity')
-    region1['area1'] = region1.pop('area')
-    region0.update(region1)
-    df = pd.DataFrame(region0)
-    df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
-              header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
+    if do_3d:
+        chan0 = img[:, :, channel0, :]
+        chan1 = img[:, :, channel1, :]
+        mask_label = mask_label.astype(int)
+
+        # Generate .csv file with intensities of 2 channels
+        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=chan0,
+                                                    properties=['label', 'mean_intensity', 'area'])
+        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=chan1,
+                                                    properties=['label', 'mean_intensity', 'area'])
+        region1['mean_intensity1'] = region1.pop('mean_intensity')
+        region1['area1'] = region1.pop('area')
+        region0.update(region1)
+        df = pd.DataFrame(region0)
+        df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
+                  header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
+
+    else:
+        chan0 = img[:, :, channel0]
+        chan1 = img[:, :, channel1]
+        mask_label = mask_label.astype(int)
+
+        # Generate .csv file with intensities of 2 channels
+        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=chan0,
+                                                    properties=['label', 'mean_intensity', 'area'])
+        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=chan1,
+                                                    properties=['label', 'mean_intensity', 'area'])
+        region1['mean_intensity1'] = region1.pop('mean_intensity')
+        region1['area1'] = region1.pop('area')
+        region0.update(region1)
+        df = pd.DataFrame(region0)
+        df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
+                  header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
 
 # img_path = 'mask-19juil05a_12Z.tif'
 # res_watershed = segment_nuclei_watershed(img_path)

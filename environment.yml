@@ -13,6 +13,7 @@ dependencies:
   - pip
   - pip:
     - cellpose
+    - scikit-image
     - path
     - pip
     - torch

@@ -370,11 +370,13 @@ server <- function(input, output, session) {
   # Reactive variables
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
+  global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
+                           nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
+  
   seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
                         maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, roisPath= "", resPath= "", algo= "")
   
-  global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
-                           nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
+  clustering <- reactiveValues(imgFrame = 1, imgChan = 1, actualImg = NULL, imgPNG = NULL)
   
   plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, imgPNG2=NULL,crops = list(), totalCrops = NULL , subData=NULL, selected=NULL, filtered=NULL)
   
@@ -382,7 +384,7 @@ server <- function(input, output, session) {
   
   annote <- reactiveValues(selected = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL, ID=NULL)
   
-  clustering <- reactiveValues(imgFrame = 1, imgChan = 1, actualImg = NULL, imgPNG = NULL)
+  
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -1218,7 +1220,7 @@ server <- function(input, output, session) {
   #                if (seg$nFrame >1){
   #                }
   #              })
-  # 
+
   
   #=============================================================================
   
