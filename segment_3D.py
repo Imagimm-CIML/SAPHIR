@@ -172,7 +172,7 @@ def ROIs_archive(img_label, rois_path: str, filename: str = 'ROIset', do_3d: boo
         shutil.rmtree(str(path) + '/' + filename)
 
 
-def result_file(img, mask_label, channel0: int = 0, channel1: int = 1, result_path: str = "", filename: str = 'result',
+def result_file(mask_label, channel0, channel1, result_path: str = "", filename: str = 'result',
                 do_3d: bool = True):
     """ save ROIs archive, ROIs are recovered from their most representative Z (plane)
 
@@ -180,17 +180,16 @@ def result_file(img, mask_label, channel0: int = 0, channel1: int = 1, result_pa
 
     Parameters
     ---------
-    img : array
-    2D or 3D image with at least 3 channels, image should be of shape Y*X*C*Z (if 3D) or Y*X*C (if 2D)
-
     mask_label : array
     2D or 3D array with labeled objects, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
-    channel0 : int (default = 0)
+    channel0 : array
     first channel to measure area and mean intensity
+    2D or 3D array, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
-    channel1 : int (default=1)
+    channel1 : array
     second channel to measure area and mean intensity
+    2D or 3D array, image should be of shape Z*Y*X (if 3D) or Y*X (if 2D)
 
     result_path : str (optional, default = 'result')
 
@@ -201,16 +200,13 @@ def result_file(img, mask_label, channel0: int = 0, channel1: int = 1, result_pa
     specify if img_label is 3D or 2D array
 
     """
+    mask_label = mask_label.astype(int)
 
     if do_3d:
-        chan0 = img[:, :, channel0, :]
-        chan1 = img[:, :, channel1, :]
-        mask_label = mask_label.astype(int)
-
         # Generate .csv file with intensities of 2 channels
-        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=chan0,
+        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=channel0,
                                                     properties=['label', 'mean_intensity', 'area'])
-        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=chan1,
+        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=channel1,
                                                     properties=['label', 'mean_intensity', 'area'])
         region1['mean_intensity1'] = region1.pop('mean_intensity')
         region1['area1'] = region1.pop('area')
@@ -220,14 +216,10 @@ def result_file(img, mask_label, channel0: int = 0, channel1: int = 1, result_pa
                   header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
 
     else:
-        chan0 = img[:, :, channel0]
-        chan1 = img[:, :, channel1]
-        mask_label = mask_label.astype(int)
-
-        # Generate .csv file with intensities of 2 channels
-        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=chan0,
+        #Generate .csv file with intensities of 2 channels
+        region0 = skimage.measure.regionprops_table(mask_label, intensity_image=channel0,
                                                     properties=['label', 'mean_intensity', 'area'])
-        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=chan1,
+        region1 = skimage.measure.regionprops_table(mask_label, intensity_image=channel1,
                                                     properties=['label', 'mean_intensity', 'area'])
         region1['mean_intensity1'] = region1.pop('mean_intensity')
         region1['area1'] = region1.pop('area')

@@ -374,7 +374,7 @@ server <- function(input, output, session) {
                            nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
   
   seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL,
-                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, roisPath= "", resPath= "", algo= "")
+                        maskFrame =1, maskToDisplay =NULL, mask_cp = NULL, mask_ws= NULL, maskTo = NULL, Path= "", chan1 = 1, chan2 = 2)
   
   clustering <- reactiveValues(imgFrame = 1, imgChan = 1, actualImg = NULL, imgPNG = NULL)
   
@@ -1142,20 +1142,16 @@ server <- function(input, output, session) {
       tagList(
         box(width = NULL,  solidHeader = TRUE, status = "primary", title = "SAPHIR files",
             # ROIs archive UI
-            helpText('Choose directory where you want to save the ROIs archive'),
-            shinyDirButton('seg_rois_dir', 'Upload directory', title = 'Choose directory where you want to save the ROIs archive'),
-            textOutput("seg_rois_path"),
-            tags$br(),
+            helpText('Choose directory where you want to save the ROIs archive and the result file'),
+            shinyDirButton('seg_dir', 'Upload directory', title = 'Choose directory where you want to save the ROIs archive'),
+            textOutput("seg_path"),
+            tags$hr(),
             textInput("seg_rois_filename", "Name your ROIs archive :", value='ROIset'),
             actionButton('seg_download_rois', 'Save ROIset'),
             tags$hr(),
             # result file UI
-            helpText('Choose directory where you want to save the result file'),
-            shinyDirButton('seg_res_dir', 'Upload directory', title = 'Choose directory where you want to save the result file'),
-            textOutput("seg_res_path"),
-            tags$br(),
-            radioGroupButtons("seg_channel1", "Choose first channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
-            radioGroupButtons("seg_channel2", "Choose second channel on which to generate result file :", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE),
+            radioGroupButtons("seg_channel1", "Choose first channel on which to generate result file :", choices=c(1:seg$nChan), selected=1, justified=TRUE),
+            radioGroupButtons("seg_channel2", "Choose second channel on which to generate result file :", choices=c(1:seg$nChan), selected=2, justified=TRUE),
             textInput("seg_res_filename", "Name your result file :", value='Result'),
             actionButton('seg_download_res', 'Save result file')
             )))
@@ -1168,14 +1164,13 @@ server <- function(input, output, session) {
     roots = c(home='C:')
   }
   
-  shinyDirChoose(input, 'seg_rois_dir', roots=roots)
-  shinyDirChoose(input, 'seg_res_dir', roots=roots)
+  shinyDirChoose(input, 'seg_dir', roots=roots)
   
-  observeEvent(eventExpr=input$seg_rois_dir, 
+  observeEvent(eventExpr=input$seg_dir, 
                handlerExpr={
-                 seg$roisPath <- normalizePath(parseDirPath(roots, input$seg_rois_dir), winslash="/")
-                 output$seg_rois_path <- renderText({
-                     paste("You are going to download ROIs archive at : ", seg$roisPath,"/", sep="")
+                 seg$Path <- normalizePath(parseDirPath(roots, input$seg_dir), winslash="/")
+                 output$seg_path <- renderText({
+                     paste("You are going to download files at : ", seg$Path,"/", sep="")
                    })
                }, ignoreNULL=FALSE)
   
@@ -1183,17 +1178,17 @@ server <- function(input, output, session) {
                handlerExpr = {
                  if(input$seg_algo== "Cellpose"){
                  if (seg$nFrame == 1){
-                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3d=FALSE)
+                   ROIs_archive(seg$mask_cp, seg$Path, input$seg_rois_filename,do_3d=FALSE)
                  }
                  if (seg$nFrame >1){
-                   ROIs_archive(seg$mask_cp, seg$roisPath, input$seg_rois_filename,do_3d=TRUE)
+                   ROIs_archive(seg$mask_cp, seg$Path, input$seg_rois_filename,do_3d=TRUE)
                  }}
                  if(input$seg_algo== "Watershed"){
                    if (seg$nFrame == 1){
-                     ROIs_archive(seg$mask_ws, seg$roisPath, input$seg_rois_filename,do_3d=FALSE)
+                     ROIs_archive(seg$mask_ws, seg$Path, input$seg_rois_filename,do_3d=FALSE)
                    }
                    if (seg$nFrame >1){
-                     ROIs_archive(seg$mask_ws, seg$roisPath, input$seg_rois_filename,do_3d=TRUE)
+                     ROIs_archive(seg$mask_ws, seg$Path, input$seg_rois_filename,do_3d=TRUE)
                    }}
                  })
   
@@ -1203,23 +1198,33 @@ server <- function(input, output, session) {
   },
   handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
   )
-
-  observeEvent(eventExpr=input$seg_res_dir,
+  
+  # Modification of channel when modification of channel slider 
+  observeEvent(eventExpr={input$seg_channel1
+    input$seg_channel2},
                handlerExpr={
-                 seg$resPath <- normalizePath(parseDirPath(roots, input$seg_res_dir), winslash="/")
-                 output$seg_res_path <- renderText({
-                   paste("You are going to download result file at : ", seg$resPath,"/", sep="")
-                 })
-               }, ignoreNULL=FALSE)
+                   seg$chan1 <- as.numeric(input$seg_channel1)
+                   seg$ĉhan2 <- as.numeric(input$seg_channel2)
+                 }
+  )
 
-  # observeEvent(eventExpr = input$seg_download_res,
-  #              handlerExpr = {
-  #                if (seg$nFrame == 1){
-  #                  result_file(seg$mask_cp, seg$resPath, input$seg_res_filename)
-  #                }
-  #                if (seg$nFrame >1){
-  #                }
-  #              })
+  observeEvent(eventExpr = input$seg_download_res,
+               handlerExpr = {req(seg$maskTo)
+                 if (seg$nFrame == 1){
+                   img <- read_tif(seg$imgPath)
+                   C1 <- img[,,seg$chan1,1]
+                   C2 <- img[,,seg$chan2,1]
+                   result_file(seg$maskTo, C1, C2, result_path=seg$Path, filename=input$seg_res_filename, do_3d= FALSE)
+                  }
+                 if (seg$nFrame >1){
+                   img <- read_tif(seg$imgPath)
+                   C1 <- img[,,seg$chan1,]
+                   C1 <- aperm(C1, c(3,1,2))
+                   C2 <- img[,,seg$chan2,]
+                   C2 <- aperm(C2, c(3,1,2))
+                   result_file(seg$maskTo, C1,C2, result_path=seg$Path, filename=input$seg_res_filename, do_3d= TRUE)
+                 }
+               })
 
   
   #=============================================================================
