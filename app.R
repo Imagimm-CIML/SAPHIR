@@ -1,6 +1,6 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
-         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc","dbscan","reticulate") # Necessary packages
+         "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -26,20 +26,6 @@ library(plotly)
 library(V8)
 library(shinyFiles)
 library(shinyWidgets)
-library(fpc)
-library(dbscan)
-library(reticulate)
-
-
-# environnment to use
-reticulate::use_condaenv("envStageM1", required = TRUE)
-
-#see python versions and environments
-#reticulate::py_config()
-
-# path to the python script
-reticulate::source_python('/home/anna/Documents/cours/M1/Stage/SAPHIR/segment_3D.py', convert = FALSE)
-
 
 # User interface 
 ui <- dashboardPage(
@@ -50,13 +36,11 @@ ui <- dashboardPage(
     ## Menu with 3 items
     sidebarMenu(
       id = "menu",
-      menuItem("A) ImageJ segmentation", tabName = "segmentation", icon=icon("images")),
-      menuItem("B) Select your results", tabName = "image", icon=icon("file-import")),
-      menuItem("AB') Segmentation", tabName = "seg", icon = icon("draw-polygon")),
-      menuItem("C) Clustering", tabName = "clustering", icon = icon("arrows-h")),
-      menuItem("D) Plot to image", tabName = "plotToImage", icon = icon("poll")),
-      menuItem("E) Image to plot", tabName = "imageToPlot", icon = icon("image")),
-      menuItem("F) Annotate your data", tabName = "annotation", icon = icon("edit"))
+      menuItem("Segmentation", tabName = "segmentation", icon=icon("images")),
+      menuItem("Select your results", tabName = "image", icon=icon("file-import")),
+      menuItem("Plot to image", tabName = "plotToImage", icon = icon("poll")),
+      menuItem("Image to plot", tabName = "imageToPlot", icon = icon("image")),
+      menuItem("Annotate your data", tabName = "annotation", icon = icon("edit"))
     )
   ),
   dashboardBody(
@@ -96,7 +80,6 @@ ui <- dashboardPage(
                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                 )
               )),
-            
       tabItem(tabName= "image",
               # Image browser 
               fluidRow(
@@ -109,7 +92,7 @@ ui <- dashboardPage(
                      actionButton("default", "Use default files", 
                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                      verbatimTextOutput("errorDefaultFiles")
-                ),
+                     ),
                 box (width = 12, solidHeader=TRUE, status = "primary",collapsible = TRUE, collapsed=TRUE,
                      title = "Select the different files to use", 
                      helpText("Select the image you want to analyse. (Format .tif)"),
@@ -128,67 +111,17 @@ ui <- dashboardPage(
                      tags$hr(),
                      helpText("Select the zip file containing your ROIs."),
                      fileInput("zipFile", "Choose ROIs .zip file", multiple=FALSE),
-                ),
+                     ),
                 box (width = 12, solidHeader=TRUE, status="primary", collapsible = TRUE, collapsed=TRUE,
                      title = "Combine multiple images", 
                      numericInput("multiImages_nb", "Number of files to use", 1, min=0, max=5, step=1),
                      uiOutput("multiImages_selectors"),
                      verbatimTextOutput("errorMultiImages")
-                )
+                     )
               ),
               actionButton("refresh", "Reset", 
                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
       ),
-      ## Tab Segmentation
-      tabItem(tabName = "seg",
-              fluidRow(
-                column(width = 6,
-                       box(width = NULL, solidHeader = TRUE, status = "primary", title = "Parameters",
-                           helpText("Select the image you want to analyse. (Format .tif)"),
-                           fileInput("seg_imgFile", "Choose Image", multiple = FALSE),
-                           verbatimTextOutput("test"),
-                           uiOutput("seg_channel"),
-                           uiOutput("seg_frame"),
-                           checkboxInput("seg_brightnessImg", "Enhance brightness in image"),
-                           uiOutput("seg_brightnessSlider"),
-                           withSpinner(EBImage::displayOutput("seg_img")),
-                           tags$br(),
-                           radioButtons("seg_algo", "Choose segmentation algorithm : ", choices = c("Watershed", "Cellpose"), selected = "Watershed")
-                                  )
-                              ),
-                column (width=6,
-                        uiOutput("seg_algo_para"),
-                       
-                        box(width = NULL, solidHeader = TRUE, status = "primary", title = "View segmentation",
-                            uiOutput("seg_ws_display"),
-                            uiOutput("seg_cp_display"))
-                        )
-                )
-              ),
-      ## Tab Clustering
-      tabItem(tabName = "clustering",
-              fluidRow(
-                column(width =  6,
-                       box(width =  NULL, solidHeader = TRUE, status = "primary",
-                           title = "DBSCAN clustering", 
-                           helpText("Select DBSCAN parameters : "),
-                           verbatimTextOutput("clustering_advise"),
-                           tags$br(),
-                           sliderInput("eps", "Epsilon (in micron) :", value = "10", min = 0, max = 200, step = 0.1),
-                           sliderInput("mp", "Min Points : ", value = 5, min = 0, max = 100, step = 1),
-                           actionButton("godbs", "Run DBSCAN"), 
-                           plotlyOutput("clustering_plot")
-                       )
-                ),
-                column(width=6,
-                       box(width = NULL, solidHeader = TRUE, status = "primary",
-                           title = "View results",
-                           downloadLink('downloadClusterDataUI','Download'),
-                           tableOutput('clustering_table')
-                       )
-                )
-              )
-              ),
       ## Tab Plot to image 
       tabItem(tabName = "plotToImage",
               fluidRow(
@@ -248,20 +181,20 @@ ui <- dashboardPage(
                       actionLink("plotToImg_downloadDataLink", "Download results"),
                       tags$br(),
                       tags$br(),
-                      tabsetPanel (id="infosGroup", selected="Global",
-                                   tabPanel("Global",
-                                            verbatimTextOutput("plotToImg_groups")
-                                   ),
-                                   tabPanel("Selected", 
-                                            tags$br(),
-                                            verbatimTextOutput("plotToImg_infosSelection"),
-                                            tags$br(),
-                                            tableOutput("plotToImg_tableSelected")
-                                   )
-                                   
-                      )
-                )
+                  tabsetPanel (id="infosGroup", selected="Global",
+                               tabPanel("Global",
+                                        verbatimTextOutput("plotToImg_groups")
+                               ),
+                               tabPanel("Selected", 
+                                        tags$br(),
+                                        verbatimTextOutput("plotToImg_infosSelection"),
+                                        tags$br(),
+                                        tableOutput("plotToImg_tableSelected")
+                               )
+                               
+                  )
               )
+            )
       ),
       ## Tab Image to plot
       tabItem(tabName = "imageToPlot",
@@ -340,8 +273,8 @@ ui <- dashboardPage(
                              verbatimTextOutput("annote_actualValue"),
                              tags$br(),
                              fluidRow(column(6, uiOutput("annote_modifyValue"), uiOutput("annote_inputNewValue")),
-                                      column (6, div(style="display: inline-block;vertical-align:top;",uiOutput("annote_previous")),
-                                              div(style="display: inline-block;vertical-align:top;",uiOutput("annote_next")))),
+                             column (6, div(style="display: inline-block;vertical-align:top;",uiOutput("annote_previous")),
+                                     div(style="display: inline-block;vertical-align:top;",uiOutput("annote_next")))),
                              tags$br(),
                              tags$br(),
                              uiOutput("annote_validateModif"),
@@ -353,15 +286,13 @@ ui <- dashboardPage(
                 )
               )
       )
-      )
-      
     ) 
   )
+)
 
 
 server <- function(input, output, session) {
   
-  #=============================================================================
   ### MENU SEGMENTATION 
   observeEvent(input$refresh, {
     shinyjs::js$refresh()
@@ -370,18 +301,14 @@ server <- function(input, output, session) {
   # Reactive variables
   segmentation <- reactiveValues(ijPath="", fijiPath="", macroPath="", macro2Path="")
   
-  seg <- reactiveValues(imgPath= "", img = list(), nFrame = 1, nChan = 1, resolution = NULL, resize = FALSE, coeff_prop = 1,imgFrame = 1, imgPNG  = NULL, imgToSegment = NULL, mask_cp=NULL, mask_ws= NULL)
-  
   global <- reactiveValues(data = NULL, dataPath = "" , zipPath = "", legendPath="", legend=NULL, imgPath = "", img=list(), zip=NULL, nFrame=1, 
-                           nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
+                          nChan=1, resolution=NULL, resize = FALSE, coeff_prop = 1, xcenters=NULL, ycenters=NULL)
   
   plotToImg <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, imgPNG2=NULL,crops = list(), totalCrops = NULL , subData=NULL, selected=NULL, filtered=NULL)
   
   imgToPlot <- reactiveValues(imgFrame=1, imgChan=1, actualImg=NULL, imgPNG=NULL, selected=NULL)
   
   annote <- reactiveValues(selected = NULL, actual = NULL, index=1, imgChan=1, imgFrame=1, imgPNG=NULL, data=NULL, ID=NULL)
-  
-  clustering <- reactiveValues(imgFrame = 1, imgChan = 1, actualImg = NULL, imgPNG = NULL)
   
   # Roots for shinyfiles chooser
   if (.Platform$OS.type=="unix") {
@@ -601,8 +528,7 @@ server <- function(input, output, session) {
       }
     }, once=TRUE)
   
-  #=============================================================================
-
+  
   ## MENU SELECT YOUR RESULTS
   # Prerequisites button for www files 
   observeEvent(input$help, {
@@ -727,7 +653,7 @@ server <- function(input, output, session) {
     imgToPlot$imgFrame
     annote$imgFrame
   }
-  ,{ 
+    ,{ 
     req(length(global$img) > 0)
     if (global$nFrame > 1) {
       plotToImg$actualImg <- global$img[[plotToImg$imgFrame]]
@@ -740,15 +666,15 @@ server <- function(input, output, session) {
   output$multiImages_selectors <- renderUI ({
     if (input$multiImages_nb > 1) {
       tagList(radioButtons("multiImages_legendSep", label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
-              fileInput("multiImages_legendFile", "Choose legend file", multiple=FALSE), # Only one legend file for all images, they must all have the same legend 
-              lapply(1:input$multiImages_nb, function(i) 
-              { tagList(fileInput(paste0("multiImages_imgFile", i), paste0("Choose image number ", i), multiple=FALSE), # Image input
-                        radioButtons(paste0("multiImages_sep", i), label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
-                        radioButtons(paste0("multiImages_dec", i), label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
-                        checkboxInput(paste0("multiImages_header", i), label = "Header", value = TRUE), 
-                        fileInput(paste0("multiImages_dataFile", i), paste0("Choose data file number ", i), multiple=FALSE), # Data input
-                        fileInput(paste0("multiImages_zipFile", i), paste0("Choose Roi set number ", i), multiple=FALSE),)}), # ROI.zip input
-              actionButton("multiImages_validate", "Combine files", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
+      fileInput("multiImages_legendFile", "Choose legend file", multiple=FALSE), # Only one legend file for all images, they must all have the same legend 
+      lapply(1:input$multiImages_nb, function(i) 
+             { tagList(fileInput(paste0("multiImages_imgFile", i), paste0("Choose image number ", i), multiple=FALSE), # Image input
+                       radioButtons(paste0("multiImages_sep", i), label="Type of separator in the file", choices = c("Tab", "Comma", "Semicolon"), selected="Tab", inline=TRUE),
+                       radioButtons(paste0("multiImages_dec", i), label="Type of decimals in the file", choices = c("Point", "Comma"), selected="Point", inline=TRUE),
+                       checkboxInput(paste0("multiImages_header", i), label = "Header", value = TRUE), 
+                       fileInput(paste0("multiImages_dataFile", i), paste0("Choose data file number ", i), multiple=FALSE), # Data input
+                       fileInput(paste0("multiImages_zipFile", i), paste0("Choose Roi set number ", i), multiple=FALSE),)}), # ROI.zip input
+      actionButton("multiImages_validate", "Combine files", style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
     }
   })
   
@@ -756,7 +682,7 @@ server <- function(input, output, session) {
   
   observeEvent({ 
     input$multiImages_validate
-  }, { 
+    }, { 
     req(input[[paste0("multiImages_imgFile", input$multiImages_nb)]],
         input[[paste0("multiImages_dataFile", input$multiImages_nb)]],
         input[[paste0("multiImages_zipFile", input$multiImages_nb)]],
@@ -828,260 +754,7 @@ server <- function(input, output, session) {
       })
     }
   })
-
-  #=============================================================================
   
-  ## MENU SEGMENTATION
-  # store the path of the image file in a variable
-  observeEvent(eventExpr= input$seg_imgFile, handlerExpr = { seg$imgPath <- input$seg_imgFile$datapath }, label = "files")
-  
-  # read image and resize it if necessary
-  observeEvent({seg$imgPath},
-               {req(seg$imgPath)
-                 if ((dim(read_tif(seg$imgPath)))[4] ==1) {
-                   seg$img <- read_tif(seg$imgPath)
-                   seg$img <- as_EBImage(seg$img)
-                   EBImage::colorMode(seg$img) <- "Grayscale"
-                   seg$nChan <- dim(seg$img)[3]
-                   seg$resolution <- attr(read_tif(seg$imgPath), "x_resolution")
-                   if (dim(seg$img)[1] > 1024 | dim(seg$img)[2] > 1024) { # if the image is too big (more than 1024*1024), resize it proportionaly
-                     seg$coeff_prop <- 1024/max(dim(seg$img)[1], dim(seg$img)[2])  # the highest dimension is resized to 1024
-                     seg$img <- EBImage::resize(seg$img, dim(seg$img)[1] * seg$coeff_prop, dim(seg$img)[2]*seg$coeff_prop) # resize the image
-                     seg$resize <- TRUE
-                     seg$resolution <- seg$resolution*seg$coeff_prop # adapt the resolution
-                   }
-                 }
-                 else if ((dim(read_tif(seg$imgPath)))[4] > 1)  { # If multiple frame
-                   seg$nFrame <- (dim(read_tif(seg$imgPath)))[4] # number of frames on the image
-                   seg$resolution <- attr(read_tif(seg$imgPath, frames=1), "x_resolution") # resolution of the image (number of microns corresponding to 1 pixel)
-                   for (i in c(1:seg$nFrame)) { # for any frame of the image
-                     seg$img[[i]] <- read_tif(seg$imgPath, frames=i) # store each frame as an element of a list
-                     seg$img[[i]] <- as_EBImage(seg$img[[i]]) # and transform it in a EBImage object
-                     EBImage::colorMode(seg$img[[i]]) <- "Grayscale"
-                     if (dim(seg$img[[i]])[1] > 1024 | dim(seg$img[[i]])[2] > 1024) { # if the image is too big (more than 1024*1024), resize it proportionaly
-                       seg$coeff_prop <- 1024/max(dim(seg$img[[i]])[1], dim(seg$img[[i]])[2]) # the highest dimension is resized to 1024
-                       seg$img[[i]] <- EBImage::resize(seg$img[[i]], dim(seg$img[[i]])[1]* seg$coeff_prop, dim(seg$img[[i]])[2]*seg$coeff_prop) # resize the image
-                       seg$resize <- TRUE
-                     }
-                   }
-                   if (seg$resize == TRUE) {
-                     seg$resolution <- seg$resolution*seg$coeff_prop # adapt the global resolution of the image
-                   }
-                   seg$nChan <- dim(seg$img[[1]])[3] # number of channel on the image
-                 }
-               })
-  # Observer which modify the actual image of each menu depending on the actual frame selected
-  
-  observe({req(input$seg_imgFile)
-    if (seg$nFrame > 1) {
-      seg$actualImg <- seg$img[[seg$imgFrame]]
-    }
-    else {
-      seg$actualImg <- seg$img
-    }
-  })
-  
-  observeEvent( {
-    seg$imgFrame
-  }
-  ,{
-    req(length(seg$img) > 0)
-    if (seg$nFrame > 1) {
-      seg$actualImg <- seg$img[[seg$imgFrame]]
-    }
-  })
-  
-  # UI to choose channel to display for the image
-  output$seg_channel <- renderUI({
-    req(length(seg$img) != 0)
-    radioGroupButtons(inputId = "seg_channel_in", label = "Channel to segment", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE)
-  })
-  
-  # # Modification of channel when modification of channel slider
-  observeEvent(eventExpr=input$seg_channel_in,
-               handlerExpr={seg$imgChan = as.numeric(input$seg_channel_in)})
-  
-  
-  # UI to choose slice to display
-  output$seg_frame <- renderUI ({
-    req(length(seg$img) != 0, seg$nFrame > 1)
-    radioGroupButtons(inputId = "seg_frame_in", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE)
-  })
-  
-  # Modification of frame when modification of frame slider
-  observeEvent(eventExpr=input$seg_frame_in,
-               handlerExpr={
-                 if (seg$nFrame > 1) {
-                   seg$imgFrame <- as.numeric(input$seg_frame_in)
-                   seg$imgChan <- as.numeric(input$seg_channel_in)
-                 }
-               })
-  
-  # Brightness slider
-  output$seg_brightnessSlider <- renderUI ({
-    if (input$seg_brightnessImg) {
-      sliderInput("seg_brightnessRate", "% of initial brightness", min=100, max=500, value=100)
-    }
-  })
-  
-  # PNG Image
-  observeEvent(eventExpr= {
-    input$seg_imgFile
-    input$seg_channel_in
-    input$seg_frame_in
-    seg$imgFrame
-    seg$imgChan
-    input$seg_brightnessRate
-    input$seg_brightnessImg
-    #seg$actualImg
-  },
-  handlerExpr= 
-    { if ((length(seg$img) != 0)) {
-      req(seg$actualImg)
-      out <- tempfile(fileext='.png') # temporary png file
-      png(out, height=dim(seg$actualImg)[2], width=dim(seg$actualImg)[1]) # creates a png image in this temporary file with the same dimensions as the global image
-      seg$prevImg <- seg$actualImg[,,seg$imgChan,1]
-      if (input$seg_brightnessImg==TRUE) {
-        req(input$seg_brightnessRate)
-        seg$prevImg <- magick::image_read(seg$actualImg[,,seg$imgChan,1])
-        seg$prevImg <- magick::image_modulate(seg$prevImg,saturation=100,
-                                              brightness = as.numeric(input$seg_brightnessRate),
-                                              hue=100)
-        seg$prevImg <- magick::as_EBImage(seg$prevImg)
-      }
-      display(seg$prevImg, method="raster") # display actual image
-      width = 1
-      dev.off() # end modification of the png file
-      out <- normalizePath(out, "/") # normalize path
-      seg$imgPNG <- EBImage::readImage(out) # read the PNG image
-    }}, ignoreNULL=FALSE)
-  
-  observeEvent(eventExpr =
-                 {seg$imgPNG},
-               handlerExpr = {
-                 output$seg_img <- EBImage::renderDisplay({
-                   req(!is.null(seg$imgPNG))
-                   EBImage::display(seg$imgPNG, method = 'browser')
-                 })
-               })
-  
-  observe({req(seg$actualImg)
-    if (input$seg_algo== "Watershed"){
-      output$seg_algo_para <- renderUI(
-        tagList(
-          box(width= NULL,solidHeader = TRUE, status = "primary", title = "Watershed segmentation parameters",
-              sliderInput("seg_sigma", "Standard deviation for gaussian filter : ", value = 2, min = 0, max = 20, step = 0.1),
-              sliderInput("seg_threshold","Threshold : ", value = 25, min = 0, max = 100, step = 0.1 ),
-              sliderInput("seg_min_size","Size of the smallest allowable object : ", value = 45, min = 0, max = 200, step = 0.1 ),
-              actionButton("seg_ws","Run segmentation")
-          )
-
-      )
-      )
-    }
-    else {
-      output$seg_algo_para <- renderUI(
-        tagList(
-          box(width = NULL, solidHeader = TRUE, status = "primary", title = "Cellpose segmentation parameter",
-          selectInput("seg_cp_mode","Select cellpose model : ", choices = list("nuclei segmentation" = 'nuclei', "cytoplasm segmentation" = 'cyto'), selected = 'cyto'),
-          actionButton("seg_cp","Run segmentation")
-        )
-        )
-      )
-    }
-    })
-
-  observeEvent(eventExpr = input$seg_imgFile,
-               handlerExpr = output$test <- renderText(paste(as.character(dim(seg$imgToSegment))))
-               )
-
-
-  observeEvent(eventExpr= {
-    input$seg_imgFile
-    input$seg_channel_in
-    input$seg_frame_in
-    seg$imgFrame
-    seg$imgChan
-    #seg$img
-  },
-  handlerExpr={
-    req(seg$imgPath, seg$imgChan, seg$nFrame)
-    if(seg$nFrame > 1) {
-      img <- read_tif(seg$imgPath)
-      mask <- aperm(img, c(3,4,2,1))
-      seg$imgToSegment <- mask[seg$imgChan,,,] # Z Y X
-    }
-    else if (seg$nFrame==1){
-      img <- read_tif(seg$imgPath)
-      mask <- aperm(img, c(3,4,2,1))
-      seg$imgToSegment <- img[1,seg$imgChan,,] # Y X
-    }
-    }
-  )
-
-  observeEvent(eventExpr = {input$seg_cp},
-               handlerExpr = {req(input$seg_cp,input$seg_cp_mode)
-                 if (seg$nFrame == 1){
-                 mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode, FALSE)
-                 rois_cp <- ROIS_archive()
-                 }
-                 else {mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
-                 }
-                 }
-               )
-  
-  
-  observeEvent(eventExpr =  )
-  # 
-  # observeEvent(eventExpr = {input$seg_ws},
-  #              handlerExpr = {req(input$seg_ws,input$seg_sigma,input$seg_threshold,input$seg_min_size)
-  #                mask_ws <- segment_watershed(seg$imgPNG,input$seg_sigma,input$seg_threshold,input$seg_min_size)
-  #              })
-  
-
-
-  
-  #=============================================================================
-  
-  ### MENU CLUSTERING
-  
-  dbs <- eventReactive(input$godbs,{
-    fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps*global$resolution, MinPts = input$mp)$cluster
-  })
-  
-  observe({req(input$godbs)
-    df = data.frame(global$xcenters,global$ycenters)
-    d = dbscan::kNNdist(df, k = 3, all = TRUE)
-    mean_dist = mean(d)
-    deviation = sd(d)
-    output$clustering_advise <- renderText({paste("Average distance to the 3 nearest neighbors : ", round(mean_dist,3), "     ", "Standard deviation", round(deviation,3))})
-  })
-  
-  output$clustering_plot <- renderPlotly({
-    dbr <-dbs()
-    gg <- ggplot(data=global$data) + geom_point(aes_string(x=global$xcenters, y = global$ycenters, customdata = "ID", color = factor(dbr)))
-  })
-  
-  observeEvent(eventExpr = input$godbs,
-               handlerExpr = {
-                 Cluster <- as.integer(fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps*global$resolution, MinPts = input$mp)$cluster)
-                 cluster_data <- cbind(global$data,Cluster)
-                 
-                 #Link to download data with the new corrected column
-                 output$downloadClusterDataUI <- downloadHandler(
-                   filename = function() {
-                     paste("data_cluster_", Sys.Date(), ".txt", sep="")
-                   },
-                   content = function(file) {
-                     write.table(cluster_data, file, row.names = FALSE)
-                   }
-                 )
-                 
-                 output$clustering_table <- renderTable({cluster_data})
-               })
-  
-  
-  #=============================================================================
   
   ## MENU PLOT TO IMAGE
   # Filtering Plot
@@ -1135,7 +808,7 @@ server <- function(input, output, session) {
     else {
       1
     }
-  })
+    })
   
   
   # Plot with selected variables (histogram if one variable selected, scatter plot if two)
@@ -1243,7 +916,7 @@ server <- function(input, output, session) {
   ## Multi filtering
   plotToImgFilter_multiSelect <- reactiveValues(indiv=c(), totale=c(), final = c(), nSel = 0) 
   # indiv = actual selection / totale = concate the indiv selection when validate actual clicked / final = totale selection when validate final / nSel = number of individual selection made
-  
+
   
   output$plotToImgFilter_validateSelection <- renderUI ({
     req(filterSelected(), nrow(plotToImg$filtered)==0)
@@ -1268,7 +941,7 @@ server <- function(input, output, session) {
       actionLink("plotToImgFilter_reset", "Reset selection")
     }
   })
-  
+
   observeEvent(eventExpr= {
     input$plotToImgFilter_nextSelection
   }, handlerExpr = {
@@ -1295,8 +968,8 @@ server <- function(input, output, session) {
                  plotToImgFilter_multiSelect$final <- NULL
                  plotToImgFilter_multiSelect$nSel <- 0
                  plotToImg$filtered <- NULL
-               })
-  
+                 })
+
   
   ## Interactive plot
   # UI for choosing variables to display 
@@ -1341,7 +1014,7 @@ server <- function(input, output, session) {
       10
     }
   })
-  
+
   
   ## Variables to change shape of the points 
   # UI Output for the names of the columns used for the shape of the point
@@ -1362,7 +1035,7 @@ server <- function(input, output, session) {
       as.numeric(input[[paste0("plotToImg_threshold", i)]]) })
   }) 
   
-  
+
   # Sliders input for threshold
   output$plotToImg_shapeThreshold <- renderUI({
     req(!is.null(global$data), !is.null(input$plotToImg_colShape))
@@ -1373,7 +1046,7 @@ server <- function(input, output, session) {
           sliderInput(inputId = paste0("plotToImg_threshold", i), label = paste("Threshold for shape change (parameter ", input$plotToImg_colShape[[i]], ")"),
                       min = min(global$data[input$plotToImg_colShape[[i]]]), max = max(global$data[input$plotToImg_colShape[[i]]]), value = mean(global$data[input$plotToImg_colShape[[i]]]))
         }),
-        actionLink("plotToImg_validateThreshold", "Validate threshold(s)"))
+      actionLink("plotToImg_validateThreshold", "Validate threshold(s)"))
     }
   })
   
@@ -1413,13 +1086,13 @@ server <- function(input, output, session) {
     handlerExpr = { 
       req((!is.null(global$data)), (!is.null(input$plotToImg_colsX)), (!is.null(input$plotToImg_colsY)))
       if (nrow(data.frame(global$data$ID[global$data$ID %in% plotToImg$filtered$ID]))>0) {
-        # Dataframe which will contain datas to plot depending on selected cells on filtering plot
-        plotToImg$subData <- data.frame(global$data$ID[global$data$ID %in% plotToImg$filtered$ID])
-        plotToImg$subData$color <- "R0"
-        colnames(plotToImg$subData) <- c("ID","color")
-        plotToImg$subData$shape <- "No threshold"
-        plotToImg$subData[input$plotToImg_colsX] <- global$data[input$plotToImg_colsX][global$data$ID %in% plotToImg$filtered$ID,]
-        plotToImg$subData[input$plotToImg_colsY] <- global$data[input$plotToImg_colsY][global$data$ID %in% plotToImg$filtered$ID,]
+          # Dataframe which will contain datas to plot depending on selected cells on filtering plot
+          plotToImg$subData <- data.frame(global$data$ID[global$data$ID %in% plotToImg$filtered$ID])
+          plotToImg$subData$color <- "R0"
+          colnames(plotToImg$subData) <- c("ID","color")
+          plotToImg$subData$shape <- "No threshold"
+          plotToImg$subData[input$plotToImg_colsX] <- global$data[input$plotToImg_colsX][global$data$ID %in% plotToImg$filtered$ID,]
+          plotToImg$subData[input$plotToImg_colsY] <- global$data[input$plotToImg_colsY][global$data$ID %in% plotToImg$filtered$ID,]
       }
       else { # if no filtering : all cells 
         plotToImg$subData <- data.frame(global$data$ID)
@@ -1482,7 +1155,7 @@ server <- function(input, output, session) {
                           tags$br(),
                           downloadLink("plotToImg_downloadSummarySubdata", "Download summary of selected data"),
                           easyClose = FALSE
-    ))
+                          ))
   })
   
   # New names for groups in downloaded files
@@ -1490,11 +1163,11 @@ server <- function(input, output, session) {
     req(input$plotToImgDownload_modifyNames, plotToImg$subData)
     groups <- unique(plotToImg$subData$color)
     tagList(
-      lapply(groups, function(i) {
-        textInput(paste0("plotToImgDownload_inputNewName", i), paste0("New name for ", i))
-      }),
-      actionButton("plotToImgDownload_validateNewNames", "Validate new names", 
-                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+    lapply(groups, function(i) {
+      textInput(paste0("plotToImgDownload_inputNewName", i), paste0("New name for ", i))
+    }),
+    actionButton("plotToImgDownload_validateNewNames", "Validate new names", 
+                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     )
   })
   
@@ -1513,7 +1186,7 @@ server <- function(input, output, session) {
                  removeUI(selector = "#plotToImgDownload_inputNewNames")
                  groups <- unique(plotToImg$subData$color)
                  lapply(groups, function(i) {
-                   plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,2]==i] <- input[[paste0("plotToImgDownload_inputNewName", i)]]
+                     plotToImgDownload$groupNames[,2][plotToImgDownload$groupNames[,2]==i] <- input[[paste0("plotToImgDownload_inputNewName", i)]]
                  })
                })
   
@@ -1584,12 +1257,12 @@ server <- function(input, output, session) {
         }
       }
       nCell <- paste0("Number of cells in ",i, " : ",length(plotToImg$subData$ID[plotToImg$subData$color==i]), ", ", 
-                      round(100*(length(plotToImg$subData$ID[plotToImg$subData$color==i])/nrow(global$data)), 2)," percent of the cells. ", str_sub(shapes, 3, -1))
+                     round(100*(length(plotToImg$subData$ID[plotToImg$subData$color==i])/nrow(global$data)), 2)," percent of the cells. ", str_sub(shapes, 3, -1))
       groups <- c(nCell, groups)
     }
     paste0(groups, "\n")
   })
-  
+
   ## Interactive plot 
   observeEvent(eventExpr= {plotToImg$subData
     input$plotToImg_colorType
@@ -1700,14 +1373,14 @@ server <- function(input, output, session) {
       numericInput("plotToImg_specificFrame", "Slice number :", value=1, min=1, max=global$nFrame, step=1)
     }
   })
-  
+
   # Render UI -> if multiple selection, choose to associate color with selections or with the position of the plot lines (quadrants)
   output$plotToImg_colorType <- renderUI({
     if (input$plotToImg_selectionType=="Multiple selection") {
       checkboxInput("plotToImg_colorType", "Associate colors with different selections", value=TRUE)
     }
   })
-  
+
   # Reactive values for multiple selection (indiv = actual, total = all the multiple selection, indice = number of selections)
   plotToImg_multiSelect <- reactiveValues(indiv = c(), total=c(), indice=0)
   
@@ -1743,18 +1416,18 @@ server <- function(input, output, session) {
   
   # Save cells selected on totale value when Validate button pushed
   observeEvent(eventExpr={input$plotToImg_nextSel},
-               handlerExpr={
-                 if (plotToImg_multiSelect$indice < 4) { # maximum 5 selections
-                   plotToImg_multiSelect$indice <- plotToImg_multiSelect$indice + 1
-                   if (!is.null(input$plotToImg_colorType) & input$plotToImg_colorType==TRUE) {
-                     for (i in unique(plotToImg_multiSelect$indiv)) {
-                       plotToImg$subData$color[plotToImg$subData$ID == i] <- paste0("R", plotToImg_multiSelect$indice,"_multiselect")
-                     } # modify the color attribute depending on the index of the selection
-                   }
-                   plotToImg_multiSelect$total <- c(plotToImg_multiSelect$total, plotToImg_multiSelect$indiv) # add indiv selection to total selection
-                   plotToImg_multiSelect$indiv <- c() # reinitialize indiv selection
-                 }
-               })
+    handlerExpr={
+      if (plotToImg_multiSelect$indice < 4) { # maximum 5 selections
+        plotToImg_multiSelect$indice <- plotToImg_multiSelect$indice + 1
+        if (!is.null(input$plotToImg_colorType) & input$plotToImg_colorType==TRUE) {
+          for (i in unique(plotToImg_multiSelect$indiv)) {
+            plotToImg$subData$color[plotToImg$subData$ID == i] <- paste0("R", plotToImg_multiSelect$indice,"_multiselect")
+          } # modify the color attribute depending on the index of the selection
+        }
+        plotToImg_multiSelect$total <- c(plotToImg_multiSelect$total, plotToImg_multiSelect$indiv) # add indiv selection to total selection
+        plotToImg_multiSelect$indiv <- c() # reinitialize indiv selection
+      }
+    })
   
   # Remove all selections when reset button pushed
   observeEvent(eventExpr = {
@@ -1807,8 +1480,8 @@ server <- function(input, output, session) {
   # When button validate the quadrants and annote your datas is pushed, add a gate column to the file and go to tabItem annotation
   observeEvent(input$plotToImg_validateAndAnnote,
                { global$data$gate <- "R0"
-               global$data$gate[global$data$ID %in% plotToImg$subData$ID] <- plotToImg$subData$color
-               updateTabItems(session, "menu", selected="annotation")})
+                 global$data$gate[global$data$ID %in% plotToImg$subData$ID] <- plotToImg$subData$color
+                 updateTabItems(session, "menu", selected="annotation")})
   
   # Update tabset panel : go to panel "Selected" instead of groups when there is a selection
   observeEvent(eventExpr={plotToImg$selected}, 
@@ -1880,30 +1553,30 @@ server <- function(input, output, session) {
     if (!is.null(input$plotToImg_displayImg)) {
       if (input$plotToImg_displayImg==TRUE) {
         tagList( 
-          box( width=NULL, 
-               title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
-               tags$h5(tags$strong("Channel legend : ")),
-               tableOutput("plotToImg_legend"),
-               checkboxInput("plotToImg_overlay", "Overlay channels (up to 3)"),
-               uiOutput("plotToImg_channelOverlay"),
-               tags$h5(tags$strong("Color legend : ")), 
-               tableOutput("plotToImg_colorLegend"),
-               actionButton("plotToImg_modifyColorLegend", "Modify color legend"),
-               uiOutput("plotToImg_colorLegendChoice")
-          ),
-          box( width=NULL, 
-               title = "Image display", solidHeader= TRUE, status = "primary",
-               checkboxInput("plotToImg_ids", "Display IDs"),
-               withSpinner(
-                 EBImage::displayOutput("plotToImg_zoomImg", width = "100%", height = "800px")
-               ),
-               uiOutput("plotToImg_channel"),
-               uiOutput("plotToImg_frame"),
-               checkboxInput("plotToImg_addBrightness", "Enhance brightness in image"),
-               uiOutput("plotToImg_brightnessSlider"),
-               checkboxInput("plotToImg_modifyThickness", "Increase thickness of contours"), 
-               uiOutput("plotToImg_thicknessSlider")
-          ))
+             box( width=NULL, 
+             title = "Legends", solidHeader= TRUE, status = "primary", collapsible = TRUE,
+             tags$h5(tags$strong("Channel legend : ")),
+             tableOutput("plotToImg_legend"),
+             checkboxInput("plotToImg_overlay", "Overlay channels (up to 3)"),
+             uiOutput("plotToImg_channelOverlay"),
+             tags$h5(tags$strong("Color legend : ")), 
+             tableOutput("plotToImg_colorLegend"),
+             actionButton("plotToImg_modifyColorLegend", "Modify color legend"),
+             uiOutput("plotToImg_colorLegendChoice")
+        ),
+        box( width=NULL, 
+             title = "Image display", solidHeader= TRUE, status = "primary",
+             checkboxInput("plotToImg_ids", "Display IDs"),
+             withSpinner(
+               EBImage::displayOutput("plotToImg_zoomImg", width = "100%", height = "800px")
+             ),
+             uiOutput("plotToImg_channel"),
+             uiOutput("plotToImg_frame"),
+             checkboxInput("plotToImg_addBrightness", "Enhance brightness in image"),
+             uiOutput("plotToImg_brightnessSlider"),
+             checkboxInput("plotToImg_modifyThickness", "Increase thickness of contours"), 
+             uiOutput("plotToImg_thicknessSlider")
+        ))
       } 
     }
   )
@@ -1985,30 +1658,30 @@ server <- function(input, output, session) {
     plotToImg$actualImg},
     handlerExpr = {
       req(input$plotToImg_displayImg, plotToImg$actualImg, !is.null(input$plotToImg_redOverlay), !is.null(input$plotToImg_greenOverlay), !is.null(input$plotToImg_blueOverlay))
-      if (input$plotToImg_redOverlay!="None") {
-        plotToImg_overlays$redChan <- as.numeric(input$plotToImg_redOverlay)
-        plotToImg_overlays$red <- plotToImg$actualImg[,,plotToImg_overlays$redChan,1]
-      }
-      else {
-        plotToImg_overlays$redChan <- NULL
-        plotToImg_overlays$red <- NULL
-      }
-      if (input$plotToImg_greenOverlay!="None") {
-        plotToImg_overlays$greenChan <- as.numeric(input$plotToImg_greenOverlay)
-        plotToImg_overlays$green <- plotToImg$actualImg[,,plotToImg_overlays$greenChan,1]
-      }
-      else {
-        plotToImg_overlays$greenChan <- NULL
-        plotToImg_overlays$green <- NULL
-      }
-      if (input$plotToImg_blueOverlay!="None") {
-        plotToImg_overlays$blueChan <- as.numeric(input$plotToImg_blueOverlay)
-        plotToImg_overlays$blue <- plotToImg$actualImg[,,plotToImg_overlays$blueChan,1]
-      }
-      else {
-        plotToImg_overlays$blueChan <- NULL
-        plotToImg_overlays$blue <- NULL
-      }
+        if (input$plotToImg_redOverlay!="None") {
+          plotToImg_overlays$redChan <- as.numeric(input$plotToImg_redOverlay)
+          plotToImg_overlays$red <- plotToImg$actualImg[,,plotToImg_overlays$redChan,1]
+        }
+        else {
+          plotToImg_overlays$redChan <- NULL
+          plotToImg_overlays$red <- NULL
+        }
+        if (input$plotToImg_greenOverlay!="None") {
+          plotToImg_overlays$greenChan <- as.numeric(input$plotToImg_greenOverlay)
+          plotToImg_overlays$green <- plotToImg$actualImg[,,plotToImg_overlays$greenChan,1]
+        }
+        else {
+          plotToImg_overlays$greenChan <- NULL
+          plotToImg_overlays$green <- NULL
+        }
+        if (input$plotToImg_blueOverlay!="None") {
+          plotToImg_overlays$blueChan <- as.numeric(input$plotToImg_blueOverlay)
+          plotToImg_overlays$blue <- plotToImg$actualImg[,,plotToImg_overlays$blueChan,1]
+        }
+        else {
+          plotToImg_overlays$blueChan <- NULL
+          plotToImg_overlays$blue <- NULL
+        }
     })
   
   # Modify the final image when the values are choosen 
@@ -2219,20 +1892,18 @@ server <- function(input, output, session) {
   
   # reactive value of the centers of each cell
   observeEvent( global$zip,
-                { req(global$zip)
-                  for (i in 1:length(global$zip)) { # For each ROI, determine its center 
-                    global$xcenters <- c(global$xcenters, round(max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
-                    global$ycenters <- c(global$ycenters, round(max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
-                  }
-                })
+               { req(global$zip)
+                 for (i in 1:length(global$zip)) { # For each ROI, determine its center 
+                   global$xcenters <- c(global$xcenters, round(max(global$zip[[i]]$coords[,1])+min(global$zip[[i]]$coords[,1]))/2)
+                   global$ycenters <- c(global$ycenters, round(max(global$zip[[i]]$coords[,2])+min(global$zip[[i]]$coords[,2]))/2)
+                 }
+               })
   
   # Zoom displayer -> Image PNG in a displayer
   output$plotToImg_zoomImg <- EBImage::renderDisplay({
     req(input$plotToImg_displayImg, plotToImg$imgPNG2)
     EBImage::display(plotToImg$imgPNG2, method = 'browser')
   })
-  
-  #=============================================================================
   
   ## MENU IMAGE TO PLOT
   # Legend of the channels
@@ -2277,7 +1948,7 @@ server <- function(input, output, session) {
   # Brightness slider
   output$imgToPlot_brightnessSlider <- renderUI ({
     if (input$imgToPlot_brightnessImg) {
-      sliderInput("imgToPlot_brightnessRate", "% of initial brightness", min=100, max=500, value=100)
+        sliderInput("imgToPlot_brightnessRate", "% of initial brightness", min=100, max=500, value=100)
     }
   })
   
@@ -2449,10 +2120,10 @@ server <- function(input, output, session) {
         helpText("Make a selection on the image, click on the validate actual selection button to record it, your selection will change color and make an other selection. 
                  When you have finish all your selections, click on the validate final selection and see it on the plot."),
         actionButton("imgToPlot_nextSelection", "Validate actual selection and select an other", 
-                     style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+        style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
         if (imgToPlot_multiSelect$nSel > 1) {
           actionButton("imgToPlot_validateSelection", "Validate final selection", 
-                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
         },
         tags$br()
       )
@@ -2561,8 +2232,7 @@ server <- function(input, output, session) {
       1
     }
   })
-  
-  #=============================================================================
+
   
   ### MENU ANNOTATIONS 
   # Choice of the variable to annotate
@@ -2684,23 +2354,23 @@ server <- function(input, output, session) {
       radioButtons("annote_idSelectionType", "Type of selection", choices=c("Select one or more ID(s)", "Select ID n -> m"))
     }
   })
-  
+
   # Choosers for the IDs 
-  output$annote_idSelection <- renderUI({
-    req(!is.null(input$annote_selectionType), !is.null(input$annote_idSelectionType), input$annote_selectionType == "Select ROI(s) with their ID")
-    if (input$annote_idSelectionType == "Select one or more ID(s)") { # If one or more IDs selected, selectizeInput in which the user can selected one or more IDs
-      tagList(selectizeInput("annote_selectID", "Select the ID to use", choices=global$data$ID, multiple=TRUE),
-              actionLink("annote_validateIDselection", "Validate IDs"))
-    }
-    else if (input$annote_idSelectionType == "Select ID n -> m") { # If a series of IDs, numeric input in which the user choose the beginning and the end of the sequence
-      tagList(
-        numericInput("annote_nIDselection", "Select the number of the first ID to use (n in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
-        numericInput("annote_mIDselection", "Select the number of the last ID to use (m in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
-        actionLink("annote_validateIDselection", "Validate IDs")
-      )
-    }
-  })
-  
+   output$annote_idSelection <- renderUI({
+     req(!is.null(input$annote_selectionType), !is.null(input$annote_idSelectionType), input$annote_selectionType == "Select ROI(s) with their ID")
+     if (input$annote_idSelectionType == "Select one or more ID(s)") { # If one or more IDs selected, selectizeInput in which the user can selected one or more IDs
+       tagList(selectizeInput("annote_selectID", "Select the ID to use", choices=global$data$ID, multiple=TRUE),
+               actionLink("annote_validateIDselection", "Validate IDs"))
+     }
+     else if (input$annote_idSelectionType == "Select ID n -> m") { # If a series of IDs, numeric input in which the user choose the beginning and the end of the sequence
+       tagList(
+         numericInput("annote_nIDselection", "Select the number of the first ID to use (n in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
+         numericInput("annote_mIDselection", "Select the number of the last ID to use (m in n -> m)", value=1, min=1, max=length(global$data$ID), step=1),
+         actionLink("annote_validateIDselection", "Validate IDs")
+       )
+     }
+   })
+
   # Save the IDs selected 
   observeEvent(eventExpr=input$annote_validateIDselection,
                handlerExpr={
@@ -2785,7 +2455,7 @@ server <- function(input, output, session) {
       }
     }
   })
-  
+
   # Print the selected cells 
   output$annote_selection <- renderPrint({
     annote_selected()
@@ -2803,21 +2473,21 @@ server <- function(input, output, session) {
                   {input$annote_validateSelection},
                 handlerExpr = 
                   {annote$selected <- annote_selected()$ID # cells to annotate
-                  annote$index <- 1 # initialize index of the actual cell to annotate 
-                  annote$actualID <- annote$selected[annote$index] # actual cell to annotate
-                  annote$imgFrame <- global$data$Slice[global$data$ID==annote$actualID] # slice of the actual cell 
-                  annote$data <- data.frame(annote$selected) # annotated data
-                  colnames(annote$data) <- c("ID")
-                  if (!is.null(global$data[input$annote_variable])) {
-                    annote$data[paste0("corrected_", input$annote_variable)] <- global$data[input$annote_variable][global$data$ID %in% annote$selected,]
-                  } # creates a "corrected" column in the data 
-                  output$annote_validateModif <- renderUI ({
-                    actionButton("annote_validateModif", "Validate modifications", 
-                                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                  })
+                   annote$index <- 1 # initialize index of the actual cell to annotate 
+                   annote$actualID <- annote$selected[annote$index] # actual cell to annotate
+                   annote$imgFrame <- global$data$Slice[global$data$ID==annote$actualID] # slice of the actual cell 
+                   annote$data <- data.frame(annote$selected) # annotated data
+                   colnames(annote$data) <- c("ID")
+                   if (!is.null(global$data[input$annote_variable])) {
+                     annote$data[paste0("corrected_", input$annote_variable)] <- global$data[input$annote_variable][global$data$ID %in% annote$selected,]
+                   } # creates a "corrected" column in the data 
+                   output$annote_validateModif <- renderUI ({
+                     actionButton("annote_validateModif", "Validate modifications", 
+                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                   })
                   })
   
-  
+
   # previous button for the cells to annotate 
   output$annote_previous <- renderUI ({
     if (length(annote$selected) != 1 & annote$index > 1) {
@@ -2825,7 +2495,7 @@ server <- function(input, output, session) {
                    style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     }
   })
-  
+
   # next button for the cells to annotate
   output$annote_next <- renderUI ({
     if (length(annote$selected) != 1 & annote$index < length(annote$selected)) {
@@ -2833,7 +2503,7 @@ server <- function(input, output, session) {
                    style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     }
   })
-  
+
   
   # Button to choose channels to overlay
   output$annote_channelOverlay <- renderUI ({
@@ -2855,30 +2525,30 @@ server <- function(input, output, session) {
     annote$actualImg},
     handlerExpr = {
       req(annote$actualImg,!is.null(input$annote_redOverlay), !is.null(input$annote_greenOverlay), !is.null(input$annote_blueOverlay))
-      if (input$annote_redOverlay!="None") {
-        annote_overlays$redChan <- as.numeric(input$annote_redOverlay)
-        annote_overlays$red <- annote$actualImg[,,annote_overlays$redChan,1]
-      }
-      else {
-        annote_overlays$redChan <- NULL
-        annote_overlays$red <- NULL
-      }
-      if (input$annote_greenOverlay!="None") {
-        annote_overlays$greenChan <- as.numeric(input$annote_greenOverlay)
-        annote_overlays$green <- annote$actualImg[,,annote_overlays$greenChan,1]
-      }
-      else {
-        annote_overlays$greenChan <- NULL
-        annote_overlays$green <- NULL
-      }
-      if (input$annote_blueOverlay!="None") {
-        annote_overlays$blueChan <- as.numeric(input$annote_blueOverlay)
-        annote_overlays$blue <- annote$actualImg[,,annote_overlays$blueChan,1]
-      }
-      else {
-        annote_overlays$blueChan <- NULL
-        annote_overlays$blue <- NULL
-      }
+          if (input$annote_redOverlay!="None") {
+            annote_overlays$redChan <- as.numeric(input$annote_redOverlay)
+            annote_overlays$red <- annote$actualImg[,,annote_overlays$redChan,1]
+          }
+          else {
+            annote_overlays$redChan <- NULL
+            annote_overlays$red <- NULL
+          }
+          if (input$annote_greenOverlay!="None") {
+            annote_overlays$greenChan <- as.numeric(input$annote_greenOverlay)
+            annote_overlays$green <- annote$actualImg[,,annote_overlays$greenChan,1]
+          }
+          else {
+            annote_overlays$greenChan <- NULL
+            annote_overlays$green <- NULL
+          }
+          if (input$annote_blueOverlay!="None") {
+            annote_overlays$blueChan <- as.numeric(input$annote_blueOverlay)
+            annote_overlays$blue <- annote$actualImg[,,annote_overlays$blueChan,1]
+          }
+          else {
+            annote_overlays$blueChan <- NULL
+            annote_overlays$blue <- NULL
+          }
     })
   
   
@@ -2966,7 +2636,7 @@ server <- function(input, output, session) {
                      }
                    })
                  })
-  
+
   # Modification of frame when modification of frame slider 
   observeEvent(eventExpr=input$annote_frame,
                handlerExpr={
@@ -2983,8 +2653,8 @@ server <- function(input, output, session) {
   # Text for the value of the actual cell to annotate
   output$annote_actualValue <- renderText ({
     req(length(global$data[input$annote_variable][global$data$ID==annote$actualID,]) != 0)
-    value = global$data[input$annote_variable][global$data$ID==annote$actualID,]
-    paste0("Actual value of ", input$annote_variable, " for ROI ", annote$actualID, " : ", "\n", value)
+      value = global$data[input$annote_variable][global$data$ID==annote$actualID,]
+      paste0("Actual value of ", input$annote_variable, " for ROI ", annote$actualID, " : ", "\n", value)
   })
   
   # Image PNG with the actual cell to annotate highlighted
@@ -3000,46 +2670,46 @@ server <- function(input, output, session) {
                     annote$actualImg
                     input$annote_thicknessRate
                     input$annote_modifyThickness
-                  }, 
+                    }, 
                 handlerExpr = 
                   { if ((length(global$img) != 0) & (length(global$zip)>0)) {
                     req(annote$actualImg)
-                    out3 <- tempfile(fileext='.png') # temporary png file
-                    png(out3, height=dim(annote$actualImg)[2], width=dim(annote$actualImg)[1]) # dimension of the png file
-                    if (input$annote_overlay==TRUE & !is.null(annote_overlays$imgOverlay)) {
-                      annote$prevImg <- annote_overlays$imgOverlay
-                    }
-                    else {
-                      annote$prevImg <- annote$actualImg[,,annote$imgChan,1]
-                    }
-                    if (input$annote_addBrightness==TRUE) {
-                      req(input$annote_brightnessRate)
-                      annote$prevImg <- magick::image_read(annote$actualImg[,,annote$imgChan,1])
-                      annote$prevImg <- magick::image_modulate(annote$prevImg,saturation=100,
-                                                               brightness = as.numeric(input$annote_brightnessRate), 
-                                                               hue=100)
-                      annote$prevImg <- magick::as_EBImage(annote$prevImg)
-                    }
-                    display(annote$prevImg, method = "raster")
-                    if (!is.null(annote$actualID)) {
-                      width = 1
-                      if (input$annote_modifyThickness) {
-                        width = input$annote_thicknessRate
+                      out3 <- tempfile(fileext='.png') # temporary png file
+                      png(out3, height=dim(annote$actualImg)[2], width=dim(annote$actualImg)[1]) # dimension of the png file
+                      if (input$annote_overlay==TRUE & !is.null(annote_overlays$imgOverlay)) {
+                        annote$prevImg <- annote_overlays$imgOverlay
                       }
-                      if (global$nFrame == 1 | (global$nFrame > 1 & input$annote_associate==FALSE)) {
-                        plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) # if only one frame or no association with slice, no need to check if the actual frame is the cells one
+                      else {
+                        annote$prevImg <- annote$actualImg[,,annote$imgChan,1]
                       }
-                      else if (global$nFrame > 1 & input$annote_associate==TRUE) { # if more than one frame and association with slice, check if the cell is on the actual frame or not
-                        if (global$data$Slice[global$data$ID==annote$actualID]==annote$imgFrame) {
-                          plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) 
+                      if (input$annote_addBrightness==TRUE) {
+                        req(input$annote_brightnessRate)
+                        annote$prevImg <- magick::image_read(annote$actualImg[,,annote$imgChan,1])
+                        annote$prevImg <- magick::image_modulate(annote$prevImg,saturation=100,
+                                                                    brightness = as.numeric(input$annote_brightnessRate), 
+                                                                    hue=100)
+                        annote$prevImg <- magick::as_EBImage(annote$prevImg)
+                      }
+                      display(annote$prevImg, method = "raster")
+                      if (!is.null(annote$actualID)) {
+                        width = 1
+                        if (input$annote_modifyThickness) {
+                          width = input$annote_thicknessRate
+                        }
+                        if (global$nFrame == 1 | (global$nFrame > 1 & input$annote_associate==FALSE)) {
+                          plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) # if only one frame or no association with slice, no need to check if the actual frame is the cells one
+                        }
+                        else if (global$nFrame > 1 & input$annote_associate==TRUE) { # if more than one frame and association with slice, check if the cell is on the actual frame or not
+                          if (global$data$Slice[global$data$ID==annote$actualID]==annote$imgFrame) {
+                            plot(global$zip[[annote$actualID]], add=TRUE, col="yellow", lwd=width) 
+                          }
                         }
                       }
+                      dev.off()
+                      out3 <- normalizePath(out3, "/")
+                      annote$imgPNG <- EBImage::readImage(out3)
                     }
-                    dev.off()
-                    out3 <- normalizePath(out3, "/")
-                    annote$imgPNG <- EBImage::readImage(out3)
-                  }
-                  }, ignoreNULL=FALSE)
+                    }, ignoreNULL=FALSE)
   
   # Next button : change the actual cell to the next one to annotate
   observeEvent(eventExpr = input$annote_next,
@@ -3074,12 +2744,12 @@ server <- function(input, output, session) {
                 handlerExpr = {
                   req(input$annote_modifyValue, length(global$data[input$annote_variable][global$data$ID==annote$actualID,]) != 0)
                   output$annote_inputNewValue <- renderUI ({
-                    if (input$annote_modifyValue=="Yes" & !is.null(input$annote_variable)) {
-                      tagList(
-                        textInput("annote_inputNewValue", paste0("Input new value for ", input$annote_variable), ""),
-                        actionButton("annote_validateNewValue", "Ok", 
-                                     style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
-                    }
+                      if (input$annote_modifyValue=="Yes" & !is.null(input$annote_variable)) {
+                        tagList(
+                          textInput("annote_inputNewValue", paste0("Input new value for ", input$annote_variable), ""),
+                          actionButton("annote_validateNewValue", "Ok", 
+                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))
+                      }
                   })
                 }, ignoreNULL=FALSE)
   
@@ -3124,7 +2794,7 @@ server <- function(input, output, session) {
                  )
                  
                })
-
+  
 }
 options(shiny.maxRequestSize = 10000 * 10240 ^ 2)
 shinyApp(ui=ui, server=server)
