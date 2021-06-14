@@ -1,7 +1,7 @@
 # Installation of the necessary packages
 pkg <- c("shiny", "ggplot2", "stringr", "shinydashboard", "shinyFiles", "shinycssloaders", "ijtiff", "RImageJROI", 
          "plotly", "BiocManager", "shinyjs", "V8", "Rcpp", "pillar", "readtext", "magick", "png", "shinyWidgets","fpc",
-         "dbscan","reticulate","htmltools","rlang") # Necessary packages
+         "dbscan","reticulate") # Necessary packages
 
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)) { # If any necessary packages not installed, install them
@@ -30,8 +30,7 @@ library(shinyWidgets)
 library(fpc)
 library(dbscan)
 library(reticulate)
-library(htmltools)
-library(rlang)
+
 np <- import("numpy", convert=FALSE)
 
 # environnment to use
