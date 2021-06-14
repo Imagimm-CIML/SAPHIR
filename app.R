@@ -837,7 +837,7 @@ server <- function(input, output, session) {
   ## MENU SEGMENTATION
   # store the path of the image file in a variable
   observeEvent(eventExpr= input$seg_imgFile, handlerExpr = { seg$imgPath <- input$seg_imgFile$datapath }, label = "files")
-  
+
   # read image and resize it if necessary
   observeEvent({seg$imgPath},
                {req(seg$imgPath)
@@ -873,7 +873,7 @@ server <- function(input, output, session) {
                    seg$nChan <- dim(seg$img[[1]])[3] # number of channel on the image
                  }
                })
-  
+
   # Observer which modify the actual image of each menu depending on the actual frame selected
   observe({req(input$seg_imgFile)
     if (seg$nFrame > 1) {
@@ -883,7 +883,7 @@ server <- function(input, output, session) {
       seg$actualImg <- seg$img
     }
   })
-  
+
   observeEvent( {
     seg$imgFrame
   }
@@ -893,24 +893,24 @@ server <- function(input, output, session) {
       seg$actualImg <- seg$img[[seg$imgFrame]]
     }
   })
-  
+
   # UI to choose channel to display for the image
   output$seg_channel <- renderUI({
     req(length(seg$img) != 0)
     radioGroupButtons(inputId = "seg_channel_in", label = "Channel to segment", choices=c(1:seg$nChan), selected=seg$imgChan, justified=TRUE)
   })
-  
+
   # Modification of channel when modification of channel slider
   observeEvent(eventExpr=input$seg_channel_in,
                handlerExpr={seg$imgChan = as.numeric(input$seg_channel_in)})
-  
-  
+
+
   # UI to choose slice to display
   output$seg_frame <- renderUI ({
     req(length(seg$img) != 0, seg$nFrame > 1)
     radioGroupButtons(inputId = "seg_frame_in", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$imgFrame, justified=TRUE)
   })
-  
+
   # Modification of frame when modification of frame slider
   observeEvent(eventExpr=input$seg_frame_in,
                handlerExpr={
@@ -919,14 +919,14 @@ server <- function(input, output, session) {
                    seg$imgChan <- as.numeric(input$seg_channel_in)
                  }
                })
-  
+
   # Brightness slider
   output$seg_brightnessSlider <- renderUI ({
     if (input$seg_brightnessImg) {
       sliderInput("seg_brightnessRate", "% of initial brightness", min=100, max=500, value=100)
     }
   })
-  
+
   # PNG Image
   observeEvent(eventExpr= {
     input$seg_imgFile
@@ -938,7 +938,7 @@ server <- function(input, output, session) {
     input$seg_brightnessImg
     #seg$actualImg
   },
-  handlerExpr= 
+  handlerExpr=
     { if ((length(seg$img) != 0)) {
       req(seg$actualImg)
       out <- tempfile(fileext='.png') # temporary png file
@@ -958,7 +958,7 @@ server <- function(input, output, session) {
       out <- normalizePath(out, "/") # normalize path
       seg$imgPNG <- EBImage::readImage(out) # read the PNG image
     }}, ignoreNULL=FALSE)
-  
+
   # display image
   observeEvent(eventExpr =
                  {seg$imgPNG},
@@ -968,7 +968,7 @@ server <- function(input, output, session) {
                    EBImage::display(seg$imgPNG, method = 'browser')
                  })
                })
-  
+
   # define watershed and cellpose parameters
   observe({req(seg$actualImg)
     if (input$seg_algo== "Watershed"){
@@ -1020,8 +1020,8 @@ server <- function(input, output, session) {
     }
     }
   )
-  
-  
+
+
   # run cellpose segmentation
   observeEvent(eventExpr = {input$seg_cp},
                handlerExpr = {req(input$seg_cp_mode, seg$maskFrame, !is.null(seg$imgToSegment))
@@ -1031,10 +1031,10 @@ server <- function(input, output, session) {
                  }
                  else {
                    #seg$mask_cp <- segment_cellpose(seg$imgToSegment,input$seg_cp_mode,TRUE)
-                   seg$mask_cp <- np$load("data3D.npy")
+                   seg$mask_cp <- np$load("/home/anna/Documents/cours/M1/Stage/python/data3D_BAND.npy")
                  }
                })
-  
+
   # run watershed segmentation
   observeEvent(eventExpr = {input$seg_ws},
                handlerExpr = {req(input$seg_sigma, input$seg_threshold, input$seg_min_size, seg$maskFrame, !is.null(seg$imgToSegment))
@@ -1044,8 +1044,8 @@ server <- function(input, output, session) {
                  else {
                    seg$mask_ws <- segment_watershed(seg$imgToSegment,input$seg_sigma, input$seg_threshold, input$seg_min_size, do_3d = TRUE)}
                })
-                   
-           
+
+
 
   # Modification of frame when modification of frame slider (mask)
   observeEvent(eventExpr={input$seg_mask_frame_UI},
@@ -1054,7 +1054,7 @@ server <- function(input, output, session) {
         seg$maskFrame <- as.numeric(input$seg_mask_frame_UI)
                  }}
                )
-  
+
   # what to display depending on the segmentation algorithm and the number of frame
   observeEvent(eventExpr = {input$seg_cp},
     handlerExpr = {req(seg$nFrame,input$seg_algo)
@@ -1071,9 +1071,9 @@ server <- function(input, output, session) {
               radioGroupButtons(inputId = "seg_mask_frame_UI", label = "Slice to display", choices=c(1:seg$nFrame), selected=seg$maskFrame, justified=TRUE),
               withSpinner(EBImage::displayOutput("mask_cp_3D")))))
       }})
-    
+
   observeEvent(eventExpr = {input$seg_ws},
-    handlerExpr = {req(seg$nFrame,input$seg_algo)     
+    handlerExpr = {req(seg$nFrame,input$seg_algo)
       if(seg$nFrame == 1){
         output$seg_mask_display <- renderUI(
           tagList(
@@ -1088,7 +1088,7 @@ server <- function(input, output, session) {
               withSpinner(EBImage::displayOutput("mask_ws_3D")))))
       }
     })
-  
+
   observeEvent( {
     seg$maskFrame
   }
@@ -1097,8 +1097,8 @@ server <- function(input, output, session) {
       seg$maskToDisplay <- colorLabels(seg$maskTo[seg$maskFrame,,])
     }
   })
-  
-  
+
+
   # display the segmented mask
   observeEvent(eventExpr = {input$seg_cp},
                handlerExpr = {req( seg$nFrame)
@@ -1163,17 +1163,17 @@ server <- function(input, output, session) {
   else if (.Platform$OS.type=="windows") {
     roots = c(home='C:')
   }
-  
+
   shinyDirChoose(input, 'seg_dir', roots=roots)
-  
-  observeEvent(eventExpr=input$seg_dir, 
+
+  observeEvent(eventExpr=input$seg_dir,
                handlerExpr={
                  seg$Path <- normalizePath(parseDirPath(roots, input$seg_dir), winslash="/")
                  output$seg_path <- renderText({
                      paste("You are going to download files at : ", seg$Path,"/", sep="")
                    })
                }, ignoreNULL=FALSE)
-  
+
   observeEvent(eventExpr = input$seg_download_rois,
                handlerExpr = {
                  if(input$seg_algo== "Cellpose"){
@@ -1191,15 +1191,15 @@ server <- function(input, output, session) {
                      ROIs_archive(seg$mask_ws, seg$Path, input$seg_rois_filename,do_3d=TRUE)
                    }}
                  })
-  
-  
-  observeEvent(eventExpr = {
-    input$seg_cp
-  },
-  handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
-  )
-  
-  # Modification of channel when modification of channel slider 
+
+# 
+#   observeEvent(eventExpr = {
+#     input$seg_cp
+#   },
+#   handlerExpr = output$test <- renderText(paste(class(seg$maskTo)))
+#   )
+
+  # Modification of channel when modification of channel slider
   observeEvent(eventExpr={input$seg_channel1
     input$seg_channel2},
                handlerExpr={
@@ -1226,15 +1226,15 @@ server <- function(input, output, session) {
                  }
                })
 
-  
+
   #=============================================================================
-  
+
   ### MENU CLUSTERING
-  
+
   dbs <- eventReactive(input$godbs,{
     fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps*global$resolution, MinPts = input$mp)$cluster
   })
-  
+
   observe({req(input$godbs)
     df = data.frame(global$xcenters,global$ycenters)
     d = dbscan::kNNdist(df, k = 3, all = TRUE)
@@ -1242,17 +1242,17 @@ server <- function(input, output, session) {
     deviation = sd(d)
     output$clustering_advise <- renderText({paste("Average distance to the 3 nearest neighbors : ", round(mean_dist,3), "     ", "Standard deviation", round(deviation,3))})
   })
-  
+
   output$clustering_plot <- renderPlotly({
     dbr <-dbs()
     gg <- ggplot(data=global$data) + geom_point(aes_string(x=global$xcenters, y = global$ycenters, customdata = "ID", color = factor(dbr)))
   })
-  
+
   observeEvent(eventExpr = input$godbs,
                handlerExpr = {
                  Cluster <- as.integer(fpc::dbscan(data.frame(global$xcenters,global$ycenters),eps = input$eps*global$resolution, MinPts = input$mp)$cluster)
                  cluster_data <- cbind(global$data,Cluster)
-                 
+
                  #Link to download data with the new corrected column
                  output$downloadClusterDataUI <- downloadHandler(
                    filename = function() {
@@ -1262,10 +1262,10 @@ server <- function(input, output, session) {
                      write.table(cluster_data, file, row.names = FALSE)
                    }
                  )
-                 
+
                  output$clustering_table <- renderTable({cluster_data})
                })
-  
+
   
   #=============================================================================
   
