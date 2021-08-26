@@ -66,7 +66,7 @@ def segment_watershed(img, sigma: float = 2.0, threshold: float = 25.0, min_size
         local_maxi = peak_local_max(distance, indices=False, footprint=np.ones((15,15)), labels=mask)
         markers = ndimage.label(local_maxi, structure=np.ones((3, 3)))[0]
         labels = watershed(-distance, markers, mask=mask)
-, 
+ 
     return labels
 
 
