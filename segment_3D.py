@@ -228,25 +228,3 @@ def result_file(mask_label, channel0, channel1, result_path: str = "", filename:
         df.to_csv(result_path + '/' + filename + '.csv', float_format='%.4f',
                   header=['ID', 'Int_TYPE1', 'Area_TYPE1', 'Int_TYPE2_N', 'Area_TYPE1'], index=False, sep='\t')
 
-# img_path = 'mask-19juil05a_12Z.tif'
-# res_watershed = segment_nuclei_watershed(img_path)
-# print(len(np.unique(res_watershed)))
-# print(res_watershed.shape)
-#
-# img_path = 'mask-19juil05a_12Z.tif'
-# res_cellpose = segment_nuclei_cellpose(img_path)
-# print(len(np.unique(res_cellpose)))
-# print(res_cellpose.shape)
-#
-# img_path = 'mask-19juil05a_12Z.tif'
-# #res_cellpose = segment_nuclei_cellpose(img_path)  # 25 min
-# print(len(np.unique(res_cellpose)))
-# print(res_cellpose.shape)
-#
-# img = imread('C3-19juil05a_12Z.tif', as_gray=False, plugin='tifffile')
-# img_label = res_cellpose
-# channel0 = img[:, :, :, 0]  # Z Y X C
-# channel1 = img[:, :, :, 1]
-# result_path = ''
-# filename = 'result_cellpose'
-# res_result = result_file(img_label, channel0, channel1, result_path, filename)
